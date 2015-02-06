@@ -21,9 +21,12 @@ import scala.language.implicitConversions
 
 import com.google.common.io.Files
 import org.apache.hadoop.conf.Configuration
+import org.scalatest.{BeforeAndAfterAll, FunSuite}
+
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
-import org.scalatest.{BeforeAndAfterAll, FunSuite}
+import org.apache.spark.sql._
+import org.apache.spark.sql.catalyst.types.StructField
 
 import com.databricks.examples.redshift.input.RedshiftInputFormat._
 
@@ -110,6 +113,33 @@ class RedshiftInputFormatSuite extends FunSuite with BeforeAndAfterAll {
       val actual = rdd.values.map(_.toSeq).collect()
       assert(actual.size === records.size)
       assert(actual.toSet === records)
+    }
+  }
+
+  test("schema parser") {
+    withTempDir { dir =>
+      val testRecords = Set(
+        Seq("a\n", 1, 1.0),
+        Seq("b", 2, 2.0))
+      val escaped = escape(testRecords.map(_.map(_.toString)), DEFAULT_DELIMITER)
+      writeToFile(escaped, new File(dir, "part-00000"))
+
+      val conf = new Configuration
+      conf.setLong(KEY_BLOCK_SIZE, 4)
+
+      val sqlContext = new SQLContext(sc)
+
+      val srdd = sqlContext.redshiftFile(dir.toString, "name varchar(10) id integer score float")
+      val expectedSchema = StructType(Seq(
+        StructField("name", StringType, nullable = true),
+        StructField("id", IntegerType, nullable = true),
+        StructField("score", DoubleType, nullable = true)))
+      assert(srdd.schema === expectedSchema)
+      val parsed = srdd.map { case Row(name: String, id: Int, score: Double) =>
+        Seq(name, id, score)
+      }.collect().toSet
+
+      assert(parsed === testRecords)
     }
   }
 }
