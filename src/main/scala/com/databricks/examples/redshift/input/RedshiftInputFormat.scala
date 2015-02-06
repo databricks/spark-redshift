@@ -91,8 +91,10 @@ object RedshiftInputFormat {
       val sc = sqlContext.sparkContext
       val rdd = sc.newAPIHadoopFile(path, classOf[RedshiftInputFormat],
         classOf[java.lang.Long], classOf[Array[String]], sc.hadoopConfiguration)
+      // TODO: allow setting NULL string.
+      val nullable = rdd.values.map(_.map(f => if (f.isEmpty) null else f)).map(x => Row(x: _*))
       val schema = StructType(columns.map(c => StructField(c, StringType, nullable = true)))
-      sqlContext.applySchema(rdd.values.map(x => Row(x: _*)), schema)
+      sqlContext.applySchema(nullable, schema)
     }
 
     /**
