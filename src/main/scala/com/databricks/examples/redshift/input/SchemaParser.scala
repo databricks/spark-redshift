@@ -20,6 +20,7 @@ import scala.language.implicitConversions
 import scala.util.parsing.combinator._
 
 import org.apache.spark.sql._
+import org.apache.spark.sql.types._
 
 private[redshift] object SchemaParser extends JavaTokenParsers {
   // redshift data types: http://docs.aws.amazon.com/redshift/latest/dg/c_Supported_data_types.html
@@ -43,7 +44,7 @@ private[redshift] object SchemaParser extends JavaTokenParsers {
     case colName ~ colType => StructField(colName, colType, nullable = true)
   }
   private val structType: Parser[StructType] = structField.* ^^ {
-    case fields => new StructType(fields)
+    case fields => new StructType(fields.toArray)
   }
 
   def parseSchema(schema: String): StructType = {
