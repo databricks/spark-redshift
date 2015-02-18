@@ -44,7 +44,7 @@ private[redshift] object SchemaParser extends JavaTokenParsers {
     case colName ~ colType => StructField(colName, colType, nullable = true)
   }
   private val structType: Parser[StructType] = structField.* ^^ {
-    case fields => new StructType(fields.toArray)
+    case fields => StructType(fields)
   }
 
   def parseSchema(schema: String): StructType = {

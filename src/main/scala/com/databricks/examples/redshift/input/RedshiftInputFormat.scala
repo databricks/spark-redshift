@@ -106,7 +106,7 @@ object RedshiftInputFormat {
       import sqlContext._
       val structType = SchemaParser.parseSchema(schema)
       val casts = structType.fields.map { field =>
-        col(field.name).cast(field.dataType).as(Symbol(field.name))
+        col(field.name).cast(field.dataType).as(field.name)
       }
       redshiftFile(path, structType.fieldNames).select(casts: _*)
     }
