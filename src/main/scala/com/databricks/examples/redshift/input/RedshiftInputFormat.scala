@@ -82,32 +82,36 @@ object RedshiftInputFormat {
    */
   class SQLContextWithRedshiftFile(sqlContext: SQLContext) {
 
+    def defaultConf: Configuration = sqlContext.sparkContext.hadoopConfiguration
+
     /**
      * Read a file unloaded from Redshift into a SchemaRDD.
      * @param path input path
      * @return a SchemaRDD
      */
-    def redshiftFile(path: String, columns: Seq[String]): SchemaRDD = {
+    def redshiftFile(path: String, columns: Seq[String], conf: Configuration): SchemaRDD = {
       val sc = sqlContext.sparkContext
       val rdd = sc.newAPIHadoopFile(path, classOf[RedshiftInputFormat],
-        classOf[java.lang.Long], classOf[Array[String]], sc.hadoopConfiguration)
+        classOf[java.lang.Long], classOf[Array[String]], conf)
       // TODO: allow setting NULL string.
       val nullable = rdd.values.map(_.map(f => if (f.isEmpty) null else f)).map(x => Row(x: _*))
       val schema = StructType(columns.map(c => StructField(c, StringType, nullable = true)))
       sqlContext.applySchema(nullable, schema)
     }
+    def redshiftFile(path: String, columns: Seq[String]): SchemaRDD = redshiftFile(path, columns, defaultConf)
 
     /**
      * Reads a table unload from Redshift with its schema in format "name0 type0 name1 type1 ...".
      */
-    def redshiftFile(path: String, schema: String): SchemaRDD = {
+    def redshiftFile(path: String, schema: String, conf: Configuration): SchemaRDD = {
       import sqlContext._
       val structType = SchemaParser.parseSchema(schema)
       val casts = structType.fields.map { field =>
         field.name.attr.cast(field.dataType).as(Symbol(field.name))
       }
-      redshiftFile(path, structType.fieldNames).select(casts: _*)
+      redshiftFile(path, structType.fieldNames, conf).select(casts: _*)
     }
+    def redshiftFile(path: String, schema: String): SchemaRDD = redshiftFile(path, schema, defaultConf)
   }
 
   implicit def fromSQLContext(sqlContext: SQLContext): SQLContextWithRedshiftFile =
