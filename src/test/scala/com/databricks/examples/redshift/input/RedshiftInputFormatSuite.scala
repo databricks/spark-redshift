@@ -119,8 +119,8 @@ class RedshiftInputFormatSuite extends FunSuite with BeforeAndAfterAll {
   test("schema parser") {
     withTempDir { dir =>
       val testRecords = Set(
-        Seq("a\n", 1, 1.0),
-        Seq("b", 2, 2.0))
+        Seq("a\n", "TX", 1, 1.0),
+        Seq("b", "CA", 2, 2.0))
       val escaped = escape(testRecords.map(_.map(_.toString)), DEFAULT_DELIMITER)
       writeToFile(escaped, new File(dir, "part-00000"))
 
@@ -129,14 +129,17 @@ class RedshiftInputFormatSuite extends FunSuite with BeforeAndAfterAll {
 
       val sqlContext = new SQLContext(sc)
 
-      val srdd = sqlContext.redshiftFile(dir.toString, "name varchar(10) id integer score float")
+      val srdd = sqlContext.redshiftFile(
+        dir.toString,
+        "name varchar(10) state text id integer score float")
       val expectedSchema = StructType(Seq(
         StructField("name", StringType, nullable = true),
+        StructField("state", StringType, nullable = true),
         StructField("id", IntegerType, nullable = true),
         StructField("score", DoubleType, nullable = true)))
       assert(srdd.schema === expectedSchema)
-      val parsed = srdd.map { case Row(name: String, id: Int, score: Double) =>
-        Seq(name, id, score)
+      val parsed = srdd.map { case Row(name: String, state: String, id: Int, score: Double) =>
+        Seq(name, state, id, score)
       }.collect().toSet
 
       assert(parsed === testRecords)
