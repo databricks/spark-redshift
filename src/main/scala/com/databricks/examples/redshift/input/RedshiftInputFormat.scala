@@ -82,7 +82,7 @@ object RedshiftInputFormat {
    */
   class SQLContextWithRedshiftFile(sqlContext: SQLContext) {
 
-    def defaultConf: Configuration = sqlContext.sparkContext.hadoopConfiguration
+    val defaultConf: Configuration = sqlContext.sparkContext.hadoopConfiguration
 
     /**
      * Read a file unloaded from Redshift into a SchemaRDD.
