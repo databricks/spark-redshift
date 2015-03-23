@@ -26,7 +26,7 @@ import org.scalatest.{BeforeAndAfterAll, FunSuite}
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
 import org.apache.spark.sql._
-import org.apache.spark.sql.catalyst.types.StructField
+import org.apache.spark.sql.types._
 
 import com.databricks.examples.redshift.input.RedshiftInputFormat._
 
