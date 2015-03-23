@@ -30,7 +30,6 @@ import org.apache.hadoop.mapreduce.{InputSplit, RecordReader, TaskAttemptContext
 import org.apache.spark.SparkContext._
 import org.apache.spark.sql.{SQLContext, SchemaRDD, Row}
 import org.apache.spark.sql.functions.col
-// import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.types._
 
 /**
