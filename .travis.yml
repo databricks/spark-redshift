@@ -4,5 +4,8 @@ scala:
 jdk:
   - openjdk6
 sudo: false
+cache:
+  directories:
+    - $HOME/.ivy2
 script:
   - sbt test
