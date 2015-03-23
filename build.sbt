@@ -12,9 +12,17 @@ sparkVersion := "1.2.0"
 
 spName := "databricks/spark-redshift"
 
-libraryDependencies += "org.apache.hadoop" % "hadoop-client" % "1.0.4"
+sparkComponents += "sql"
 
-libraryDependencies += "org.apache.spark" %% "spark-sql" % "1.2.0" % "provided" exclude ("org.apache.hadoop", "hadoop-client")
+libraryDependencies := libraryDependencies.value.map { module =>
+  if (module.name.indexOf("spark-sql") >= 0) {
+    module.exclude("org.apache.hadoop", "hadoop-client")
+  } else {
+    module
+  }
+}
+
+libraryDependencies += "org.apache.hadoop" % "hadoop-client" % "1.0.4"
 
 libraryDependencies += "com.google.guava" % "guava" % "14.0.1" % Test
 
