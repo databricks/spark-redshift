@@ -34,7 +34,7 @@ private[redshift] object SchemaParser extends JavaTokenParsers {
   private val BOOLEAN: Parser[DataType] = "boolean" ^^^ BooleanType
   private val VARCHAR: Parser[DataType] =
     ("varchar" | "character varying" | "nvarchar" | "text"
-      | "char" | "character" | "nchar" | "bpchar") ~ "(" ~ decimalNumber ~ ")" ^^^ StringType
+      | "char" | "character" | "nchar" | "bpchar") ~ (("(" ~ decimalNumber ~ ")") | "") ^^^ StringType
   private val DATE: Parser[DataType] = "date" ^^^ DateType
   private val TIMESTAMP: Parser[DataType] = ("timestamp" | "timestamp without time zone") ^^^ TimestampType
 
