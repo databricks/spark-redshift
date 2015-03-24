@@ -29,7 +29,8 @@ import org.apache.hadoop.mapreduce.{InputSplit, RecordReader, TaskAttemptContext
 
 import org.apache.spark.SparkContext._
 import org.apache.spark.sql.{SQLContext, SchemaRDD, Row}
-import org.apache.spark.sql.catalyst.types._
+import org.apache.spark.sql.functions.col
+import org.apache.spark.sql.types._
 
 /**
  * Input format for text records saved with in-record delimiter and newline characters escaped.
@@ -104,7 +105,7 @@ object RedshiftInputFormat {
       import sqlContext._
       val structType = SchemaParser.parseSchema(schema)
       val casts = structType.fields.map { field =>
-        field.name.attr.cast(field.dataType).as(Symbol(field.name))
+        col(field.name).cast(field.dataType).as(field.name)
       }
       redshiftFile(path, structType.fieldNames).select(casts: _*)
     }

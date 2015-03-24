@@ -8,7 +8,7 @@ version := "0.1"
 
 scalaVersion := "2.10.4"
 
-sparkVersion := "1.2.0"
+sparkVersion := "1.3.0"
 
 spName := "databricks/spark-redshift"
 
