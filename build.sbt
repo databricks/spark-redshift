@@ -1,8 +1,8 @@
 net.virtualvoid.sbt.graph.Plugin.graphSettings
 
-organization := "com.databricks.examples.redshift"
+organization := "com.databricks"
 
-name := "redshift-input-format"
+name := "spark-redshift"
 
 version := "0.1"
 

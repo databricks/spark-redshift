@@ -13,24 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.databricks.examples.redshift.input
 
-import java.lang.{Long => JavaLong}
+package com.databricks.spark.redshift
+
 import java.io.{BufferedInputStream, IOException}
+import java.lang.{Long => JavaLong}
 import java.nio.charset.Charset
 
 import scala.collection.mutable.ArrayBuffer
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{Path, FileSystem}
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.io.compress.CompressionCodecFactory
-import org.apache.hadoop.mapreduce.lib.input.{FileInputFormat, FileSplit}
 import org.apache.hadoop.mapreduce.{InputSplit, RecordReader, TaskAttemptContext}
-
-import org.apache.spark.SparkContext._
-import org.apache.spark.sql.{SQLContext, SchemaRDD, Row}
-import org.apache.spark.sql.functions.col
-import org.apache.spark.sql.types._
+import org.apache.hadoop.mapreduce.lib.input.{FileInputFormat, FileSplit}
 
 /**
  * Input format for text records saved with in-record delimiter and newline characters escaped.
@@ -69,7 +65,7 @@ object RedshiftInputFormat {
   val DEFAULT_DELIMITER = '|'
 
   /** Gets the delimiter char from conf or the default. */
-  private[input] def getDelimiterOrDefault(conf: Configuration): Char = {
+  private[redshift] def getDelimiterOrDefault(conf: Configuration): Char = {
     val c = conf.get(KEY_DELIMITER, DEFAULT_DELIMITER.toString)
     if (c.length != 1) {
       throw new IllegalArgumentException(s"Expect delimiter be a single character but got '$c'.")
@@ -77,45 +73,9 @@ object RedshiftInputFormat {
       c.charAt(0)
     }
   }
-
-  /**
-   * Wrapper of SQLContext that provide `redshiftFile` method.
-   */
-  class SQLContextWithRedshiftFile(sqlContext: SQLContext) {
-
-    /**
-     * Read a file unloaded from Redshift into a SchemaRDD.
-     * @param path input path
-     * @return a SchemaRDD
-     */
-    def redshiftFile(path: String, columns: Seq[String]): SchemaRDD = {
-      val sc = sqlContext.sparkContext
-      val rdd = sc.newAPIHadoopFile(path, classOf[RedshiftInputFormat],
-        classOf[java.lang.Long], classOf[Array[String]], sc.hadoopConfiguration)
-      // TODO: allow setting NULL string.
-      val nullable = rdd.values.map(_.map(f => if (f.isEmpty) null else f)).map(x => Row(x: _*))
-      val schema = StructType(columns.map(c => StructField(c, StringType, nullable = true)))
-      sqlContext.applySchema(nullable, schema)
-    }
-
-    /**
-     * Reads a table unload from Redshift with its schema in format "name0 type0 name1 type1 ...".
-     */
-    def redshiftFile(path: String, schema: String): SchemaRDD = {
-      import sqlContext._
-      val structType = SchemaParser.parseSchema(schema)
-      val casts = structType.fields.map { field =>
-        col(field.name).cast(field.dataType).as(field.name)
-      }
-      redshiftFile(path, structType.fieldNames).select(casts: _*)
-    }
-  }
-
-  implicit def fromSQLContext(sqlContext: SQLContext): SQLContextWithRedshiftFile =
-    new SQLContextWithRedshiftFile(sqlContext)
 }
 
-private[input] class RedshiftRecordReader extends RecordReader[JavaLong, Array[String]] {
+private[redshift] class RedshiftRecordReader extends RecordReader[JavaLong, Array[String]] {
 
   private var reader: BufferedInputStream = _
 
