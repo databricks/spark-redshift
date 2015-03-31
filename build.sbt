@@ -14,6 +14,10 @@ spName := "databricks/spark-redshift"
 
 sparkComponents += "sql"
 
+licenses += "Apache-2.0" -> url("http://opensource.org/licenses/Apache-2.0")
+
+credentials += Credentials(Path.userHome / ".ivy2" / ".credentials")
+
 libraryDependencies := libraryDependencies.value.map { module =>
   if (module.name.indexOf("spark-sql") >= 0) {
     module.exclude("org.apache.hadoop", "hadoop-client")
