@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.databricks.examples.redshift.input
+package com.databricks.spark.redshift
 
 import java.io.{DataOutputStream, File, FileOutputStream}
 
@@ -24,15 +24,14 @@ import org.apache.hadoop.conf.Configuration
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 
 import org.apache.spark.SparkContext
-import org.apache.spark.SparkContext._
-import org.apache.spark.sql._
+import org.apache.spark.sql.{SQLContext, Row}
 import org.apache.spark.sql.types._
 
-import com.databricks.examples.redshift.input.RedshiftInputFormat._
+import com.databricks.spark.redshift.RedshiftInputFormat._
 
 class RedshiftInputFormatSuite extends FunSuite with BeforeAndAfterAll {
 
-  import com.databricks.examples.redshift.input.RedshiftInputFormatSuite._
+  import RedshiftInputFormatSuite._
 
   private var sc: SparkContext = _
 

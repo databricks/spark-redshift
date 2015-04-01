@@ -14,14 +14,15 @@
  * limitations under the License.
  */
 
-package com.databricks.examples.redshift.input
+package com.databricks.spark.redshift
 
-import scala.language.implicitConversions
 import scala.util.parsing.combinator._
 
-import org.apache.spark.sql._
 import org.apache.spark.sql.types._
 
+/**
+ * A simple parser for Redshift table schemas.
+ */
 private[redshift] object SchemaParser extends JavaTokenParsers {
   // redshift data types: http://docs.aws.amazon.com/redshift/latest/dg/c_Supported_data_types.html
   private val SMALLINT: Parser[DataType] = ("smallint" | "int2") ^^^ ShortType

@@ -1,10 +1,10 @@
 net.virtualvoid.sbt.graph.Plugin.graphSettings
 
-organization := "com.databricks.examples.redshift"
+organization := "com.databricks"
 
-name := "redshift-input-format"
+name := "spark-redshift"
 
-version := "0.1"
+version := "0.3"
 
 scalaVersion := "2.10.4"
 
@@ -13,6 +13,10 @@ sparkVersion := "1.3.0"
 spName := "databricks/spark-redshift"
 
 sparkComponents += "sql"
+
+licenses += "Apache-2.0" -> url("http://opensource.org/licenses/Apache-2.0")
+
+credentials += Credentials(Path.userHome / ".ivy2" / ".credentials")
 
 libraryDependencies := libraryDependencies.value.map { module =>
   if (module.name.indexOf("spark-sql") >= 0) {

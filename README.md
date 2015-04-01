@@ -5,7 +5,7 @@ Hadoop input format for Redshift tables unloaded with the ESCAPE option.
 
 Usage in Spark Core:
 ```scala
-import com.databricks.examples.redshift.input.RedshiftInputFormat
+import com.databricks.spark.redshift.RedshiftInputFormat
 
 val records = sc.newAPIHadoopFile(
   path,
@@ -16,8 +16,11 @@ val records = sc.newAPIHadoopFile(
 
 Usage in Spark SQL:
 ```scala
-import com.databricks.examples.redshift.input.RedshiftInputFormat._
+import com.databricks.spark.redshift._
 
 // Call redshiftFile() that returns a SchemaRDD with all string columns.
-val records: SchemaRDD = sqlContext.redshiftFile(path, Seq("name", "age"))
+val records: DataFrame = sqlContext.redshiftFile(path, Seq("name", "age"))
+
+// Call redshiftFile() with the table schema.
+val records: DataFrame = sqlContext.redshiftFile(path, "name varchar(10) age integer")
 ```
