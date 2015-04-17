@@ -40,7 +40,7 @@ private[redshift] object SchemaParser extends JavaTokenParsers {
   private val TIMESTAMP: Parser[DataType] = ("timestamp" | "timestamp without time zone") ^^^ TimestampType
 
   private val sqlType: Parser[DataType] =
-    SMALLINT | INTEGER | BIGINT | DECIMAL | VARCHAR | DATE | BOOLEAN | REAL | DOUBLE
+    SMALLINT | INTEGER | BIGINT | DECIMAL | VARCHAR | DATE | BOOLEAN | REAL | DOUBLE | TIMESTAMP
   private val structField: Parser[StructField] = (ident ~ sqlType) ^^ {
     case colName ~ colType => StructField(colName, colType, nullable = true)
   }
