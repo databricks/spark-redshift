@@ -1,5 +1,7 @@
 net.virtualvoid.sbt.graph.Plugin.graphSettings
 
+val hadoopVersion = settingKey[String]("Hadoop version")
+
 organization := "com.databricks"
 
 name := "spark-redshift"
@@ -8,7 +10,9 @@ version := "0.4-SNAPSHOT"
 
 scalaVersion := "2.10.4"
 
-sparkVersion := "1.3.0"
+sparkVersion := sys.props.get("spark.version").getOrElse("1.3.1")
+
+hadoopVersion := sys.props.get("hadoop.version").getOrElse("1.0.4")
 
 spName := "databricks/spark-redshift"
 
@@ -26,7 +30,7 @@ libraryDependencies := libraryDependencies.value.map { module =>
   }
 }
 
-libraryDependencies += "org.apache.hadoop" % "hadoop-client" % "1.0.4"
+libraryDependencies += "org.apache.hadoop" % "hadoop-client" % hadoopVersion.value
 
 libraryDependencies += "com.google.guava" % "guava" % "14.0.1" % Test
 
