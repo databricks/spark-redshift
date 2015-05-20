@@ -6,7 +6,7 @@ organization := "com.databricks"
 
 name := "spark-redshift"
 
-version := "0.4-SNAPSHOT"
+version := "0.4.0"
 
 scalaVersion := "2.10.4"
 
