@@ -17,6 +17,7 @@
 package com.databricks.spark
 
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.redshift.RedshiftRelation
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 
@@ -52,5 +53,9 @@ package object redshift {
       }
       redshiftFile(path, structType.fieldNames).select(casts: _*)
     }
+
+    def redshiftTable(url: String, table: String, tempPath: String)
+    = sqlContext.baseRelationToDataFrame(RedshiftRelation(table, url, tempPath)(sqlContext))
+
   }
 }
