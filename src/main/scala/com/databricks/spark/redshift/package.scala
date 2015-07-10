@@ -16,8 +16,11 @@
 
 package com.databricks.spark
 
+import java.util.{Properties, UUID}
+
+import com.databricks.spark.redshift.RedshiftRelation
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.redshift.RedshiftRelation
+import org.apache.spark.sql.jdbc.RedshiftJDBCWrapper
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 
@@ -56,6 +59,13 @@ package object redshift {
 
     def redshiftTable(url: String, table: String, tempPath: String)
     = sqlContext.baseRelationToDataFrame(RedshiftRelation(table, url, tempPath)(sqlContext))
+  }
 
+  implicit class RedshiftDataFrame(dataFrame: DataFrame) {
+    def saveAsRedshiftTable(table: String, jdbcUrl: String, tempDir: String, overwrite: Boolean = false): Unit = {
+      val tempPath = Utils.joinUrls(tempDir, UUID.randomUUID().toString)
+      val getConnection = RedshiftJDBCWrapper.getConnector(PostgresDriver.CLASS_NAME, jdbcUrl, new Properties())
+      RedshiftWriter.saveToRedshift(dataFrame, jdbcUrl, table, tempPath, overwrite, getConnection)
+    }
   }
 }
