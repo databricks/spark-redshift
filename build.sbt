@@ -31,12 +31,15 @@ libraryDependencies += "org.apache.spark" %% "spark-sql" % "1.4.0" % "provided"
 
 libraryDependencies += "org.apache.hadoop" % "hadoop-client" % hadoopVersion.value excludeAll ExclusionRule(organization = "javax.servlet")
 
+// TODO: Provided scope? We need this, but it'll like be on the cluster?
 libraryDependencies += "org.apache.hadoop" % "hadoop-aws" % hadoopVersion.value
 
+// TODO: This isn't the ideal JDBC driver
 libraryDependencies += "postgresql" % "postgresql" % "8.3-606.jdbc4"
 
 libraryDependencies += "com.databricks" % "spark-avro_2.10" % "1.0.0"
 
+// TODO: Should be provided?
 libraryDependencies += "org.apache.avro" % "avro-mapred" % "1.7.6" classifier "hadoop2" exclude("org.mortbay.jetty", "servlet-api")
 
 // TODO: Need a better fix for dependency hell here
@@ -49,8 +52,6 @@ libraryDependencies += "org.scalatest" %% "scalatest" % "2.1.5" % Test
 libraryDependencies := libraryDependencies.value.map { module =>
   if (module.name.indexOf("spark-sql") >= 0) {
     module.exclude("org.apache.hadoop", "hadoop-client")
-  }  else if (module.name.indexOf("spark-core") >= 0) {
-    module.exclude("net.java.dev.jets3t", "jets3t")
   } else {
     module
   }

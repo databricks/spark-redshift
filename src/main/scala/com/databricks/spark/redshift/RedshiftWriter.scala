@@ -6,7 +6,10 @@ import org.apache.spark.Logging
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.jdbc.RedshiftJDBCWrapper
 
-object RedshiftWriter extends Logging{
+/**
+ * Functions to write data to Redshift with intermediate Avro serialisation into S3.
+ */
+object RedshiftWriter extends Logging {
 
   def createTableSql(data: DataFrame, jdbcUrl: String, table: String) : String = {
     val schemaSql = RedshiftJDBCWrapper.schemaString(data, jdbcUrl)
@@ -20,6 +23,7 @@ object RedshiftWriter extends Logging{
     val createTable = conn.prepareStatement(createTableSql(data, jdbcUrl, table))
     createTable.execute()
 
+    // TODO: s3n shouldn't be mandated like this
     val s3nSource = tempPath.replace("s3://", "s3n://")
     data.write.format("com.databricks.spark.avro").save(s3nSource)
 
@@ -32,9 +36,7 @@ object RedshiftWriter extends Logging{
     val copySql = s"COPY $table FROM '$tempPath' CREDENTIALS '$credsString' FORMAT AS AVRO 'auto'"
     val copyData = conn.prepareStatement(copySql)
 
-    log.info(copySql)
     copyData.execute()
     conn.close()
-
   }
 }

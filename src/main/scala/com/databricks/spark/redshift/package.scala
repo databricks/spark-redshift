@@ -61,7 +61,19 @@ package object redshift {
     = sqlContext.baseRelationToDataFrame(RedshiftRelation(table, url, tempPath)(sqlContext))
   }
 
+  /**
+   * Add write functionality to DataFrame
+   */
   implicit class RedshiftDataFrame(dataFrame: DataFrame) {
+
+    /**
+     * Load the DataFrame into a Redshift database table
+     *
+     * @param table The name of the table
+     * @param jdbcUrl URL for the table - must include credentials using ?user=username&password=password
+     * @param tempDir S3 path to use a cache for data being loaded into Redshift
+     * @param overwrite If true, first truncate the table before copying new data in
+     */
     def saveAsRedshiftTable(table: String, jdbcUrl: String, tempDir: String, overwrite: Boolean = false): Unit = {
       val tempPath = Utils.joinUrls(tempDir, UUID.randomUUID().toString)
       val getConnection = RedshiftJDBCWrapper.getConnector(PostgresDriver.CLASS_NAME, jdbcUrl, new Properties())

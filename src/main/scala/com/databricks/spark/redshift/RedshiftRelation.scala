@@ -12,17 +12,20 @@ import org.apache.spark.sql.sources.{InsertableRelation, BaseRelation, TableScan
 import org.apache.spark.sql.types.{TimestampType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 
+/**
+ * Constants for JDBC depdendencies
+ */
 object PostgresDriver {
   val CLASS_NAME = "org.postgresql.Driver"
 }
 
-case class RedshiftRelation(table: String,
-                            jdbcUrl: String,
-                            tempRoot: String)
-                           (@transient val sqlContext: SQLContext)
+/**
+ * Data Source API implementation for Amazon Redshift database tables
+ */
+private [redshift] case class RedshiftRelation(table: String, jdbcUrl: String,  tempRoot: String)
+                                              (@transient val sqlContext: SQLContext)
   extends BaseRelation
   with TableScan
-  with InsertableRelation
   with Logging {
 
   val tempPath = Utils.joinUrls(tempRoot, UUID.randomUUID().toString)
@@ -63,6 +66,8 @@ case class RedshiftRelation(table: String,
       case (data, field) =>
         if(data.isEmpty) null else field.dataType match {
           case TimestampType => convertTimestamp(data)
+
+          // TODO: More conversions will be needed
           case _ => data
       }
     }
@@ -75,10 +80,5 @@ case class RedshiftRelation(table: String,
     val rdd = sc.newAPIHadoopFile(tempPath.replace("s3://", "s3n://"), classOf[RedshiftInputFormat],
       classOf[java.lang.Long], classOf[Array[String]], sc.hadoopConfiguration)
     rdd.values.map(convertRow)
-    // rdd.values.map(_.map(f => if (f.isEmpty) null else f)).map(x => Row(x: _*))
   }
-
-  override def insert(data: DataFrame, overwrite: Boolean): Unit = {
-  }
-
 }
