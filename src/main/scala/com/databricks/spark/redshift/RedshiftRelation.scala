@@ -52,8 +52,9 @@ private [redshift] case class RedshiftRelation(table: String, jdbcUrl: String,  
   def unloadStmnt() : String = {
     val credsString = Utils.credentialsString()
     val query = s"SELECT * FROM $table"
+    val fixedUrl = Utils.fixS3Url(tempPath)
 
-    s"UNLOAD ('$query') TO '$tempPath' WITH CREDENTIALS '$credsString' ESCAPE ALLOWOVERWRITE"
+    s"UNLOAD ('$query') TO '$fixedUrl' WITH CREDENTIALS '$credsString' ESCAPE ALLOWOVERWRITE"
   }
 
   def convertTimestamp(s: String) : Timestamp = {
@@ -77,7 +78,7 @@ private [redshift] case class RedshiftRelation(table: String, jdbcUrl: String,  
 
   def makeRdd(): RDD[Row] = {
     val sc = sqlContext.sparkContext
-    val rdd = sc.newAPIHadoopFile(tempPath.replace("s3://", "s3n://"), classOf[RedshiftInputFormat],
+    val rdd = sc.newAPIHadoopFile(tempPath, classOf[RedshiftInputFormat],
       classOf[java.lang.Long], classOf[Array[String]], sc.hadoopConfiguration)
     rdd.values.map(convertRow)
   }

@@ -23,9 +23,7 @@ object RedshiftWriter extends Logging {
     val createTable = conn.prepareStatement(createTableSql(data, jdbcUrl, table))
     createTable.execute()
 
-    // TODO: s3n shouldn't be mandated like this
-    val s3nSource = tempPath.replace("s3://", "s3n://")
-    data.write.format("com.databricks.spark.avro").save(s3nSource)
+    data.write.format("com.databricks.spark.avro").save(tempPath)
 
     if(overWrite) {
       val deleteExisting = conn.prepareStatement(s"TRUNCATE TABLE $table")
@@ -33,7 +31,8 @@ object RedshiftWriter extends Logging {
     }
 
     val credsString = Utils.credentialsString()
-    val copySql = s"COPY $table FROM '$tempPath' CREDENTIALS '$credsString' FORMAT AS AVRO 'auto'"
+    val fixedUrl = Utils.fixS3Url(tempPath)
+    val copySql = s"COPY $table FROM '$fixedUrl' CREDENTIALS '$credsString' FORMAT AS AVRO 'auto'"
     val copyData = conn.prepareStatement(copySql)
 
     copyData.execute()

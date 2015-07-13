@@ -30,9 +30,17 @@ object Utils {
    * Joins prefix URL a to path suffix b, and appends a trailing /, in order to create
    * a temp directory path for S3.
    */
-  def joinUrls(a: String, b: String): String= {
+  def joinUrls(a: String, b: String): String = {
     val aUri = new URI(a)
     new URI(aUri.getScheme, aUri.getHost, Paths.get(aUri.getPath, b).toString, null).toString + "/"
+  }
+
+  /**
+   * Redshift COPY and UNLOAD commands don't support s3n or s3a, but users may wish to use them
+   * for data loads. This function converts the URL back to the s3:// format.
+   */
+  def fixS3Url(url: String) = {
+    url.replaceAll("s3[an]://", "s3://")
   }
 
 }
