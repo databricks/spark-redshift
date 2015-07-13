@@ -74,7 +74,7 @@ package object redshift {
      * @param overwrite If true, first truncate the table before copying new data in
      */
     def saveAsRedshiftTable(table: String, jdbcUrl: String, tempDir: String, overwrite: Boolean = false): Unit = {
-      val tempPath = Utils.joinUrls(tempDir, UUID.randomUUID().toString)
+      val tempPath = Utils.makeTempPath(tempDir)
       val getConnection = RedshiftJDBCWrapper.getConnector(PostgresDriver.CLASS_NAME, jdbcUrl, new Properties())
       RedshiftWriter.saveToRedshift(dataFrame, jdbcUrl, table, tempPath, overwrite, getConnection)
     }

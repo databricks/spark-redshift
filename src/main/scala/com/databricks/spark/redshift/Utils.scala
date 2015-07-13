@@ -2,6 +2,7 @@ package com.databricks.spark.redshift
 
 import java.net.URI
 import java.nio.file.Paths
+import java.util.UUID
 
 import com.amazonaws.auth.DefaultAWSCredentialsProviderChain
 
@@ -9,7 +10,6 @@ import com.amazonaws.auth.DefaultAWSCredentialsProviderChain
  * Various arbitrary helper functions
  */
 object Utils {
-
   /**
    * Gets credentials from AWS default provider chain
    */
@@ -42,5 +42,10 @@ object Utils {
   def fixS3Url(url: String) = {
     url.replaceAll("s3[an]://", "s3://")
   }
+
+  /**
+   * Creates a randomly named temp directory path for intermediate data
+   */
+  def makeTempPath(tempRoot: String) = Utils.joinUrls(tempRoot, UUID.randomUUID().toString)
 
 }

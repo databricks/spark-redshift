@@ -49,7 +49,7 @@ class DefaultSource
    */
   override def createRelation(sqlContext: SQLContext, mode: SaveMode, parameters: Map[String, String], data: DataFrame): BaseRelation = {
     val url = checkUrl(parameters)
-    val tempPath = checkTempPath(parameters)
+    val tempRoot = checkTempPath(parameters)
     val table = checkTable(parameters)
     val getConnection = RedshiftJDBCWrapper.getConnector(PostgresDriver.CLASS_NAME, url, new Properties())
     val conn = getConnection()
@@ -73,6 +73,7 @@ class DefaultSource
     }
 
     if(doSave) {
+      val tempPath = Utils.makeTempPath(tempRoot)
       RedshiftWriter.saveToRedshift(data, url, table, tempPath, dropExisting, getConnection)
     }
 

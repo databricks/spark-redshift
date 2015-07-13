@@ -8,7 +8,7 @@ import org.apache.spark.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.jdbc.RedshiftJDBCWrapper
 import org.apache.spark.sql.sources._
-import org.apache.spark.sql.types.{StructType, TimestampType, UTF8String}
+import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 
 /**
@@ -34,7 +34,7 @@ case class RedshiftRelation(table: String,
   with InsertableRelation
   with Logging {
 
-  val tempPath = Utils.joinUrls(tempRoot, UUID.randomUUID().toString)
+  val tempPath = Utils.makeTempPath(tempRoot)
 
   override def schema = {
     userSchema match {
@@ -87,30 +87,11 @@ case class RedshiftRelation(table: String,
     s"UNLOAD ('$query') TO '$fixedUrl' WITH CREDENTIALS '$credsString' ESCAPE"
   }
 
-  def convertTimestamp(s: String) : Timestamp = {
-    val redshiftDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.S")
-    new Timestamp(redshiftDateFormat.parse(s).getTime)
-  }
-
-  def convertRow(schema: StructType, fields: Array[String]) : Row = {
-    val converted = fields zip schema map {
-      case (data, field) =>
-        if(data.isEmpty) null else field.dataType match {
-          case TimestampType => convertTimestamp(data)
-
-          // TODO: More conversions will be needed
-          case _ => data
-      }
-    }
-
-    Row(converted: _*)
-  }
-
   def makeRdd(schema: StructType): RDD[Row] = {
     val sc = sqlContext.sparkContext
     val rdd = sc.newAPIHadoopFile(tempPath, classOf[RedshiftInputFormat],
       classOf[java.lang.Long], classOf[Array[String]], sc.hadoopConfiguration)
-    rdd.values.map(convertRow(schema, _))
+    rdd.values.map(Conversions.rowConverter(schema))
   }
 
   def pruneSchema(schema: StructType, columns: Array[String]): StructType = {
@@ -135,12 +116,14 @@ case class RedshiftRelation(table: String,
     if (value == null) null else value.replace("'", "''")
 
   def buildWhereClause(filters: Array[Filter]): String = {
-    "WHERE " + (filters map {
+    val filterClauses = filters map {
       case EqualTo(attr, value) => s"${sqlQuote(attr)} = ${compileValue(value)}"
       case LessThan(attr, value) => s"${sqlQuote(attr)} < ${compileValue(value)}"
       case GreaterThan(attr, value) => s"${sqlQuote(attr)}) > ${compileValue(value)}"
       case LessThanOrEqual(attr, value) => s"${sqlQuote(attr)} <= ${compileValue(value)}"
       case GreaterThanOrEqual(attr, value) => s"${sqlQuote(attr)} >= ${compileValue(value)}"
-    } mkString "AND")
+    } mkString "AND"
+
+    if (filterClauses.isEmpty) "" else "WHERE " + filterClauses
   }
 }

@@ -29,21 +29,22 @@ resolvers +=
 
 libraryDependencies += "org.apache.spark" %% "spark-sql" % "1.4.0" % "provided"
 
-libraryDependencies += "org.apache.hadoop" % "hadoop-client" % hadoopVersion.value excludeAll ExclusionRule(organization = "javax.servlet")
+libraryDependencies += "org.apache.hadoop" % "hadoop-client" % hadoopVersion.value % "provided" exclude("org.mortbay.jetty", "javax.servlet")
 
-// TODO: Provided scope? We need this, but it'll like be on the cluster?
-libraryDependencies += "org.apache.hadoop" % "hadoop-aws" % hadoopVersion.value
-
-// TODO: This isn't the ideal JDBC driver
-libraryDependencies += "postgresql" % "postgresql" % "8.3-606.jdbc4"
+libraryDependencies += "org.apache.hadoop" % "hadoop-aws" % hadoopVersion.value % "provided"
 
 libraryDependencies += "com.databricks" % "spark-avro_2.10" % "1.0.0"
 
-// TODO: Should be provided?
+// TODO: Should be provided? This seems to be needed to make spark-avro work.
 libraryDependencies += "org.apache.avro" % "avro-mapred" % "1.7.6" classifier "hadoop2" exclude("org.mortbay.jetty", "servlet-api")
 
 // TODO: Need a better fix for dependency hell here
 libraryDependencies += "net.java.dev.jets3t" % "jets3t" % "0.9.0"
+
+// A Redshift-compatible JDBC driver must be present on the classpath for spark-redshift to work.
+// For testing, we using a Postgres driver, but it is recommended that the Amazon driver is used
+// in production. See http://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-connection.html
+libraryDependencies += "postgresql" % "postgresql" % "8.3-606.jdbc4" % "provided"
 
 libraryDependencies += "com.google.guava" % "guava" % "14.0.1" % Test
 
