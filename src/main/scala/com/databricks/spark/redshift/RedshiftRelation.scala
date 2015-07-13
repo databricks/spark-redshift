@@ -8,7 +8,7 @@ import com.amazonaws.auth.{AWSCredentials, DefaultAWSCredentialsProviderChain}
 import org.apache.spark.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.jdbc.{RedshiftJDBCWrapper, DriverRegistry, JDBCRDD}
-import org.apache.spark.sql.sources.{InsertableRelation, BaseRelation, TableScan}
+import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.{TimestampType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 
@@ -26,6 +26,8 @@ private [redshift] case class RedshiftRelation(table: String, jdbcUrl: String,  
                                               (@transient val sqlContext: SQLContext)
   extends BaseRelation
   with TableScan
+  with PrunedScan
+  with InsertableRelation
   with Logging {
 
   val tempPath = Utils.joinUrls(tempRoot, UUID.randomUUID().toString)
@@ -44,19 +46,25 @@ private [redshift] case class RedshiftRelation(table: String, jdbcUrl: String,  
 
   override def buildScan(): RDD[Row] = {
     unloadToTemp()
-    makeRdd()
+    makeRdd(schema)
   }
 
-  def unloadToTemp(): Unit = {
+  override def buildScan(requiredColumns: Array[String]): RDD[Row] = {
+    val columns = columnList(requiredColumns)
+    unloadToTemp(columns)
+    makeRdd(pruneSchema(schema, requiredColumns))
+  }
+
+  def unloadToTemp(columnList: String = "*"): Unit = {
     val conn = getConnection()
-    val statement = conn.prepareStatement(unloadStmnt())
+    val statement = conn.prepareStatement(unloadStmnt(columnList))
     statement.execute()
     conn.close()
   }
 
-  def unloadStmnt() : String = {
+  def unloadStmnt(columnList: String) : String = {
     val credsString = Utils.credentialsString()
-    val query = s"SELECT * FROM $table"
+    val query = s"SELECT $columnList FROM $table"
     val fixedUrl = Utils.fixS3Url(tempPath)
 
     s"UNLOAD ('$query') TO '$fixedUrl' WITH CREDENTIALS '$credsString' ESCAPE ALLOWOVERWRITE"
@@ -67,7 +75,7 @@ private [redshift] case class RedshiftRelation(table: String, jdbcUrl: String,  
     new Timestamp(redshiftDateFormat.parse(s).getTime)
   }
 
-  def convertRow(fields: Array[String]) : Row = {
+  def convertRow(schema: StructType, fields: Array[String]) : Row = {
     val converted = fields zip schema map {
       case (data, field) =>
         if(data.isEmpty) null else field.dataType match {
@@ -81,10 +89,27 @@ private [redshift] case class RedshiftRelation(table: String, jdbcUrl: String,  
     Row(converted: _*)
   }
 
-  def makeRdd(): RDD[Row] = {
+  def makeRdd(schema: StructType): RDD[Row] = {
     val sc = sqlContext.sparkContext
     val rdd = sc.newAPIHadoopFile(tempPath, classOf[RedshiftInputFormat],
       classOf[java.lang.Long], classOf[Array[String]], sc.hadoopConfiguration)
-    rdd.values.map(convertRow)
+    rdd.values.map(convertRow(schema, _))
+  }
+
+  override def insert(data: DataFrame, overwrite: Boolean): Unit = {
+    RedshiftWriter.saveToRedshift(data, jdbcUrl, table, tempPath, overwrite, getConnection)
+  }
+
+  def pruneSchema(schema: StructType, columns: Array[String]): StructType = {
+    val fieldMap = Map(schema.fields map { x => x.metadata.getString("name") -> x }: _*)
+    new StructType(columns map { name => fieldMap(name) })
+  }
+
+  def sqlQuote(identifier: String) = s""""$identifier""""
+
+  def columnList(columns: Seq[String]): String = {
+    val sb = new StringBuilder()
+    columns.foreach(x => sb.append(",").append(sqlQuote(x)))
+    if (sb.length == 0) "1" else sb.substring(1)
   }
 }
