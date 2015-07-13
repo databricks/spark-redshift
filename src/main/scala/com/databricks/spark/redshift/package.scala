@@ -58,7 +58,7 @@ package object redshift {
     }
 
     def redshiftTable(url: String, table: String, tempPath: String)
-    = sqlContext.baseRelationToDataFrame(RedshiftRelation(table, url, tempPath)(sqlContext))
+    = sqlContext.baseRelationToDataFrame(RedshiftRelation(table, url, tempPath, None)(sqlContext))
   }
 
   /**

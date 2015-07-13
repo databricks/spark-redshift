@@ -22,7 +22,7 @@ object PostgresDriver {
 /**
  * Data Source API implementation for Amazon Redshift database tables
  */
-private [redshift] case class RedshiftRelation(table: String, jdbcUrl: String,  tempRoot: String)
+private [redshift] case class RedshiftRelation(table: String, jdbcUrl: String,  tempRoot: String, userSchema: Option[StructType])
                                               (@transient val sqlContext: SQLContext)
   extends BaseRelation
   with TableScan
@@ -31,8 +31,13 @@ private [redshift] case class RedshiftRelation(table: String, jdbcUrl: String,  
   val tempPath = Utils.joinUrls(tempRoot, UUID.randomUUID().toString)
 
   override def schema = {
-    RedshiftJDBCWrapper.registerDriver(PostgresDriver.CLASS_NAME)
-    RedshiftJDBCWrapper.resolveTable(jdbcUrl, table, new Properties())
+    userSchema match {
+      case Some(schema) => schema
+      case None => {
+        RedshiftJDBCWrapper.registerDriver(PostgresDriver.CLASS_NAME)
+        RedshiftJDBCWrapper.resolveTable(jdbcUrl, table, new Properties())
+      }
+    }
   }
 
   val getConnection = RedshiftJDBCWrapper.getConnector(PostgresDriver.CLASS_NAME, jdbcUrl, new Properties())
