@@ -24,12 +24,16 @@ class DefaultSource
   }
 
   /**
-   * Create a new RedshiftRelation instance using parameters from Spark SQL DDL
+   * Create a new RedshiftRelation instance using parameters from Spark SQL DDL. Resolves the schema using
+   * JDBC connection over provided URL, which must contain credentials.
    */
   override def createRelation(sqlContext: SQLContext, parameters: Map[String, String]): BaseRelation = {
     RedshiftRelation(checkTable(parameters), checkUrl(parameters), checkTempPath(parameters), None)(sqlContext)
   }
 
+  /**
+   * Load a RedshiftRelation using user-provided schema, so no inference over JDBC will be used.
+   */
   override def createRelation(sqlContext: SQLContext, parameters: Map[String, String], schema: StructType): BaseRelation = {
     RedshiftRelation(checkTable(parameters), checkUrl(parameters), checkTempPath(parameters), Some(schema))(sqlContext)
   }
