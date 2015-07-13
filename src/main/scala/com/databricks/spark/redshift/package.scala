@@ -18,7 +18,6 @@ package com.databricks.spark
 
 import java.util.{Properties, UUID}
 
-import com.databricks.spark.redshift.RedshiftRelation
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.jdbc.RedshiftJDBCWrapper
 import org.apache.spark.sql.types.{StringType, StructField, StructType}

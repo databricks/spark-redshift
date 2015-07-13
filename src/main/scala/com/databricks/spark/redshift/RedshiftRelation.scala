@@ -2,14 +2,13 @@ package com.databricks.spark.redshift
 
 import java.sql.Timestamp
 import java.text.SimpleDateFormat
-import java.util.{UUID, Properties}
+import java.util.{Properties, UUID}
 
-import com.amazonaws.auth.{AWSCredentials, DefaultAWSCredentialsProviderChain}
 import org.apache.spark.Logging
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.jdbc.{RedshiftJDBCWrapper, DriverRegistry, JDBCRDD}
+import org.apache.spark.sql.jdbc.RedshiftJDBCWrapper
 import org.apache.spark.sql.sources._
-import org.apache.spark.sql.types.{UTF8String, TimestampType, StructField, StructType}
+import org.apache.spark.sql.types.{StructType, TimestampType, UTF8String}
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 
 /**
@@ -22,11 +21,12 @@ object PostgresDriver {
 /**
  * Data Source API implementation for Amazon Redshift database tables
  */
-private [redshift] case class RedshiftRelation(table: String,
-                                               jdbcUrl: String,
-                                               tempRoot: String,
-                                               userSchema: Option[StructType])
-                                              (@transient val sqlContext: SQLContext)
+private [redshift]
+case class RedshiftRelation(table: String,
+                            jdbcUrl: String,
+                            tempRoot: String,
+                            userSchema: Option[StructType])
+                           (@transient val sqlContext: SQLContext)
   extends BaseRelation
   with TableScan
   with PrunedScan
@@ -135,12 +135,12 @@ private [redshift] case class RedshiftRelation(table: String,
     if (value == null) null else value.replace("'", "''")
 
   def buildWhereClause(filters: Array[Filter]): String = {
-    "WHERE " + ((filters map {
+    "WHERE " + (filters map {
       case EqualTo(attr, value) => s"${sqlQuote(attr)} = ${compileValue(value)}"
       case LessThan(attr, value) => s"${sqlQuote(attr)} < ${compileValue(value)}"
       case GreaterThan(attr, value) => s"${sqlQuote(attr)}) > ${compileValue(value)}"
       case LessThanOrEqual(attr, value) => s"${sqlQuote(attr)} <= ${compileValue(value)}"
       case GreaterThanOrEqual(attr, value) => s"${sqlQuote(attr)} >= ${compileValue(value)}"
-    }) mkString "AND")
+    } mkString "AND")
   }
 }
