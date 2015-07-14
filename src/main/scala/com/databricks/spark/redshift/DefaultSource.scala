@@ -17,55 +17,46 @@ class DefaultSource
   with CreatableRelationProvider
   with Logging {
 
-  def checkTempPath(params: Map[String, String]) = {
-    params.getOrElse("tempPath", sys.error("'tempPath' is required for all Redshift loads and saves"))
-  }
-
-  def checkTable(params: Map[String, String]) = {
-    params.getOrElse("redshiftTable", sys.error("You must specify a Redshift table name with 'redshiftTable' parameter"))
-  }
-
-  def checkUrl(params: Map[String, String]) = {
-    params.getOrElse("jdbcUrl", sys.error("A JDBC URL must be provided with 'jdbcUrl' parameter"))
-  }
-
   /**
    * Create a new RedshiftRelation instance using parameters from Spark SQL DDL. Resolves the schema using
    * JDBC connection over provided URL, which must contain credentials.
    */
   override def createRelation(sqlContext: SQLContext, parameters: Map[String, String]): BaseRelation = {
-    RedshiftRelation(checkTable(parameters), checkUrl(parameters), checkTempPath(parameters), None)(sqlContext)
+    val params = Parameters.mergeParameters(parameters)
+    RedshiftRelation(params, None)(sqlContext)
   }
 
   /**
    * Load a RedshiftRelation using user-provided schema, so no inference over JDBC will be used.
    */
   override def createRelation(sqlContext: SQLContext, parameters: Map[String, String], schema: StructType): BaseRelation = {
-    RedshiftRelation(checkTable(parameters), checkUrl(parameters), checkTempPath(parameters), Some(schema))(sqlContext)
+    val params = Parameters.mergeParameters(parameters)
+    RedshiftRelation(params, Some(schema))(sqlContext)
   }
 
   /**
    * Creates a Relation instance by first writing the contents of the given DataFrame to Redshift
    */
-  override def createRelation(sqlContext: SQLContext, mode: SaveMode, parameters: Map[String, String], data: DataFrame): BaseRelation = {
-    val url = checkUrl(parameters)
-    val tempRoot = checkTempPath(parameters)
-    val table = checkTable(parameters)
-    val getConnection = RedshiftJDBCWrapper.getConnector(PostgresDriver.CLASS_NAME, url, new Properties())
+  override def createRelation(sqlContext: SQLContext,
+                              mode: SaveMode,
+                              parameters: Map[String, String],
+                              data: DataFrame): BaseRelation = {
+    val params = Parameters.mergeParameters(parameters)
+    val getConnection = RedshiftJDBCWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, new Properties())
     val conn = getConnection()
 
     val (doSave, dropExisting) = mode match {
       case SaveMode.Append => (true, false)
       case SaveMode.Overwrite => (true, true)
       case SaveMode.ErrorIfExists =>
-        if(RedshiftJDBCWrapper.tableExists(conn, table)) {
-          sys.error(s"Table $table already exists! (SaveMode is set to ErrorIfExists)")
+        if(RedshiftJDBCWrapper.tableExists(conn, params.table)) {
+          sys.error(s"Table ${params.table} already exists! (SaveMode is set to ErrorIfExists)")
         } else {
           (true, false)
         }
       case SaveMode.Ignore =>
-        if(RedshiftJDBCWrapper.tableExists(conn, table)) {
-          log.info(s"Table $table already exists -- ignoring save request.")
+        if(RedshiftJDBCWrapper.tableExists(conn, params.table)) {
+          log.info(s"Table ${params.table} already exists -- ignoring save request.")
           (false, false)
         } else {
           (true, false)
@@ -73,8 +64,8 @@ class DefaultSource
     }
 
     if(doSave) {
-      val tempPath = Utils.makeTempPath(tempRoot)
-      RedshiftWriter.saveToRedshift(data, url, table, tempPath, dropExisting, getConnection)
+      val updatedParams = parameters updated ("overwrite", dropExisting.toString)
+      RedshiftWriter.saveToRedshift(data, Parameters.mergeParameters(updatedParams), getConnection)
     }
 
     createRelation(sqlContext, parameters)

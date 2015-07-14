@@ -1,5 +1,3 @@
-import sbt.ExclusionRule
-
 net.virtualvoid.sbt.graph.Plugin.graphSettings
 
 val hadoopVersion = settingKey[String]("Hadoop version")

@@ -4,6 +4,7 @@ import java.sql.Timestamp
 import java.text.SimpleDateFormat
 import java.util.{Properties, UUID}
 
+import com.databricks.spark.redshift.Parameters.MergedParameters
 import org.apache.spark.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.jdbc.RedshiftJDBCWrapper
@@ -12,19 +13,10 @@ import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 
 /**
- * Constants for JDBC depdendencies
- */
-object PostgresDriver {
-  val CLASS_NAME = "org.postgresql.Driver"
-}
-
-/**
  * Data Source API implementation for Amazon Redshift database tables
  */
 private [redshift]
-case class RedshiftRelation(table: String,
-                            jdbcUrl: String,
-                            tempRoot: String,
+case class RedshiftRelation(params: MergedParameters,
                             userSchema: Option[StructType])
                            (@transient val sqlContext: SQLContext)
   extends BaseRelation
@@ -34,19 +26,17 @@ case class RedshiftRelation(table: String,
   with InsertableRelation
   with Logging {
 
-  val tempPath = Utils.makeTempPath(tempRoot)
-
   override def schema = {
     userSchema match {
       case Some(schema) => schema
       case None => {
-        RedshiftJDBCWrapper.registerDriver(PostgresDriver.CLASS_NAME)
-        RedshiftJDBCWrapper.resolveTable(jdbcUrl, table, new Properties())
+        RedshiftJDBCWrapper.registerDriver(params.jdbcDriver)
+        RedshiftJDBCWrapper.resolveTable(params.jdbcUrl, params.table, new Properties())
       }
     }
   }
 
-  val getConnection = RedshiftJDBCWrapper.getConnector(PostgresDriver.CLASS_NAME, jdbcUrl, new Properties())
+  val getConnection = RedshiftJDBCWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, new Properties())
 
   override def buildScan(): RDD[Row] = {
     unloadToTemp()
@@ -67,7 +57,7 @@ case class RedshiftRelation(table: String,
   }
 
   override def insert(data: DataFrame, overwrite: Boolean): Unit = {
-    RedshiftWriter.saveToRedshift(data, jdbcUrl, table, tempPath, overwrite, getConnection)
+    RedshiftWriter.saveToRedshift(data, params, getConnection)
   }
 
   def unloadToTemp(columnList: String = "*", whereClause: String = ""): Unit = {
@@ -81,15 +71,15 @@ case class RedshiftRelation(table: String,
 
   def unloadStmnt(columnList: String, whereClause: String) : String = {
     val credsString = Utils.credentialsString()
-    val query = s"SELECT $columnList FROM $table $whereClause"
-    val fixedUrl = Utils.fixS3Url(tempPath)
+    val query = s"SELECT $columnList FROM ${params.table} $whereClause"
+    val fixedUrl = Utils.fixS3Url(params.tempPath)
 
-    s"UNLOAD ('$query') TO '$fixedUrl' WITH CREDENTIALS '$credsString' ESCAPE"
+    s"UNLOAD ('$query') TO '$fixedUrl' WITH CREDENTIALS '$credsString' ESCAPE ALLOWOVERWRITE"
   }
 
   def makeRdd(schema: StructType): RDD[Row] = {
     val sc = sqlContext.sparkContext
-    val rdd = sc.newAPIHadoopFile(tempPath, classOf[RedshiftInputFormat],
+    val rdd = sc.newAPIHadoopFile(params.tempPath, classOf[RedshiftInputFormat],
       classOf[java.lang.Long], classOf[Array[String]], sc.hadoopConfiguration)
     rdd.values.map(Conversions.rowConverter(schema))
   }

@@ -2,8 +2,9 @@ package com.databricks.spark.redshift
 
 import java.sql.Timestamp
 import java.text.SimpleDateFormat
+import java.util.Date
 
-import org.apache.spark.sql.Row
+import org.apache.spark.sql.{DataFrame, Row}
 import org.apache.spark.sql.types._
 
 import scala.util.parsing.combinator.JavaTokenParsers
@@ -23,11 +24,15 @@ private object RedshiftBooleanParser extends JavaTokenParsers {
  */
 object Conversions {
 
+  // Imports and exports with Redshift require that timestamps are represented
+  // as strings, using the following formats
+  val redshiftTimestampFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.S")
+  val redshiftDateFormat = new SimpleDateFormat("yyyy-MM-dd")
+
   /**
    * Parse a string exported from a Redshift TIMESTAMP column
    */
   def parseTimestamp(s: String): Timestamp = {
-    val redshiftTimestampFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.S")
     new Timestamp(redshiftTimestampFormat.parse(s).getTime)
   }
 
@@ -35,7 +40,6 @@ object Conversions {
    * Parse a string exported from a Redshift DATE column
    */
   def parseDate(s: String): Timestamp = {
-    val redshiftDateFormat = new SimpleDateFormat("yyyy-MM-dd")
     new Timestamp(redshiftDateFormat.parse(s).getTime)
   }
 
@@ -70,4 +74,5 @@ object Conversions {
    * the given schema to Row instances
    */
   def rowConverter(schema: StructType) = convertRow(schema, _: Array[String])
+
 }

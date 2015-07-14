@@ -56,8 +56,14 @@ package object redshift {
       redshiftFile(path, structType.fieldNames).select(casts: _*)
     }
 
-    def redshiftTable(url: String, table: String, tempPath: String)
-    = sqlContext.baseRelationToDataFrame(RedshiftRelation(table, url, tempPath, None)(sqlContext))
+    /**
+     * Read a Redshift table into a DataFrame, using S3 for data transfer and JDBC
+     * to control Redshift and resolve the schema
+     */
+    def redshiftTable(parameters: Map[String, String]) = {
+      val params = Parameters.mergeParameters(parameters)
+      sqlContext.baseRelationToDataFrame(RedshiftRelation(params, None)(sqlContext))
+    }
   }
 
   /**
@@ -67,16 +73,11 @@ package object redshift {
 
     /**
      * Load the DataFrame into a Redshift database table
-     *
-     * @param table The name of the table
-     * @param jdbcUrl URL for the table - must include credentials using ?user=username&password=password
-     * @param tempDir S3 path to use a cache for data being loaded into Redshift
-     * @param overwrite If true, first truncate the table before copying new data in
      */
-    def saveAsRedshiftTable(table: String, jdbcUrl: String, tempDir: String, overwrite: Boolean = false): Unit = {
-      val tempPath = Utils.makeTempPath(tempDir)
-      val getConnection = RedshiftJDBCWrapper.getConnector(PostgresDriver.CLASS_NAME, jdbcUrl, new Properties())
-      RedshiftWriter.saveToRedshift(dataFrame, jdbcUrl, table, tempPath, overwrite, getConnection)
+    def saveAsRedshiftTable(parameters: Map[String, String]): Unit = {
+      val params = Parameters.mergeParameters(parameters)
+      val getConnection = RedshiftJDBCWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, new Properties())
+      RedshiftWriter.saveToRedshift(dataFrame, params, getConnection)
     }
   }
 }
