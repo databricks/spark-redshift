@@ -1,5 +1,6 @@
 /*
  * Copyright 2015 Databricks
+ * Copyright 2015 TouchType Ltd. (Added JDBC-based Data Source API implementation)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
