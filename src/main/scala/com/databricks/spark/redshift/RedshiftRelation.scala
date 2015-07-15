@@ -1,8 +1,6 @@
 package com.databricks.spark.redshift
 
-import java.sql.Timestamp
-import java.text.SimpleDateFormat
-import java.util.{Properties, UUID}
+import java.util.Properties
 
 import com.databricks.spark.redshift.Parameters.MergedParameters
 import org.apache.spark.Logging

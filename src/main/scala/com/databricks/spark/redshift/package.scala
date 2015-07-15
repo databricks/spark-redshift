@@ -16,7 +16,7 @@
 
 package com.databricks.spark
 
-import java.util.{Properties, UUID}
+import java.util.Properties
 
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.jdbc.RedshiftJDBCWrapper

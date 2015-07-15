@@ -4,9 +4,9 @@ import java.util.Properties
 
 import org.apache.spark.Logging
 import org.apache.spark.sql.jdbc.RedshiftJDBCWrapper
-import org.apache.spark.sql.{DataFrame, SaveMode, SQLContext}
-import org.apache.spark.sql.sources.{CreatableRelationProvider, BaseRelation, RelationProvider, SchemaRelationProvider}
+import org.apache.spark.sql.sources.{BaseRelation, CreatableRelationProvider, RelationProvider, SchemaRelationProvider}
 import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.{DataFrame, SQLContext, SaveMode}
 
 /**
  * Redshift Source implementation for Spark SQL

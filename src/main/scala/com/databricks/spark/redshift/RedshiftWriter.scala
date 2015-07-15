@@ -1,7 +1,6 @@
 package com.databricks.spark.redshift
 
 import java.sql.Connection
-import java.util.UUID
 
 import com.databricks.spark.redshift.Parameters.MergedParameters
 import org.apache.spark.Logging

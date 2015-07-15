@@ -1,10 +1,10 @@
 package com.databricks.spark.redshift
 
 import java.sql.Timestamp
-import java.text.{FieldPosition, ParsePosition, DateFormat, SimpleDateFormat}
+import java.text.{DateFormat, FieldPosition, ParsePosition, SimpleDateFormat}
 import java.util.Date
 
-import org.apache.spark.sql.{DataFrame, Row}
+import org.apache.spark.sql.Row
 import org.apache.spark.sql.types._
 
 import scala.util.parsing.combinator.JavaTokenParsers

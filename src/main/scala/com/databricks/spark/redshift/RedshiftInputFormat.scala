@@ -20,13 +20,13 @@ import java.io.{BufferedInputStream, IOException}
 import java.lang.{Long => JavaLong}
 import java.nio.charset.Charset
 
-import scala.collection.mutable.ArrayBuffer
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.io.compress.CompressionCodecFactory
-import org.apache.hadoop.mapreduce.{InputSplit, RecordReader, TaskAttemptContext}
 import org.apache.hadoop.mapreduce.lib.input.{FileInputFormat, FileSplit}
+import org.apache.hadoop.mapreduce.{InputSplit, RecordReader, TaskAttemptContext}
+
+import scala.collection.mutable.ArrayBuffer
 
 /**
  * Input format for text records saved with in-record delimiter and newline characters escaped.
