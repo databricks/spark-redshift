@@ -67,7 +67,7 @@ object Conversions {
   }
 
   /**
-   * Construct a Row from the given array of strings, retrieved from Reshift UNLOAD.
+   * Construct a Row from the given array of strings, retrieved from Redshift UNLOAD.
    * The schema will be used for type mappings.
    */
   def convertRow(schema: StructType, fields: Array[String]): Row = {
