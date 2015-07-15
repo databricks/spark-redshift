@@ -94,6 +94,13 @@ object RedshiftWriter extends Logging {
     val copyStatement = copySql(params.table, params.tempPath)
     val copyData = conn.prepareStatement(copyStatement)
     copyData.execute()
+
+    // Execute postActions
+    params.postActions.foreach(action => {
+      val actionSql = if(action.contains("%s")) action.format(params.table) else action
+      log.info("Executing postAction: " + actionSql)
+      conn.prepareStatement(actionSql).execute()
+    })
   }
 
   /**

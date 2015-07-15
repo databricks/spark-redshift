@@ -14,7 +14,8 @@ private [redshift] object Parameters {
     "jdbcdriver" -> "org.postgresql.Driver",
     "overwrite" -> "false",
     "diststyle" -> "EVEN",
-    "usestagingtable" -> "true"
+    "usestagingtable" -> "true",
+    "postactions" -> ""
   )
 
   /**
@@ -121,8 +122,10 @@ private [redshift] object Parameters {
      * List of semi-colon separated SQL statements to run after successful write operations.
      * This can be useful for running GRANT operations to make your new tables readable to other users and groups.
      *
+     * If the action string contains %s, the table name will be substituted in, in case a staging table is being used.
+     *
      * Defaults to empty.
      */
-    def postActions = parameters("postActions").split(";")
+    def postActions = parameters("postactions").split(";")
   }
 }
