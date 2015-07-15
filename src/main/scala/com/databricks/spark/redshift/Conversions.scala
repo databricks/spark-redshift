@@ -1,7 +1,7 @@
 package com.databricks.spark.redshift
 
 import java.sql.Timestamp
-import java.text.SimpleDateFormat
+import java.text.{FieldPosition, ParsePosition, DateFormat, SimpleDateFormat}
 import java.util.Date
 
 import org.apache.spark.sql.{DataFrame, Row}
@@ -26,7 +26,30 @@ object Conversions {
 
   // Imports and exports with Redshift require that timestamps are represented
   // as strings, using the following formats
-  val redshiftTimestampFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.S")
+  val PATTERN_WITH_MILLIS = "yyyy-MM-dd HH:mm:ss.S"
+  val PATTERN_WITHOUT_MILLIS = "yyyy-MM-dd HH:mm:ss"
+
+  val redshiftTimestampFormatWithMillis = new SimpleDateFormat(PATTERN_WITH_MILLIS)
+  val redshiftTimestampFormatWithoutMillis = new SimpleDateFormat(PATTERN_WITHOUT_MILLIS)
+
+  // Redshift may or may not include the fraction component in the UNLOAD data, and there are
+  // apparently not clues about this in the table schema. This format delegates to one of the above
+  // formats based on string length.
+  val redshiftTimestampFormat = new DateFormat() {
+    override def format(date: Date, toAppendTo: StringBuffer, fieldPosition: FieldPosition): StringBuffer = {
+      // Always export with milliseconds, as they can just be zero if not specified
+      redshiftTimestampFormatWithMillis.format(date, toAppendTo, fieldPosition)
+    }
+
+    override def parse(source: String, pos: ParsePosition): Date = {
+      if(source.length < PATTERN_WITH_MILLIS.length) {
+        redshiftTimestampFormatWithoutMillis.parse(source, pos)
+      } else {
+        redshiftTimestampFormatWithMillis.parse(source, pos)
+      }
+    }
+  }
+
   val redshiftDateFormat = new SimpleDateFormat("yyyy-MM-dd")
 
   /**
