@@ -84,7 +84,7 @@ case class RedshiftRelation(params: MergedParameters,
   }
 
   def unloadStmnt(columnList: String, whereClause: String) : String = {
-    val credsString = Utils.credentialsString()
+    val credsString = params.credentialsString()
     val query = s"SELECT $columnList FROM ${params.table} $whereClause"
     val fixedUrl = Utils.fixS3Url(params.tempPath)
 

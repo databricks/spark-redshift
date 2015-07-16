@@ -51,10 +51,10 @@ object RedshiftWriter extends Logging {
   /**
    * Generate the COPY SQL command
    */
-  def copySql(table: String, path: String) = {
-    val credsString = Utils.credentialsString()
-    val fixedUrl = Utils.fixS3Url(path)
-    s"COPY $table FROM '$fixedUrl' CREDENTIALS '$credsString' FORMAT AS AVRO 'auto' TIMEFORMAT 'epochmillisecs'"
+  def copySql(params: MergedParameters) = {
+    val creds = params.credentialsString()
+    val fixedUrl = Utils.fixS3Url(params.tempPath)
+    s"COPY ${params.table} FROM '$fixedUrl' CREDENTIALS '$creds' FORMAT AS AVRO 'auto' TIMEFORMAT 'epochmillisecs'"
   }
 
   /**
@@ -106,7 +106,7 @@ object RedshiftWriter extends Logging {
     createTable.execute()
 
     // Load the temporary data into the new file
-    val copyStatement = copySql(params.table, params.tempPath)
+    val copyStatement = copySql(params)
     val copyData = conn.prepareStatement(copyStatement)
     copyData.execute()
 

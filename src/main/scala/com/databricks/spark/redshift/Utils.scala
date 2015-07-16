@@ -27,22 +27,6 @@ import com.amazonaws.auth.DefaultAWSCredentialsProviderChain
  */
 object Utils {
   /**
-   * Gets credentials from AWS default provider chain
-   */
-  def credentials() = (new DefaultAWSCredentialsProviderChain).getCredentials
-
-  /**
-   * Formats credentials as required for Redshift COPY and UNLOAD commands
-   */
-  def credentialsString() = {
-    val awsCredentials = credentials()
-    val accessKeyId = awsCredentials.getAWSAccessKeyId
-    val secretAccessKey = awsCredentials.getAWSSecretKey
-
-    s"aws_access_key_id=$accessKeyId;aws_secret_access_key=$secretAccessKey"
-  }
-
-  /**
    * Joins prefix URL a to path suffix b, and appends a trailing /, in order to create
    * a temp directory path for S3.
    */

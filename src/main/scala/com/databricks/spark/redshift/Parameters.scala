@@ -16,6 +16,8 @@
 
 package com.databricks.spark.redshift
 
+import com.amazonaws.auth.DefaultAWSCredentialsProviderChain
+
 /**
  * All user-specifiable parameters for spark-redshift, along with their validation rules and defaults
  */
@@ -143,5 +145,28 @@ private [redshift] object Parameters {
      * Defaults to empty.
      */
     def postActions = parameters("postactions").split(";")
+
+    /**
+     * Looks up "aws_access_key_id" and "aws_secret_access_key" in the parameter map
+     * and generates a credentials string for Redshift. If no credentials have been provided,
+     * this function will instead try using the AWS DefaultCredentialsProviderChain, which makes
+     * use of standard system properties, environment variables, or IAM role configuration if available.
+     */
+    def credentialsString() = {
+
+      val (accessKeyId, secretAccessKey) =
+        if(parameters.contains("aws_access_key_id")) {
+          (parameters("aws_access_key_id"), parameters("aws_secret_access_key"))
+        } else {
+          try {
+            val awsCredentials = (new DefaultAWSCredentialsProviderChain).getCredentials
+            (awsCredentials.getAWSAccessKeyId, awsCredentials.getAWSSecretKey)
+          } catch {
+            case e: Exception => throw new Exception("No credentials provided and unable to detect automatically.", e)
+          }
+        }
+
+      s"aws_access_key_id=$accessKeyId;aws_secret_access_key=$secretAccessKey"
+    }
   }
 }
