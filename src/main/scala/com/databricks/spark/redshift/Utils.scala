@@ -16,8 +16,8 @@
 
 package com.databricks.spark.redshift
 
+import java.io.File
 import java.net.URI
-import java.nio.file.Paths
 import java.util.UUID
 
 import com.amazonaws.auth.DefaultAWSCredentialsProviderChain
@@ -48,7 +48,8 @@ object Utils {
    */
   def joinUrls(a: String, b: String): String = {
     val aUri = new URI(a)
-    new URI(aUri.getScheme, aUri.getHost, Paths.get(aUri.getPath, b).toString, null).toString + "/"
+    val joinedPath = new File(aUri.getPath, b).toString
+    new URI(aUri.getScheme, aUri.getHost, joinedPath, null).toString + "/"
   }
 
   /**
