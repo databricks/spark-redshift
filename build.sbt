@@ -29,7 +29,7 @@ libraryDependencies += "org.apache.spark" %% "spark-sql" % "1.4.0" % "provided"
 
 libraryDependencies += "org.apache.hadoop" % "hadoop-client" % hadoopVersion.value % "provided" exclude("org.mortbay.jetty", "javax.servlet")
 
-libraryDependencies += "org.apache.hadoop" % "hadoop-aws" % hadoopVersion.value % "provided"
+libraryDependencies += "org.apache.hadoop" % "hadoop-aws" % "2.6.0" % "provided"
 
 libraryDependencies += "com.databricks" % "spark-avro_2.10" % "1.0.0"
 
