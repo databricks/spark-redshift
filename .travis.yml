@@ -12,4 +12,6 @@ env:
   - HADOOP_VERSION="1.2.1"
   - HADOOP_VERSION="2.2.0"
 script:
-  - sbt -Dhadoop.version=$HADOOP_VERSION test
+  - sbt -Dhadoop.version=$HADOOP_VERSION coverage test
+after_success:
+  - bash <(curl -s https://codecov.io/bash)

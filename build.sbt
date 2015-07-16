@@ -55,3 +55,14 @@ libraryDependencies := libraryDependencies.value.map { module =>
     module
   }
 }
+
+libraryDependencies += "org.apache.hadoop" % "hadoop-client" % hadoopVersion.value
+
+libraryDependencies += "com.google.guava" % "guava" % "14.0.1" % Test
+
+libraryDependencies += "org.scalatest" %% "scalatest" % "2.1.5" % Test
+
+ScoverageSbtPlugin.ScoverageKeys.coverageHighlighting := {
+  if (scalaBinaryVersion.value == "2.10") false
+  else false
+}
