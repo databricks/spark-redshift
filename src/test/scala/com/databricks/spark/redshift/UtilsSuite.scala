@@ -5,7 +5,7 @@ import org.scalatest.{Matchers, FunSuite}
 /**
  * Unit tests for helper functions
  */
-class UtilsSuit extends FunSuite with Matchers {
+class UtilsSuite extends FunSuite with Matchers {
 
   test("joinUrls preserves protocol information") {
     Utils.joinUrls("s3n://foo/bar/", "/baz") shouldBe "s3n://foo/bar/baz/"
