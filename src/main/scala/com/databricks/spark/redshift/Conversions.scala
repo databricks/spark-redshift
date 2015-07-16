@@ -32,7 +32,7 @@ private object RedshiftBooleanParser extends JavaTokenParsers {
   val TRUE: Parser[Boolean] = "t" ^^ Function.const(true)
   val FALSE: Parser[Boolean] = "f" ^^ Function.const(false)
 
-  def parseRedshiftBoolean(s: String) = parse(TRUE | FALSE, s)
+  def parseRedshiftBoolean(s: String): Boolean = parse(TRUE | FALSE, s).get
 }
 
 /**
@@ -89,7 +89,7 @@ object Conversions {
   def convertRow(schema: StructType, fields: Array[String]): Row = {
     val converted = fields zip schema map {
       case (data, field) =>
-        if (data.isEmpty) null
+        if (data == null || data.isEmpty) null
         else field.dataType match {
           case ByteType => data.toByte
           case BooleanType => RedshiftBooleanParser.parseRedshiftBoolean(data)

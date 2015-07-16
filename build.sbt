@@ -12,7 +12,7 @@ scalaVersion := "2.10.4"
 
 sparkVersion := sys.props.get("spark.version").getOrElse("1.4.0")
 
-hadoopVersion := sys.props.get("hadoop.version").getOrElse("2.6.0")
+hadoopVersion := sys.props.get("hadoop.version").getOrElse("2.2.0")
 
 spName := "databricks/spark-redshift"
 
