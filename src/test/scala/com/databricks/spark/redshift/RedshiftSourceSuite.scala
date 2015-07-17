@@ -77,13 +77,14 @@ class RedshiftSourceSuite
   }
 
   override def afterAll(): Unit = {
-    sc.stop()
     val temp = new File(tempDir)
-    temp.listFiles() foreach {
-      case f => f.delete()
+    val tempFiles = temp.listFiles()
+    if(tempFiles != null) tempFiles foreach {
+      case f => if(f != null) f.delete()
     }
     temp.delete()
 
+    sc.stop()
     super.afterAll()
   }
 
@@ -149,10 +150,38 @@ class RedshiftSourceSuite
     val relation = source.createRelation(testSqlContext, params)
 
     // Assert that we've loaded and converted all data in the test file
-    val df = testSqlContext.baseRelationToDataFrame(relation)
-    df.collect() zip expectedData foreach {
+    val rdd = relation.asInstanceOf[TableScan].buildScan()
+    rdd.collect() zip expectedData foreach {
       case (loaded, expected) =>
         loaded shouldBe expected
+    }
+  }
+
+  test("DefaultSource supports simple column filtering") {
+
+    val params = Map("jdbcurl" -> "jdbc:postgresql://foo/bar",
+      "tempdir" -> "tmp",
+      "redshifttable" -> "test_table",
+      "aws_access_key_id" -> "test1",
+      "aws_secret_access_key" -> "test2")
+
+    val jdbcWrapper = prepareUnloadTest(params)
+    val testSqlContext = new SQLContext(sc)
+
+    // Construct the source with a custom schema
+    val source = new DefaultSource(jdbcWrapper)
+    val relation = source.createRelation(testSqlContext, params, TestUtils.testSchema)
+
+    val rdd = relation.asInstanceOf[PrunedScan].buildScan(Array("testByte", "testBool"))
+    val prunedExpectedValues =
+      Array(Row(1.toByte, true),
+            Row(1.toByte, false),
+            Row(0.toByte, null),
+            Row(0.toByte, false),
+            Row(null, null))
+
+    rdd.collect() zip prunedExpectedValues foreach {
+      case (loaded, expected) => loaded shouldBe expected
     }
   }
 
@@ -174,6 +203,7 @@ class RedshiftSourceSuite
     // Define a simple filter to only include a subset of rows
     val filters: Array[Filter] =
       Array(EqualTo("testBool", true),
+            EqualTo("testString", "Unicode是樂趣"),
             GreaterThan("testDouble", 1000.0),
             LessThan("testDouble", Double.MaxValue),
             GreaterThanOrEqual("testFloat", 1.0f),
