@@ -31,7 +31,6 @@ class RedshiftSourceSuite
     var dir = File.createTempFile("spark_redshift_tests", "")
     dir.delete()
     dir.mkdirs()
-    dir.deleteOnExit()
     dir.toURI.toString
   }
 
@@ -79,6 +78,12 @@ class RedshiftSourceSuite
 
   override def afterAll(): Unit = {
     sc.stop()
+    val temp = new File(tempDir)
+    temp.listFiles() foreach {
+      case f => f.delete()
+    }
+    temp.delete()
+
     super.afterAll()
   }
 
