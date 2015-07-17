@@ -7,6 +7,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.mapreduce.InputFormat
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.jdbc.JDBCWrapper
+import org.apache.spark.sql.sources._
 import org.apache.spark.sql.{SaveMode, Row, SQLContext}
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalamock.scalatest.MockFactory
@@ -107,11 +108,11 @@ class RedshiftSourceSuite
     jdbcWrapper
   }
 
-  test("DefaultSource can load Redshift UNLOAD output to a DataFrame") {
-
-    val testSqlContext = new SQLContext(sc)
-
-    val jdbcUrl = "jdbc:postgresql://foo/bar"
+  /**
+   * Prepare the JDBC wrapper for an UNLOAD test.
+   */
+  def prepareUnloadTest(params: Map[String, String]) = {
+    val jdbcUrl = params("jdbcurl")
     val jdbcWrapper = mockJdbcWrapper(jdbcUrl, Seq("UNLOAD.*".r))
 
     // We expect some extra calls to the JDBC wrapper,
@@ -124,20 +125,60 @@ class RedshiftSourceSuite
       .returning(TestUtils.testSchema)
       .anyNumberOfTimes()
 
+    jdbcWrapper
+  }
+
+  test("DefaultSource can load Redshift UNLOAD output to a DataFrame") {
+
+    val params = Map("jdbcurl" -> "jdbc:postgresql://foo/bar",
+      "tempdir" -> "tmp",
+      "redshifttable" -> "test_table",
+      "aws_access_key_id" -> "test1",
+      "aws_secret_access_key" -> "test2")
+
+    val jdbcWrapper = prepareUnloadTest(params)
+    val testSqlContext = new SQLContext(sc)
+
     // Use the data source to create a relation with given test settings
     val source = new DefaultSource(jdbcWrapper)
-    val relation = source.createRelation(testSqlContext,
-      Map("jdbcurl" -> jdbcUrl,
-          "tempdir" -> "tmp",
-          "redshifttable" -> "test_table",
-          "aws_access_key_id" -> "test1",
-          "aws_secret_access_key" -> "test2"))
+    val relation = source.createRelation(testSqlContext, params)
 
     // Assert that we've loaded and converted all data in the test file
     val df = testSqlContext.baseRelationToDataFrame(relation)
     df.collect() zip expectedData foreach {
       case (loaded, expected) =>
         loaded shouldBe expected
+    }
+  }
+
+  test("DefaultSource supports user schema, pruned and filtered scans") {
+
+    val params = Map("jdbcurl" -> "jdbc:postgresql://foo/bar",
+      "tempdir" -> "tmp",
+      "redshifttable" -> "test_table",
+      "aws_access_key_id" -> "test1",
+      "aws_secret_access_key" -> "test2")
+
+    val jdbcWrapper = prepareUnloadTest(params)
+    val testSqlContext = new SQLContext(sc)
+
+    // Construct the source with a custom schema
+    val source = new DefaultSource(jdbcWrapper)
+    val relation = source.createRelation(testSqlContext, params, TestUtils.testSchema)
+
+    // Define a simple filter to only include a subset of rows
+    val filters: Array[Filter] =
+      Array(EqualTo("testBool", true),
+            GreaterThan("testDouble", 1000.0),
+            LessThan("testDouble", Double.MaxValue),
+            GreaterThanOrEqual("testFloat", 1.0f),
+            LessThanOrEqual("testInt", 43))
+    val rdd = relation.asInstanceOf[PrunedFilteredScan].buildScan(Array("testByte", "testBool"), filters)
+
+    // We should now only have one matching row, with two columns
+    val filteredExpectedValues = Array(Row(1, true))
+    rdd.collect() zip filteredExpectedValues foreach {
+      case (loaded, expected) => loaded shouldBe expected
     }
   }
 
@@ -185,4 +226,6 @@ class RedshiftSourceSuite
         loaded shouldBe expected
     }
   }
+
+
 }
