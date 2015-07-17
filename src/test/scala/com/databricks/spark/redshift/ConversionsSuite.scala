@@ -12,21 +12,7 @@ import org.scalatest.{FunSuite, Matchers}
  */
 class ConversionsSuite extends FunSuite {
 
-  val testSchema =
-    StructType(
-      Seq(
-        StructField("testByte", ByteType, nullable = true),
-        StructField("testBool", BooleanType, nullable = true),
-        StructField("testDate", DateType, nullable = true),
-        StructField("testDouble", DoubleType, nullable = true),
-        StructField("testFloat", FloatType, nullable = true),
-        StructField("testInt", IntegerType, nullable = true),
-        StructField("testLong", LongType, nullable = true),
-        StructField("testShort", ShortType, nullable = true),
-        StructField("testString", StringType, nullable = true),
-        StructField("testTimestamp", TimestampType, nullable = true)))
-
-  val convertRow = Conversions.rowConverter(testSchema)
+  val convertRow = Conversions.rowConverter(TestUtils.testSchema)
 
   test("Data should be correctly converted") {
     val doubleMin = Double.MinValue.toString
@@ -35,19 +21,8 @@ class ConversionsSuite extends FunSuite {
 
     val timestampWithMillis = "2014-03-01 00:00:01.123"
 
-    val expectedDateMillis = {
-      val calendar = Calendar.getInstance()
-      calendar.set(2015, 6, 1, 0, 0, 0)
-      calendar.set(Calendar.MILLISECOND, 0)
-      calendar.getTime.getTime
-    }
-
-    val expectedTimestampMillis = {
-      val calendar = Calendar.getInstance()
-      calendar.set(2014, 2, 1, 0, 0, 1)
-      calendar.set(Calendar.MILLISECOND, 123)
-      calendar.getTime.getTime
-    }
+    val expectedDateMillis = TestUtils.toMillis(2015, 6, 1, 0, 0, 0)
+    val expectedTimestampMillis = TestUtils.toMillis(2014, 2, 1, 0, 0, 1, 123)
 
     val convertedRow = convertRow(
       Array("1", "t", "2015-07-01", doubleMin, "1.0", "42",
@@ -61,7 +36,7 @@ class ConversionsSuite extends FunSuite {
   }
 
   test("Row conversion handles null values") {
-    val emptyRow = List.fill(testSchema.length)(null).toArray[String]
+    val emptyRow = List.fill(TestUtils.testSchema.length)(null).toArray[String]
     assert(convertRow(emptyRow) == Row(emptyRow: _*))
   }
 }

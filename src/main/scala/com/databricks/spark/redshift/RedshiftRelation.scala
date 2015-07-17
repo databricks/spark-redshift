@@ -21,7 +21,7 @@ import java.util.Properties
 import com.databricks.spark.redshift.Parameters.MergedParameters
 import org.apache.spark.Logging
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.jdbc.RedshiftJDBCWrapper
+import org.apache.spark.sql.jdbc.JDBCWrapper
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
@@ -30,7 +30,8 @@ import org.apache.spark.sql.{DataFrame, Row, SQLContext}
  * Data Source API implementation for Amazon Redshift database tables
  */
 private [redshift]
-case class RedshiftRelation(params: MergedParameters,
+case class RedshiftRelation(jdbcWrapper: JDBCWrapper,
+                            params: MergedParameters,
                             userSchema: Option[StructType])
                            (@transient val sqlContext: SQLContext)
   extends BaseRelation
@@ -44,13 +45,11 @@ case class RedshiftRelation(params: MergedParameters,
     userSchema match {
       case Some(schema) => schema
       case None => {
-        RedshiftJDBCWrapper.registerDriver(params.jdbcDriver)
-        RedshiftJDBCWrapper.resolveTable(params.jdbcUrl, params.table, new Properties())
+        jdbcWrapper.registerDriver(params.jdbcDriver)
+        jdbcWrapper.resolveTable(params.jdbcUrl, params.table, new Properties())
       }
     }
   }
-
-  val getConnection = RedshiftJDBCWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, new Properties())
 
   override def buildScan(): RDD[Row] = {
     unloadToTemp()
@@ -71,11 +70,11 @@ case class RedshiftRelation(params: MergedParameters,
   }
 
   override def insert(data: DataFrame, overwrite: Boolean): Unit = {
-    RedshiftWriter.saveToRedshift(data, params, getConnection)
+    new RedshiftWriter(jdbcWrapper).saveToRedshift(sqlContext, data, params)
   }
 
   def unloadToTemp(columnList: String = "*", whereClause: String = ""): Unit = {
-    val conn = getConnection()
+    val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, new Properties()).apply()
     val unloadSql = unloadStmnt(columnList, whereClause)
     val statement = conn.prepareStatement(unloadSql)
 

@@ -22,9 +22,9 @@ import java.util.Properties
 import org.apache.spark.sql.DataFrame
 
 /**
- * Hack to access some private JDBC SQL functionality.
+ * Hack to access some private JDBC SQL functionality
  */
-object RedshiftJDBCWrapper {
+class JDBCWrapper {
   def schemaString(dataFrame: DataFrame, url: String) = JDBCWriteDetails.schemaString(dataFrame, url)
   def registerDriver(driverClass: String) = DriverRegistry.register(driverClass)
   def resolveTable(jdbcUrl: String, table: String, properties: Properties) =
@@ -33,3 +33,5 @@ object RedshiftJDBCWrapper {
     JDBCRDD.getConnector(driver, url, properties)
   def tableExists(conn: Connection, table: String) = JdbcUtils.tableExists(conn, table)
 }
+
+object DefaultJDBCWrapper extends JDBCWrapper

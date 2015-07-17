@@ -20,8 +20,6 @@ import java.io.File
 import java.net.URI
 import java.util.UUID
 
-import com.amazonaws.auth.DefaultAWSCredentialsProviderChain
-
 /**
  * Various arbitrary helper functions
  */

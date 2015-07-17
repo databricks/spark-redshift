@@ -20,7 +20,7 @@ import java.sql.Timestamp
 import java.text.{DateFormat, FieldPosition, ParsePosition, SimpleDateFormat}
 import java.util.Date
 
-import org.apache.spark.sql.Row
+import org.apache.spark.sql.{SQLContext, DataFrame, Row}
 import org.apache.spark.sql.types._
 
 import scala.util.parsing.combinator.JavaTokenParsers
@@ -114,4 +114,17 @@ object Conversions {
    */
   def rowConverter(schema: StructType) = convertRow(schema, _: Array[String])
 
+
+  /**
+   * Convert schema representation of Dates to Timestamps, as spark-avro only works with Timestamps
+   */
+  def datesToTimestamps(sqlContext: SQLContext, df: DataFrame): DataFrame = {
+    val schema = StructType(
+      df.schema map {
+        case StructField(name, DateType, nullable, meta) => StructField(name, TimestampType, nullable, meta)
+        case other => other
+      })
+
+    sqlContext.createDataFrame(df.rdd, schema)
+  }
 }

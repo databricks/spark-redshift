@@ -17,10 +17,8 @@
 
 package com.databricks.spark
 
-import java.util.Properties
-
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.jdbc.RedshiftJDBCWrapper
+import org.apache.spark.sql.jdbc.DefaultJDBCWrapper
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 
@@ -63,7 +61,7 @@ package object redshift {
      */
     def redshiftTable(parameters: Map[String, String]) = {
       val params = Parameters.mergeParameters(parameters)
-      sqlContext.baseRelationToDataFrame(RedshiftRelation(params, None)(sqlContext))
+      sqlContext.baseRelationToDataFrame(RedshiftRelation(DefaultJDBCWrapper, params, None)(sqlContext))
     }
   }
 
@@ -77,8 +75,7 @@ package object redshift {
      */
     def saveAsRedshiftTable(parameters: Map[String, String]): Unit = {
       val params = Parameters.mergeParameters(parameters)
-      val getConnection = RedshiftJDBCWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, new Properties())
-      RedshiftWriter.saveToRedshift(dataFrame, params, getConnection)
+      DefaultRedshiftWriter.saveToRedshift(dataFrame.sqlContext, dataFrame, params)
     }
   }
 }

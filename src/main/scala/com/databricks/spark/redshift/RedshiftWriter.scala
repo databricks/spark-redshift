@@ -16,25 +16,26 @@
 
 package com.databricks.spark.redshift
 
-import java.sql.Connection
+import java.sql.{SQLException, Connection}
+import java.util.Properties
 
 import com.databricks.spark.redshift.Parameters.MergedParameters
 import org.apache.spark.Logging
-import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.jdbc.RedshiftJDBCWrapper
+import org.apache.spark.sql.{SQLContext, DataFrame}
+import org.apache.spark.sql.jdbc.{DefaultJDBCWrapper, JDBCWrapper}
 
 import scala.util.Random
 
 /**
  * Functions to write data to Redshift with intermediate Avro serialisation into S3.
  */
-object RedshiftWriter extends Logging {
+class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
 
   /**
    * Generate CREATE TABLE statement for Redshift
    */
   def createTableSql(data: DataFrame, params: MergedParameters) : String = {
-    val schemaSql = RedshiftJDBCWrapper.schemaString(data, params.jdbcUrl)
+    val schemaSql = jdbcWrapper.schemaString(data, params.jdbcUrl)
     val distStyleDef = params.distStyle match {
       case Some(style) => s"DISTSTYLE $style"
       case None => ""
@@ -74,11 +75,11 @@ object RedshiftWriter extends Logging {
       conn.prepareStatement(s"ALTER TABLE ${params.table} RENAME TO $backupTable").execute()
       conn.prepareStatement(s"ALTER TABLE $tempTable RENAME TO ${params.table}").execute()
     } catch {
-      case e: Exception =>
-        if (RedshiftJDBCWrapper.tableExists(conn, tempTable)) {
+      case e: SQLException =>
+        if (jdbcWrapper.tableExists(conn, tempTable)) {
           conn.prepareStatement(s"DROP TABLE $tempTable").execute()
         }
-        if (RedshiftJDBCWrapper.tableExists(conn, backupTable)) {
+        if (jdbcWrapper.tableExists(conn, backupTable)) {
           conn.prepareStatement(s"ALTER TABLE $backupTable RENAME TO ${params.table}").execute()
         }
         throw new Exception("Error loading data to Redshift, changes reverted.", e)
@@ -121,27 +122,29 @@ object RedshiftWriter extends Logging {
   /**
    * Serialize temporary data to S3, ready for Redshift COPY
    */
-  def unloadData(data: DataFrame, tempPath: String): Unit = {
-    data.write.format("com.databricks.spark.avro").save(tempPath)
+  def unloadData(sqlContext: SQLContext, data: DataFrame, tempPath: String): Unit = {
+    Conversions.datesToTimestamps(sqlContext, data).write.format("com.databricks.spark.avro").save(tempPath)
   }
 
   /**
    * Write a DataFrame to a Redshift table, using S3 and Avro serialization
    */
-  def saveToRedshift(data: DataFrame, params: MergedParameters, getConnection: () => Connection) : Unit = {
-    val conn = getConnection()
+  def saveToRedshift(sqlContext: SQLContext, data: DataFrame, params: MergedParameters) : Unit = {
+    val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, new Properties()).apply()
 
     if(params.overwrite && params.useStagingTable) {
       withStagingTable(conn, params, table => {
         val updatedParams = MergedParameters(params.parameters updated ("redshifttable", table))
-        unloadData(data, updatedParams.tempPath)
+        unloadData(sqlContext, data, updatedParams.tempPath)
         doRedshiftLoad(conn, data, updatedParams)
       })
     } else {
-      unloadData(data, params.tempPath)
+      unloadData(sqlContext, data, params.tempPath)
       doRedshiftLoad(conn, data, params)
     }
 
     conn.close()
   }
 }
+
+object DefaultRedshiftWriter extends RedshiftWriter(DefaultJDBCWrapper)

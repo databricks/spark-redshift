@@ -62,6 +62,8 @@ libraryDependencies += "com.google.guava" % "guava" % "14.0.1" % Test
 
 libraryDependencies += "org.scalatest" %% "scalatest" % "2.1.5" % Test
 
+libraryDependencies += "org.scalamock" %% "scalamock-scalatest-support" % "3.2" % Test
+
 ScoverageSbtPlugin.ScoverageKeys.coverageHighlighting := {
   if (scalaBinaryVersion.value == "2.10") false
   else false

@@ -33,7 +33,7 @@ private [redshift] object Parameters {
     "overwrite" -> "false",
     "diststyle" -> "EVEN",
     "usestagingtable" -> "true",
-    "postactions" -> ""
+    "postactions" -> ";"
   )
 
   /**
