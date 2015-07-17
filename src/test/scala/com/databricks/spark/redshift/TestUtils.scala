@@ -21,7 +21,7 @@ object TestUtils {
   /**
    * Simple schema that includes all data types we support
    */
-  val testSchema =
+  lazy val testSchema =
     StructType(
       Seq(
         makeField("testByte", ByteType),
