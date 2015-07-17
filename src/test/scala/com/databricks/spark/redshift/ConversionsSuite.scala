@@ -12,7 +12,7 @@ import org.scalatest.{FunSuite, Matchers}
  */
 class ConversionsSuite extends FunSuite {
 
-  val convertRow = Conversions.rowConverter(TestUtils.testSchema)
+  lazy val convertRow = Conversions.rowConverter(TestUtils.testSchema)
 
   test("Data should be correctly converted") {
     val doubleMin = Double.MinValue.toString
