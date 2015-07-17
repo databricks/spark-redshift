@@ -53,10 +53,6 @@ class RedshiftSourceSuite
       Row(0.toByte, false, null, -1234152.123124981, 100000.0f, null, 1239012341823719L, 24, "___|_123", null),
       Row(List.fill(10)(null): _*))
 
-  /**
-   * SparkConfig for local testing
-   */
-  val testConfig = new SparkConf().setMaster("local[1]").setAppName("RedshiftSourceSuite")
 
   /**
    * Spark Context with hadoop file overridden to point at our local test data file for this suite,
@@ -66,6 +62,7 @@ class RedshiftSourceSuite
 
   override def beforeAll(): Unit = {
     super.beforeAll()
+    val testConfig = new SparkConf().setMaster("local[1]").setAppName("RedshiftSourceSuite")
     sc = new SparkContext(testConfig) {
       override def newAPIHadoopFile[K, V, F <: InputFormat[K, V]]
       (path: String, fClass: Class[F], kClass: Class[K],
