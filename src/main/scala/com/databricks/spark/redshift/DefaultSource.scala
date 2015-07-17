@@ -16,10 +16,8 @@
 
 package com.databricks.spark.redshift
 
-import java.sql.Connection
 import java.util.Properties
 
-import com.databricks.spark.redshift.Parameters.MergedParameters
 import org.apache.spark.Logging
 import org.apache.spark.sql.jdbc.{DefaultJDBCWrapper, JDBCWrapper}
 import org.apache.spark.sql.sources.{BaseRelation, CreatableRelationProvider, RelationProvider, SchemaRelationProvider}

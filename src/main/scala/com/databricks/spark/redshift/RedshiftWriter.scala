@@ -16,13 +16,13 @@
 
 package com.databricks.spark.redshift
 
-import java.sql.{SQLException, Connection}
+import java.sql.{Connection, SQLException}
 import java.util.Properties
 
 import com.databricks.spark.redshift.Parameters.MergedParameters
 import org.apache.spark.Logging
-import org.apache.spark.sql.{SQLContext, DataFrame}
 import org.apache.spark.sql.jdbc.{DefaultJDBCWrapper, JDBCWrapper}
+import org.apache.spark.sql.{DataFrame, SQLContext}
 
 import scala.util.Random
 

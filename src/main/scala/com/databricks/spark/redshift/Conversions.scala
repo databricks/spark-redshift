@@ -20,8 +20,8 @@ import java.sql.Timestamp
 import java.text.{DateFormat, FieldPosition, ParsePosition, SimpleDateFormat}
 import java.util.Date
 
-import org.apache.spark.sql.{SQLContext, DataFrame, Row}
 import org.apache.spark.sql.types._
+import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 
 import scala.util.parsing.combinator.JavaTokenParsers
 

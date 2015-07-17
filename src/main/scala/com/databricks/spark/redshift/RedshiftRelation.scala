@@ -111,7 +111,7 @@ case class RedshiftRelation(jdbcWrapper: JDBCWrapper,
   }
 
   def compileValue(value: Any): Any = value match {
-    case stringValue: UTF8String => s"\\'${escapeSql(stringValue.toString)}\\'"
+    case stringValue: String => s"\\'${escapeSql(stringValue.toString)}\\'"
     case _ => value
   }
 
