@@ -222,7 +222,8 @@ class RedshiftSourceSuite
           "tempdir" -> tempDir,
           "redshifttable" -> "test_table",
           "aws_access_key_id" -> "test1",
-          "aws_secret_access_key" -> "test2")
+          "aws_secret_access_key" -> "test2",
+          "postactions" -> "GRANT SELECT ON %s TO jeremy")
 
     val rdd = sc.parallelize(expectedData.toSeq)
     val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
@@ -231,6 +232,7 @@ class RedshiftSourceSuite
       Seq("DROP TABLE IF EXISTS test_table_staging_.*".r,
           "CREATE TABLE IF NOT EXISTS test_table_staging.*".r,
           "COPY test_table_staging_.*".r,
+          "GRANT SELECT ON test_table_staging.+ TO jeremy".r,
           "ALTER TABLE test_table RENAME TO test_table_backup_.*".r,
           "ALTER TABLE test_table_staging_.* RENAME TO test_table".r,
           "DROP TABLE test_table_backup.*".r)
