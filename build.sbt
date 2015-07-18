@@ -35,7 +35,7 @@ libraryDependencies += "org.apache.hadoop" % "hadoop-aws" % "2.6.0" % "provided"
 libraryDependencies += "com.databricks" %% "spark-avro" % "1.0.0"
 
 libraryDependencies += ("org.apache.avro" % "avro-mapred" % "1.7.6" % "provided"
-  classifier (if(version.value.startsWith("1.")) "hadoop1" else "hadoop2")
+  classifier (if(hadoopVersion.value.startsWith("1.")) "hadoop1" else "hadoop2")
   exclude("org.mortbay.jetty", "servlet-api"))
 
 // TODO: Need a better fix for dependency hell here
