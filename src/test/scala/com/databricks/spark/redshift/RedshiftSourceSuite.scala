@@ -62,8 +62,7 @@ class RedshiftSourceSuite
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    val testConfig = new SparkConf().setMaster("local[1]").setAppName("RedshiftSourceSuite")
-    sc = new SparkContext(testConfig) {
+    sc = new SparkContext("local", this.getClass.getName) {
       override def newAPIHadoopFile[K, V, F <: InputFormat[K, V]]
       (path: String, fClass: Class[F], kClass: Class[K],
        vClass: Class[V], conf: Configuration = hadoopConfiguration):
