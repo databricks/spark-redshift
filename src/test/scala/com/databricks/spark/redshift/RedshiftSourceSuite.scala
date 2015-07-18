@@ -15,6 +15,21 @@ import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
 
 import scala.util.matching.Regex
 
+class TestContext extends SparkContext("local", "RedshiftSourceSuite") {
+
+  /**
+   * A text file containing fake unloaded Redshift data of all supported types
+   */
+  val testData = new File("src/test/resources/redshift_unload_data.txt").toURI.toString
+
+  override def newAPIHadoopFile[K, V, F <: InputFormat[K, V]]
+  (path: String, fClass: Class[F], kClass: Class[K],
+   vClass: Class[V], conf: Configuration = hadoopConfiguration):
+  RDD[(K, V)] = {
+    super.newAPIHadoopFile[K, V, F](testData, fClass, kClass, vClass, conf)
+  }
+}
+
 /**
  * Tests main DataFrame loading and writing functionality
  */
@@ -33,11 +48,6 @@ class RedshiftSourceSuite
     dir.mkdirs()
     dir.toURI.toString
   }
-
-  /**
-   * A text file containing fake unloaded Redshift data of all supported types
-   */
-  val testData = new File("src/test/resources/redshift_unload_data.txt").toURI.toString
 
   /**
    * Expected parsed output corresponding to the output of testData.
@@ -62,14 +72,7 @@ class RedshiftSourceSuite
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    sc = new SparkContext("local", this.getClass.getName) {
-      override def newAPIHadoopFile[K, V, F <: InputFormat[K, V]]
-      (path: String, fClass: Class[F], kClass: Class[K],
-       vClass: Class[V], conf: Configuration = hadoopConfiguration):
-      RDD[(K, V)] = {
-        super.newAPIHadoopFile[K, V, F](testData, fClass, kClass, vClass, conf)
-      }
-    }
+    sc = new TestContext
   }
 
   override def afterAll(): Unit = {
