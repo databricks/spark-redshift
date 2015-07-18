@@ -31,7 +31,7 @@ libraryDependencies += "org.apache.hadoop" % "hadoop-client" % hadoopVersion.val
 
 libraryDependencies += "org.apache.hadoop" % "hadoop-aws" % "2.6.0" % "provided"
 
-libraryDependencies += "com.databricks" % "spark-avro_2.10" % "1.0.0"
+libraryDependencies += "com.databricks" % "spark-avro" % "1.0.0"
 
 // TODO: Should be provided? This seems to be needed to make spark-avro work.
 libraryDependencies += "org.apache.avro" % "avro-mapred" % "1.7.6" classifier "hadoop2" exclude("org.mortbay.jetty", "servlet-api")
