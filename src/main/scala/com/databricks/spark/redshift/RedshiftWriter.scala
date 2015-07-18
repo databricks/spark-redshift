@@ -132,18 +132,20 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
   def saveToRedshift(sqlContext: SQLContext, data: DataFrame, params: MergedParameters) : Unit = {
     val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, new Properties()).apply()
 
-    if(params.overwrite && params.useStagingTable) {
-      withStagingTable(conn, params, table => {
-        val updatedParams = MergedParameters(params.parameters updated ("redshifttable", table))
-        unloadData(sqlContext, data, updatedParams.tempPath)
-        doRedshiftLoad(conn, data, updatedParams)
-      })
-    } else {
-      unloadData(sqlContext, data, params.tempPath)
-      doRedshiftLoad(conn, data, params)
+    try {
+      if(params.overwrite && params.useStagingTable) {
+        withStagingTable(conn, params, table => {
+          val updatedParams = MergedParameters(params.parameters updated ("redshifttable", table))
+          unloadData(sqlContext, data, updatedParams.tempPath)
+          doRedshiftLoad(conn, data, updatedParams)
+        })
+      } else {
+        unloadData(sqlContext, data, params.tempPath)
+        doRedshiftLoad(conn, data, params)
+      }
+    } finally {
+      conn.close()
     }
-
-    conn.close()
   }
 }
 

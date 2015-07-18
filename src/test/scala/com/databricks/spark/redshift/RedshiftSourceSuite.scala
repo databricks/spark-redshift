@@ -1,7 +1,7 @@
 package com.databricks.spark.redshift
 
 import java.io.File
-import java.sql.{Connection, PreparedStatement}
+import java.sql.{SQLException, Connection, PreparedStatement}
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.mapreduce.InputFormat
@@ -89,7 +89,6 @@ class RedshiftSourceSuite
    * regular expressions will be executed, and that the connection returned will be closed.
    */
   def mockJdbcWrapper(expectedUrl: String, expectedQueries: Seq[Regex]): JDBCWrapper = {
-    val wrapper = mock[JDBCWrapper]
     val jdbcWrapper = mock[JDBCWrapper]
     val mockedConnection = mock[Connection]
 
@@ -258,5 +257,87 @@ class RedshiftSourceSuite
     }
   }
 
+  test("Failed copies are handled gracefully when using a staging table") {
+    val testSqlContext = new SQLContext(sc)
 
+    val jdbcUrl = "jdbc:postgresql://foo/bar"
+    val params =
+      Map("jdbcurl" -> jdbcUrl,
+        "tempdir" -> tempDir,
+        "redshifttable" -> "test_table",
+        "aws_access_key_id" -> "test1",
+        "aws_secret_access_key" -> "test2",
+        "usestagingtable" -> "true")
+
+    val rdd = sc.parallelize(expectedData.toSeq)
+    val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
+
+    val jdbcWrapper = mock[JDBCWrapper]
+    val mockedConnection = mock[Connection]
+
+    (jdbcWrapper.getConnector _)
+      .expects(*, jdbcUrl, *)
+      .returning(() => mockedConnection)
+
+    def successfulStatement(pattern: Regex): PreparedStatement = {
+      val mockedStatement = mock[PreparedStatement]
+      (mockedConnection.prepareStatement(_: String))
+        .expects(where {(sql: String) => pattern.findFirstMatchIn(sql).nonEmpty})
+        .returning(mockedStatement)
+      (mockedStatement.execute _).expects().returning(true)
+
+      mockedStatement
+    }
+
+    def failedStatement(pattern: Regex) : PreparedStatement = {
+      val mockedStatement = mock[PreparedStatement]
+      (mockedConnection.prepareStatement(_: String))
+        .expects(where {(sql: String) => pattern.findFirstMatchIn(sql).nonEmpty})
+        .returning(mockedStatement)
+
+      (mockedStatement.execute _)
+        .expects()
+        .throwing(new SQLException("Mocked Error"))
+
+      mockedStatement
+    }
+
+    (jdbcWrapper.tableExists _)
+      .expects(*, "test_table")
+      .returning(true)
+      .anyNumberOfTimes()
+
+    (jdbcWrapper.schemaString _)
+      .expects(*, jdbcUrl)
+      .anyNumberOfTimes()
+
+    inSequence {
+      // Initial staging table setup succeeds
+      successfulStatement("DROP TABLE IF EXISTS test_table_staging_.*".r)
+      successfulStatement("CREATE TABLE IF NOT EXISTS test_table_staging.*".r)
+
+      // Simulate COPY failure
+      failedStatement("COPY test_table_staging_.*".r)
+
+      // Expect recovery operations
+      (jdbcWrapper.tableExists _)
+        .expects(where {(conn: Connection, sql: String) =>
+          "test_table_staging.*".r.findFirstIn(sql).nonEmpty})
+        .returning(true)
+      successfulStatement("DROP TABLE test_table_staging.*".r)
+
+      (jdbcWrapper.tableExists _)
+        .expects(where {(conn: Connection, sql: String) =>
+          "test_table_backup.*".r.findFirstIn(sql).nonEmpty})
+        .returning(true)
+      successfulStatement("ALTER TABLE test_table_backup.+ RENAME TO test_table".r)
+
+      (mockedConnection.close _).expects()
+    }
+
+    val source = new DefaultSource(jdbcWrapper)
+    intercept[Exception] {
+      source.createRelation(testSqlContext, SaveMode.Overwrite, params, df)
+    }
+  }
 }
