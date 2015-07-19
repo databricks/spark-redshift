@@ -10,7 +10,7 @@ version := "0.4.1-SNAPSHOT"
 
 scalaVersion := "2.10.4"
 
-sparkVersion := sys.props.get("spark.version").getOrElse("1.4.1")
+sparkVersion := sys.props.get("spark.version").getOrElse("1.4.0")
 
 hadoopVersion := sys.props.get("hadoop.version").getOrElse("2.2.0")
 
@@ -36,10 +36,6 @@ libraryDependencies += "org.apache.avro" % "avro-mapred" % "1.7.6" % "provided" 
 // For testing, we using a Postgres driver, but it is recommended that the Amazon driver is used
 // in production. See http://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-connection.html
 libraryDependencies += "postgresql" % "postgresql" % "8.3-606.jdbc4" % "provided"
-
-libraryDependencies += "com.google.guava" % "guava" % "14.0.1" % Test
-
-libraryDependencies += "org.scalatest" %% "scalatest" % "2.1.5" % Test
 
 libraryDependencies += "com.google.guava" % "guava" % "14.0.1" % Test
 
