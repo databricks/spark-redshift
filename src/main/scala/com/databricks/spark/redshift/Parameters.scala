@@ -39,8 +39,19 @@ private [redshift] object Parameters {
   /**
    * Merge user parameters with the defaults, preferring user parameters if specified
    */
-  def mergeParameters(userParameters: Map[String, String]) : MergedParameters =
+  def mergeParameters(userParameters: Map[String, String]) : MergedParameters = {
+    if(! userParameters.contains("tempdir")) {
+      sys.error("'tempdir' is required for all Redshift loads and saves")
+    }
+    if(! userParameters.contains("redshifttable")) {
+      sys.error("You must specify a Redshift table name with 'redshifttable' parameter")
+    }
+    if(! userParameters.contains("jdbcurl")) {
+      sys.error("A JDBC URL must be provided with 'jdbcurl' parameter")
+    }
+
     MergedParameters(DEFAULT_PARAMETERS ++ userParameters)
+  }
 
   /**
    * Adds validators and accessors to string map
@@ -53,7 +64,7 @@ private [redshift] object Parameters {
      * for S3.
      */
     private def tempDir = {
-      parameters.getOrElse("tempdir", sys.error("'tempdir' is required for all Redshift loads and saves"))
+      parameters("tempdir")
     }
 
     /**
@@ -65,7 +76,7 @@ private [redshift] object Parameters {
      * The Redshift table to be used as the target when loading or writing data.
      */
     def table = {
-      parameters.getOrElse("redshifttable", sys.error("You must specify a Redshift table name with 'redshifttable' parameter"))
+      parameters("redshifttable")
     }
 
     /**
@@ -80,7 +91,7 @@ private [redshift] object Parameters {
      *  - user and password are credentials to access the database, which must be embedded in this URL for JDBC
      */
     def jdbcUrl = {
-      parameters.getOrElse("jdbcurl", sys.error("A JDBC URL must be provided with 'jdbcurl' parameter"))
+      parameters("jdbcurl")
     }
 
     /**
