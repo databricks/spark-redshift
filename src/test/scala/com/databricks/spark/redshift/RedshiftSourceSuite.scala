@@ -226,14 +226,16 @@ class RedshiftSourceSuite
           "redshifttable" -> "test_table",
           "aws_access_key_id" -> "test1",
           "aws_secret_access_key" -> "test2",
-          "postactions" -> "GRANT SELECT ON %s TO jeremy")
+          "postactions" -> "GRANT SELECT ON %s TO jeremy",
+          "diststyle" -> "KEY",
+          "distkey" -> "testInt")
 
     val rdd = sc.parallelize(expectedData.toSeq)
     val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
 
     val expectedCommands =
       Seq("DROP TABLE IF EXISTS test_table_staging_.*".r,
-          "CREATE TABLE IF NOT EXISTS test_table_staging.*".r,
+          "CREATE TABLE IF NOT EXISTS test_table_staging.* DISTSTYLE KEY DISTKEY \\(testInt\\).*".r,
           "COPY test_table_staging_.*".r,
           "GRANT SELECT ON test_table_staging.+ TO jeremy".r,
           "ALTER TABLE test_table RENAME TO test_table_backup_.*".r,
@@ -249,6 +251,7 @@ class RedshiftSourceSuite
 
     (jdbcWrapper.schemaString _)
       .expects(*, jdbcUrl)
+      .returning("schema")
       .anyNumberOfTimes()
 
     val source = new DefaultSource(jdbcWrapper)
@@ -344,5 +347,102 @@ class RedshiftSourceSuite
     intercept[Exception] {
       source.createRelation(testSqlContext, SaveMode.Overwrite, params, df)
     }
+  }
+
+  test("Append SaveMode doesn't destroy existing data") {
+    val testSqlContext = new SQLContext(sc)
+
+    val jdbcUrl = "jdbc:postgresql://foo/bar"
+    val params =
+      Map("jdbcurl" -> jdbcUrl,
+        "tempdir" -> tempDir,
+        "redshifttable" -> "test_table",
+        "aws_access_key_id" -> "test1",
+        "aws_secret_access_key" -> "test2")
+
+    val rdd = sc.parallelize(expectedData.toSeq)
+    val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
+
+    val expectedCommands =
+      Seq("CREATE TABLE IF NOT EXISTS test_table .*".r,
+          "COPY test_table .*".r)
+
+    val jdbcWrapper = mockJdbcWrapper(jdbcUrl, expectedCommands)
+
+    (jdbcWrapper.tableExists _)
+      .expects(*, "test_table")
+      .returning(true)
+      .anyNumberOfTimes()
+
+    (jdbcWrapper.schemaString _)
+      .expects(*, jdbcUrl)
+      .returning("schema")
+      .anyNumberOfTimes()
+
+    val source = new DefaultSource(jdbcWrapper)
+    val savedDf = source.createRelation(testSqlContext, SaveMode.Append, params, df)
+
+    // This test is "appending" to an empty table, so we expect all our test data to be
+    // the only content in the returned data frame
+    val written = testSqlContext.read.format("com.databricks.spark.avro").load(tempDir)
+    written.collect() zip expectedData foreach {
+      case (loaded, expected) =>
+        loaded shouldBe expected
+    }
+  }
+
+  test("Respect SaveMode.ErrorIfExists when table exists") {
+    val testSqlContext = new SQLContext(sc)
+
+    val jdbcUrl = "jdbc:postgresql://foo/bar"
+    val params =
+      Map("jdbcurl" -> jdbcUrl,
+          "tempdir" -> tempDir,
+          "redshifttable" -> "test_table",
+          "aws_access_key_id" -> "test1",
+          "aws_secret_access_key" -> "test2")
+
+    val rdd = sc.parallelize(expectedData.toSeq)
+    val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
+
+    // Check that SaveMode.ErrorIfExists throws an exception
+
+    val errIfExistsWrapper = mockJdbcWrapper(jdbcUrl, Seq.empty[Regex])
+
+    (errIfExistsWrapper.tableExists _)
+      .expects(*, "test_table")
+      .returning(true)
+
+    val errIfExistsSource = new DefaultSource(errIfExistsWrapper)
+    intercept[Exception] {
+      errIfExistsSource.createRelation(testSqlContext, SaveMode.ErrorIfExists, params, df)
+    }
+  }
+
+  test("Do nothing when table exists if SaveMode = Ignore") {
+    val testSqlContext = new SQLContext(sc)
+
+    val jdbcUrl = "jdbc:postgresql://foo/bar"
+    val params =
+      Map("jdbcurl" -> jdbcUrl,
+        "tempdir" -> tempDir,
+        "redshifttable" -> "test_table",
+        "aws_access_key_id" -> "test1",
+        "aws_secret_access_key" -> "test2")
+
+    val rdd = sc.parallelize(expectedData.toSeq)
+    val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
+
+    // Check that SaveMode.Ignore does nothing
+
+    val ignoreWrapper = mockJdbcWrapper(jdbcUrl, Seq.empty[Regex])
+
+    (ignoreWrapper.tableExists _)
+      .expects(*, "test_table")
+      .returning(true)
+
+    // Note: Assertions covered by mocks
+    val ignoreSource = new DefaultSource(ignoreWrapper)
+    ignoreSource.createRelation(testSqlContext, SaveMode.Ignore, params, df)
   }
 }

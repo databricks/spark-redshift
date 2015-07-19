@@ -64,19 +64,24 @@ class DefaultSource(jdbcWrapper: JDBCWrapper)
                               data: DataFrame): BaseRelation = {
     val params = Parameters.mergeParameters(parameters)
 
+    def tableExists: Boolean = {
+      val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, new Properties()).apply()
+      val exists = jdbcWrapper.tableExists(conn, params.table)
+      conn.close()
+      exists
+    }
+
     val (doSave, dropExisting) = mode match {
       case SaveMode.Append => (true, false)
       case SaveMode.Overwrite => (true, true)
       case SaveMode.ErrorIfExists =>
-        val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, new Properties()).apply()
-        if(jdbcWrapper.tableExists(conn, params.table)) {
+        if(tableExists) {
           sys.error(s"Table ${params.table} already exists! (SaveMode is set to ErrorIfExists)")
         } else {
           (true, false)
         }
       case SaveMode.Ignore =>
-        val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, new Properties()).apply()
-        if(jdbcWrapper.tableExists(conn, params.table)) {
+        if(tableExists) {
           log.info(s"Table ${params.table} already exists -- ignoring save request.")
           (false, false)
         } else {
