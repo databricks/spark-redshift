@@ -445,4 +445,20 @@ class RedshiftSourceSuite
     val ignoreSource = new DefaultSource(ignoreWrapper)
     ignoreSource.createRelation(testSqlContext, SaveMode.Ignore, params, df)
   }
+
+  test("Public Scala API rejects invalid parameter maps") {
+    val invalid = Map("redshifttable" -> "foo") // missing tempdir and jdbcurl
+
+    val rdd = sc.parallelize(expectedData)
+    val testSqlContext = new SQLContext(sc)
+    val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
+
+    intercept[Exception] {
+      df.saveAsRedshiftTable(invalid)
+    }
+
+    intercept[Exception] {
+      testSqlContext.redshiftTable(invalid)
+    }
+  }
 }
