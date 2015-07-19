@@ -10,7 +10,7 @@ version := "0.4.1-SNAPSHOT"
 
 scalaVersion := "2.10.4"
 
-sparkVersion := sys.props.get("spark.version").getOrElse("1.4.0")
+sparkVersion := sys.props.get("spark.version").getOrElse("1.4.1")
 
 hadoopVersion := sys.props.get("hadoop.version").getOrElse("2.2.0")
 
@@ -25,21 +25,12 @@ credentials += Credentials(Path.userHome / ".ivy2" / ".credentials")
 resolvers +=
   "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
 
-libraryDependencies += "org.apache.spark" %% "spark-sql" % "1.4.0" % "provided"
-
-libraryDependencies += "org.apache.hadoop" % "hadoop-client" % hadoopVersion.value % "provided" exclude("org.mortbay.jetty", "javax.servlet")
-
-libraryDependencies += "org.apache.hadoop" % "hadoop-aws" % "2.6.0" % "provided"
+libraryDependencies += "com.amazonaws" % "aws-java-sdk-core" % "1.9.40" % "provided"
 
 // We require spark-avro, but avro-mapred must be provided to match Hadoop version
 libraryDependencies += "com.databricks" %% "spark-avro" % "1.0.0"
 
-libraryDependencies += ("org.apache.avro" % "avro-mapred" % "1.7.6" % "provided"
-  classifier (if(hadoopVersion.value.startsWith("1.")) "hadoop1" else "hadoop2")
-  exclude("org.mortbay.jetty", "servlet-api"))
-
-// TODO: Need a better fix for dependency hell here
-libraryDependencies += "net.java.dev.jets3t" % "jets3t" % "0.9.0"
+libraryDependencies += "org.apache.avro" % "avro-mapred" % "1.7.6" % "provided" exclude("org.mortbay.jetty", "servlet-api")
 
 // A Redshift-compatible JDBC driver must be present on the classpath for spark-redshift to work.
 // For testing, we using a Postgres driver, but it is recommended that the Amazon driver is used
@@ -49,16 +40,6 @@ libraryDependencies += "postgresql" % "postgresql" % "8.3-606.jdbc4" % "provided
 libraryDependencies += "com.google.guava" % "guava" % "14.0.1" % Test
 
 libraryDependencies += "org.scalatest" %% "scalatest" % "2.1.5" % Test
-
-libraryDependencies := libraryDependencies.value.map { module =>
-  if (module.name.indexOf("spark-sql") >= 0) {
-    module.exclude("org.apache.hadoop", "hadoop-client")
-  } else {
-    module
-  }
-}
-
-libraryDependencies += "org.apache.hadoop" % "hadoop-client" % hadoopVersion.value
 
 libraryDependencies += "com.google.guava" % "guava" % "14.0.1" % Test
 
