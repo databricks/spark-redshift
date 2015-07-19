@@ -5,7 +5,7 @@
 
 A library to load data into Spark SQL DataFrames from Amazon Redshift, and write them back to
 Redshift tables. Amazon S3 is used to transfer data efficiently into and out of Redshift, and
-JDBC is used to trigger the appropriate `COPY` and `UNLOAD` commands on Redshift automatically.
+JDBC is used to trigger the appropriate <tt>COPY</tt> and <tt>UNLOAD</tt> commands on Redshift automatically.
 
 ## Install
 
@@ -26,10 +26,10 @@ distribution that you plan to deploy to.
 
 Further, as Redshift is an AWS product, some AWS libraries will be required. This library expects that
 your deployment environment will include `hadoop-aws`, or other things necessary to access S3, credentials,
-etc. Check the dependencies with "provided" scope in `build.sbt` if you're at all unclear.
+etc. Check the dependencies with "provided" scope in <tt>build.sbt</tt> if you're at all unclear.
 
 You're also going to need a JDBC driver that is compatible with Redshift. The one used for testing can be
-found in `build.sbt`, however Amazon recommend that you use [their driver](http://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-connection.html).
+found in <tt>build.sbt</tt>, however Amazon recommend that you use [their driver](http://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-connection.html).
 
 ## Usage
 
@@ -107,7 +107,7 @@ OPTIONS (redshifttable 'my_table',
 
 ### Scala helper functions
 
-The `com.databricks.spark.redshift` package has some shortcuts if you're working directly
+The <tt>com.databricks.spark.redshift</tt> package has some shortcuts if you're working directly
 from a Scala application and don't want to use the Data Sources API:
 
 ```scala
@@ -148,7 +148,7 @@ val records: DataFrame = sqlContext.redshiftFile(path, "name varchar(10) age int
 
 ## Parameters
 
-The parameter map or `OPTIONS` provided in Spark SQL supports the following settings.
+The parameter map or <tt>OPTIONS</tt> provided in Spark SQL supports the following settings.
 
 <table>
  <tr>
@@ -159,116 +159,118 @@ The parameter map or `OPTIONS` provided in Spark SQL supports the following sett
  </tr>
 
  <tr>
-    <td>`redshifttable`</td>
+    <td><tt>redshifttable</tt></td>
     <td>Yes</td>
     <td>No default</td>
     <td>The table to create or read from in Redshift</td>
  </tr
  <tr>
-    <td>`jdbcurl`</td>
+    <td><tt>jdbcurl</tt></td>
     <td>Yes</td>
     <td>No default</td>
     <td>
-A JDBC URL, of the format, `jdbc:subprotocol://host:port/database?user=username&password=password`
+<p>A JDBC URL, of the format, <tt>jdbc:subprotocol://host:port/database?user=username&password=password</tt></p>
 
-* `subprotocol` can be `postgresql` or `redshift`, depending on which JDBC driver you have loaded. Note however
-that one Redshift-compatible driver must be on the classpath and match this URL.
-* `host` and `port` should point to the Redshift master node, so security groups and/or VPC will
+<ul>
+ <li><tt>subprotocol</tt> can be <tt>postgresql</tt> or <tt>redshift</tt>, depending on which JDBC driver 
+    you have loaded. Note however that one Redshift-compatible driver must be on the classpath and match 
+    this URL.</li>
+ <li><tt>host</tt> and <tt>port</tt> should point to the Redshift master node, so security groups and/or VPC will
 need to be configured to allow access from your driver application.
-* `database` identifies a Redshift database name
-* `user` and `password` are credentials to access the database, which must be embedded in this URL for JDBC, and
-your user account should have necessary privileges for the table being referenced.
+ <li><tt>database</tt> identifies a Redshift database name</li>
+ <li><tt>user</tt> and <tt>password</tt> are credentials to access the database, which must be embedded
+    in this URL for JDBC, and your user account should have necessary privileges for the table being referenced. </li>
     </td>
  </tr>
  <tr>
-    <td>`aws_access_key_id`</td>
+    <td><tt>aws_access_key_id</tt></td>
     <td>No, unless also unavailable from environment</td>
-    <td>[Default Provider Chain](http://docs.aws.amazon.com/AWSSdkDocsJava/latest//DeveloperGuide/credentials.html)</td>
+    <td><a href="http://docs.aws.amazon.com/AWSSdkDocsJava/latest/DeveloperGuide/credentials.html">Default Provider Chain</a></td>
     <td>AWS access key, must have write permissions to the S3 bucket.</td>
  </tr>
  <tr>
-    <td>`aws_secret_access_key`</td>
+    <td><tt>aws_secret_access_key</tt></td>
     <td>No, unless also unavailable from environment</td>
-    <td>[Default Provider Chain](http://docs.aws.amazon.com/AWSSdkDocsJava/latest//DeveloperGuide/credentials.html)</td>
+    <td><a href="http://docs.aws.amazon.com/AWSSdkDocsJava/latest/DeveloperGuide/credentials.html">Default Provider Chain</a></td>
     <td>AWS secret access key corresponding to provided access key.</td>
  </tr>
  <tr>
-    <td>`tempdir`</td>
+    <td><tt>tempdir</tt></td>
     <td>Yes</td>
     <td>No default</td>
-    <td>
-A writeable location in Amazon S3, to be used for unloaded data when reading and Avro data to be loaded into
+    <td>A writeable location in Amazon S3, to be used for unloaded data when reading and Avro data to be loaded into
 Redshift when writing. If you're using `spark-redshift` as part of a regular ETL pipeline, it can be useful to
-set a [Lifecycle Policy](http://docs.aws.amazon.com/AmazonS3/latest/dev/object-lifecycle-mgmt.html) on a bucket
+set a <a href="http://docs.aws.amazon.com/AmazonS3/latest/dev/object-lifecycle-mgmt.html">Lifecycle Policy</a> on a bucket
 and use that as a temp location for this data.
     </td>
  </tr>
  <tr>
-    <td>`jdbcdriver`</td>
+    <td><tt>jdbcdriver</tt></td>
     <td>No</td>
-    <td>`org.postgresql.Driver`</td>
+    <td><tt>org.postgresql.Driver</tt></td>
     <td>The class name of the JDBC driver to load before JDBC operations. Must be on classpath.</td>
  </tr>
  <tr>
-    <td>`overwrite`</td>
+    <td><tt>overwrite</tt></td>
     <td>No</td>
-    <td>`false`</td>
-    <td>If true, drop any existing data before writing new content. See also `usestagingtable`</td>
+    <td><tt>false</tt></td>
+    <td>If true, drop any existing data before writing new content. See also <tt>usestagingtable</tt></td>
  </tr>
  <tr>
-    <td>`diststyle`</td>
+    <td><tt>diststyle</tt></td>
     <td>No</td>
-    <td>`EVEN`</td>
-    <td>
-The Redshift [Distribution Style](http://docs.aws.amazon.com/redshift/latest/dg/c_choosing_dist_sort.html) to
-be used when creating a table. Can be one of `EVEN`, `KEY` or `ALL` (see Redshift docs). When using `KEY`, you
-must also set a distribution key with the `distkey` option.
+    <td><tt>EVEN</tt></td>
+    <td>The Redshift <a href="http://docs.aws.amazon.com/redshift/latest/dg/c_choosing_dist_sort.html">Distribution Style</a> to
+be used when creating a table. Can be one of <tt>EVEN</tt>, <tt>KEY</tt> or <tt>ALL</tt> (see Redshift docs). When using <tt>KEY</tt>, you
+must also set a distribution key with the <tt>distkey</tt> option.
     </td>
  </tr>
  <tr>
-    <td>`distkey`</td>
-    <td>No, unless using `DISTSTYLE KEY`</td>
+    <td><tt>distkey</tt></td>
+    <td>No, unless using <tt>DISTSTYLE KEY</tt></td>
     <td>No default</td>
     <td>The name of a column in the table to use as the distribution key when creating a table.</td>
  </tr>
  <tr>
-    <td>`sortkeyspec`</td>
+    <td><tt>sortkeyspec</tt></td>
     <td>No</td>
     <td>No default</td>
     <td>
-A full Redshift [Sort Key](http://docs.aws.amazon.com/redshift/latest/dg/t_Sorting_data.html) definition. Examples
-include:
+<p>A full Redshift <a href="http://docs.aws.amazon.com/redshift/latest/dg/t_Sorting_data.html">Sort Key</a> definition.</p>
 
-* `SORTKEY my_sort_column`
-* `COMPOUND SORTKEY sort_col_1, sort_col_2`
-* `INTERLEAVED SORTKEY sort_col_1, sort_col_2`
+<p>Examples include:</p>
+<ul>
+    <li><tt>SORTKEY my_sort_column</tt></li>
+    <li><tt>COMPOUND SORTKEY sort_col_1, sort_col_2</tt></li>
+    <li><tt>INTERLEAVED SORTKEY sort_col_1, sort_col_2</tt></li>
+</ul>
     </td>
  </tr>
  <tr>
-    <td>`usestagingtable`</td>
+    <td><tt>usestagingtable</tt></td>
     <td>No</td>
-    <td>`true`</td>
+    <td><tt>true</tt></td>
     <td>
-When performing an overwrite of existing data, this setting can be used to stage the new data in a temporary
-table, such that we make sure the `COPY` finishes successfully before making any changes to the existing table.
+<p>When performing an overwrite of existing data, this setting can be used to stage the new data in a temporary
+table, such that we make sure the <tt>COPY</tt> finishes successfully before making any changes to the existing table.
 This means that we minimize the amount of time that the target table will be unavailable and restore the old
-data should the `COPY` fail.
+data should the <tt>COPY</tt> fail.</p>
 
-You may wish to disable this by setting the parameter to `false` if you can't spare the disk space in your
-Redshift cluster and/or don't have requirements to keep the table availability high.
+<p>You may wish to disable this by setting the parameter to <tt>false</tt> if you can't spare the disk space in your
+Redshift cluster and/or don't have requirements to keep the table availability high.</p>
     </td>
  </tr>
  <tr>
-    <td>`postactions`</td>
+    <td><tt>postactions</tt></td>
     <td>No</td>
     <td>No default</td>
     <td>
-This can be a `;` separated list of SQL commands to be executed after a successful `COPY` when loading data.
-It may be useful to have some `GRANT` commands or similar run here when loading new data. If the command contains
-`%s`, the table name will be formatted in before execution (in case you're using a staging table).
+<p>This can be a <tt>;</tt> separated list of SQL commands to be executed after a successful <tt>COPY</tt> when loading data.
+It may be useful to have some <tt>GRANT</tt> commands or similar run here when loading new data. If the command contains
+<tt>%s</tt>, the table name will be formatted in before execution (in case you're using a staging table).</p>
 
-Be warned that if this commands fail, it is treated as an error and you'll get an exception. If using a staging
-table, the changes will be reverted and the backup table restored if post actions fail.
+<p>Be warned that if this commands fail, it is treated as an error and you'll get an exception. If using a staging
+table, the changes will be reverted and the backup table restored if post actions fail.</p>
     </td>
  </tr>
 </table>
@@ -277,7 +279,7 @@ table, the changes will be reverted and the backup table restored if post action
 
 Note that you can provide AWS credentials in the parameters above, or you can make them available by the usual
 environment variables, system properties or IAM roles, etc. The credentials you provide will be used in Redshift
-`COPY` and `UNLOAD` commands, which means they need write access to the S3 bucket you reference in your `tempdir`
+<tt>COPY</tt> and <tt>UNLOAD</tt> commands, which means they need write access to the S3 bucket you reference in your <tt>tempdir</tt>
 setting.
 
 ## Migration Guide
@@ -287,10 +289,10 @@ Some breaking changes were made in version 0.3 of the Hadoop InputFormat. Users 
 following changes in their code if they would like to use the 0.3+ versions, when using the input format
 directly:
 
- * `com.databricks.examples.redshift.input` -> `com.databricks.spark.redshift`
- * `SchemaRDD` -> `DataFrame`
+ * <tt>com.databricks.examples.redshift.input</tt> -> <tt>com.databricks.spark.redshift</tt>
+ * <tt>SchemaRDD</tt> -> <tt>DataFrame</tt>
  * `import com.databricks.examples.redshift.input.RedshiftInputFormat._` -> `import com.databricks.spark.redshift._`
 
 Version 0.4+ adds the DataSource API and JDBC, which is an entirely new API, so although this won't break
 code using the InputFormat directly, you may wish to make use of the new functionality to avoid performing
-`UNLOAD` queries manually.
+<tt>UNLOAD</tt> queries manually.
