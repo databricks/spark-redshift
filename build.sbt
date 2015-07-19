@@ -10,7 +10,7 @@ version := "0.4.1-SNAPSHOT"
 
 scalaVersion := "2.10.4"
 
-sparkVersion := sys.props.get("spark.version").getOrElse("1.4.0")
+sparkVersion := sys.props.get("spark.version").getOrElse("1.4.1")
 
 hadoopVersion := sys.props.get("hadoop.version").getOrElse("2.2.0")
 
