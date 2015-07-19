@@ -254,8 +254,8 @@ class RedshiftSourceSuite
       .returning("schema")
       .anyNumberOfTimes()
 
-    val source = new DefaultSource(jdbcWrapper)
-    val savedDf = source.createRelation(testSqlContext, SaveMode.Overwrite, params, df)
+    val relation = RedshiftRelation(jdbcWrapper, Parameters.mergeParameters(params), None)(testSqlContext)
+    relation.asInstanceOf[InsertableRelation].insert(df, true)
 
     // Make sure we wrote the data out ready for Redshift load, in the expected formats
     val written = testSqlContext.read.format("com.databricks.spark.avro").load(tempDir)

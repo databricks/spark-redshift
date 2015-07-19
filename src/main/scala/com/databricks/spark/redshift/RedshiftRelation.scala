@@ -70,7 +70,8 @@ case class RedshiftRelation(jdbcWrapper: JDBCWrapper,
   }
 
   override def insert(data: DataFrame, overwrite: Boolean): Unit = {
-    new RedshiftWriter(jdbcWrapper).saveToRedshift(sqlContext, data, params)
+    val updatedParams = Parameters.mergeParameters(params.parameters updated ("overwrite", overwrite.toString))
+    new RedshiftWriter(jdbcWrapper).saveToRedshift(sqlContext, data, updatedParams)
   }
 
   def unloadToTemp(columnList: String = "*", whereClause: String = ""): Unit = {
