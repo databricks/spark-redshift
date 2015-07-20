@@ -106,9 +106,7 @@ case class RedshiftRelation(jdbcWrapper: JDBCWrapper,
   def sqlQuote(identifier: String) = s""""$identifier""""
 
   def columnList(columns: Seq[String]): String = {
-    val sb = new StringBuilder()
-    columns.foreach(x => sb.append(",").append(sqlQuote(x)))
-    if (sb.length == 0) "1" else sb.substring(1)
+    columns map sqlQuote mkString ", "
   }
 
   def compileValue(value: Any): Any = value match {
