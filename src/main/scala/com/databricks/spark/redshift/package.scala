@@ -1,5 +1,6 @@
 /*
  * Copyright 2015 Databricks
+ * Copyright 2015 TouchType Ltd. (Added JDBC-based Data Source API implementation)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +18,7 @@
 package com.databricks.spark
 
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.jdbc.DefaultJDBCWrapper
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 
@@ -51,6 +53,29 @@ package object redshift {
         col(field.name).cast(field.dataType).as(field.name)
       }
       redshiftFile(path, structType.fieldNames).select(casts: _*)
+    }
+
+    /**
+     * Read a Redshift table into a DataFrame, using S3 for data transfer and JDBC
+     * to control Redshift and resolve the schema
+     */
+    def redshiftTable(parameters: Map[String, String]) = {
+      val params = Parameters.mergeParameters(parameters)
+      sqlContext.baseRelationToDataFrame(RedshiftRelation(DefaultJDBCWrapper, params, None)(sqlContext))
+    }
+  }
+
+  /**
+   * Add write functionality to DataFrame
+   */
+  implicit class RedshiftDataFrame(dataFrame: DataFrame) {
+
+    /**
+     * Load the DataFrame into a Redshift database table
+     */
+    def saveAsRedshiftTable(parameters: Map[String, String]): Unit = {
+      val params = Parameters.mergeParameters(parameters)
+      DefaultRedshiftWriter.saveToRedshift(dataFrame.sqlContext, dataFrame, params)
     }
   }
 }
