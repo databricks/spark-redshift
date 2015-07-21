@@ -16,9 +16,9 @@
 
 package com.databricks.spark.redshift
 
-import org.apache.spark.sql.types._
-
 import scala.util.parsing.combinator._
+
+import org.apache.spark.sql.types._
 
 /**
  * A simple parser for Redshift table schemas.

@@ -16,7 +16,7 @@
 
 package com.databricks.spark.redshift
 
-import org.scalatest.{Matchers, FunSuite}
+import org.scalatest.{FunSuite, Matchers}
 
 /**
  * Check validation of parameter config
@@ -27,14 +27,14 @@ class ParametersSuite extends FunSuite with Matchers {
     val params =
       Map(
         "tempdir" -> "s3://foo/bar",
-        "redshifttable" -> "test_table",
-        "jdbcurl" -> "jdbc:postgresql://foo/bar")
+        "dbtable" -> "test_table",
+        "url" -> "jdbc:postgresql://foo/bar")
 
     val mergedParams = Parameters.mergeParameters(params)
 
     mergedParams.tempPath should startWith (params("tempdir"))
-    mergedParams.jdbcUrl shouldBe params("jdbcurl")
-    mergedParams.table shouldBe params("redshifttable")
+    mergedParams.jdbcUrl shouldBe params("url")
+    mergedParams.table shouldBe params("dbtable")
 
     // Check that the defaults have been added
     Parameters.DEFAULT_PARAMETERS foreach {
@@ -46,8 +46,8 @@ class ParametersSuite extends FunSuite with Matchers {
     val params =
       Map(
         "tempdir" -> "s3://foo/bar",
-        "redshifttable" -> "test_table",
-        "jdbcurl" -> "jdbc:postgresql://foo/bar")
+        "dbtable" -> "test_table",
+        "url" -> "jdbc:postgresql://foo/bar")
 
     val mergedParams1 = Parameters.mergeParameters(params)
     val mergedParams2 = Parameters.mergeParameters(params)
@@ -63,8 +63,8 @@ class ParametersSuite extends FunSuite with Matchers {
       }
     }
 
-    checkMerge(Map("redshifttable" -> "test_table", "jdbcurl" -> "jdbc:postgresql://foo/bar"))
-    checkMerge(Map("tempdir" -> "s3://foo/bar", "jdbcurl" -> "jdbc:postgresql://foo/bar"))
-    checkMerge(Map("redshifttable" -> "test_table", "tempdir" -> "s3://foo/bar"))
+    checkMerge(Map("dbtable" -> "test_table", "url" -> "jdbc:postgresql://foo/bar"))
+    checkMerge(Map("tempdir" -> "s3://foo/bar", "url" -> "jdbc:postgresql://foo/bar"))
+    checkMerge(Map("dbtable" -> "test_table", "tempdir" -> "s3://foo/bar"))
   }
 }

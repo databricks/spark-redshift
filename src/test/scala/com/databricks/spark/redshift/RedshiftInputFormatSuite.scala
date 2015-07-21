@@ -19,15 +19,14 @@ import java.io.{DataOutputStream, File, FileOutputStream}
 
 import scala.language.implicitConversions
 
+import com.databricks.spark.redshift.RedshiftInputFormat._
 import com.google.common.io.Files
 import org.apache.hadoop.conf.Configuration
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 
 import org.apache.spark.SparkContext
-import org.apache.spark.sql.{SQLContext, Row}
 import org.apache.spark.sql.types._
-
-import com.databricks.spark.redshift.RedshiftInputFormat._
+import org.apache.spark.sql.{Row, SQLContext}
 
 class RedshiftInputFormatSuite extends FunSuite with BeforeAndAfterAll {
 

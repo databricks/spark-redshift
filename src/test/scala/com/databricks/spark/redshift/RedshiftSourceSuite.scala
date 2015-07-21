@@ -17,19 +17,20 @@
 package com.databricks.spark.redshift
 
 import java.io.File
-import java.sql.{SQLException, Connection, PreparedStatement}
+import java.sql.{Connection, PreparedStatement, SQLException}
+
+import scala.util.matching.Regex
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.mapreduce.InputFormat
-import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.jdbc.JDBCWrapper
-import org.apache.spark.sql.sources._
-import org.apache.spark.sql.{SaveMode, Row, SQLContext}
-import org.apache.spark.{SparkConf, SparkContext}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
 
-import scala.util.matching.Regex
+import org.apache.spark.SparkContext
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.jdbc.JDBCWrapper
+import org.apache.spark.sql.sources._
+import org.apache.spark.sql.{Row, SQLContext, SaveMode}
 
 class TestContext extends SparkContext("local", "RedshiftSourceSuite") {
 
@@ -132,7 +133,7 @@ class RedshiftSourceSuite
    * Prepare the JDBC wrapper for an UNLOAD test.
    */
   def prepareUnloadTest(params: Map[String, String]) = {
-    val jdbcUrl = params("jdbcurl")
+    val jdbcUrl = params("url")
     val jdbcWrapper = mockJdbcWrapper(jdbcUrl, Seq("UNLOAD.*".r))
 
     // We expect some extra calls to the JDBC wrapper,
@@ -150,22 +151,21 @@ class RedshiftSourceSuite
 
   test("DefaultSource can load Redshift UNLOAD output to a DataFrame") {
 
-    val params = Map("jdbcurl" -> "jdbc:postgresql://foo/bar",
+    val params = Map("url" -> "jdbc:postgresql://foo/bar",
       "tempdir" -> "tmp",
-      "redshifttable" -> "test_table",
+      "dbtable" -> "test_table",
       "aws_access_key_id" -> "test1",
       "aws_secret_access_key" -> "test2")
 
     val jdbcWrapper = prepareUnloadTest(params)
     val testSqlContext = new SQLContext(sc)
 
-    // Use the data source to create a relation with given test settings
+    // Assert that we've loaded and converted all data in the test file
     val source = new DefaultSource(jdbcWrapper)
     val relation = source.createRelation(testSqlContext, params)
+    val df = testSqlContext.baseRelationToDataFrame(relation)
 
-    // Assert that we've loaded and converted all data in the test file
-    val rdd = relation.asInstanceOf[TableScan].buildScan()
-    rdd.collect() zip expectedData foreach {
+    df.rdd.collect() zip expectedData foreach {
       case (loaded, expected) =>
         loaded shouldBe expected
     }
@@ -173,9 +173,9 @@ class RedshiftSourceSuite
 
   test("DefaultSource supports simple column filtering") {
 
-    val params = Map("jdbcurl" -> "jdbc:postgresql://foo/bar",
+    val params = Map("url" -> "jdbc:postgresql://foo/bar",
       "tempdir" -> "tmp",
-      "redshifttable" -> "test_table",
+      "dbtable" -> "test_table",
       "aws_access_key_id" -> "test1",
       "aws_secret_access_key" -> "test2")
 
@@ -186,7 +186,7 @@ class RedshiftSourceSuite
     val source = new DefaultSource(jdbcWrapper)
     val relation = source.createRelation(testSqlContext, params, TestUtils.testSchema)
 
-    val rdd = relation.asInstanceOf[PrunedScan].buildScan(Array("testByte", "testBool"))
+    val rdd = relation.asInstanceOf[PrunedFilteredScan].buildScan(Array("testByte", "testBool"), Array.empty[Filter])
     val prunedExpectedValues =
       Array(Row(1.toByte, true),
             Row(1.toByte, false),
@@ -201,9 +201,9 @@ class RedshiftSourceSuite
 
   test("DefaultSource supports user schema, pruned and filtered scans") {
 
-    val params = Map("jdbcurl" -> "jdbc:postgresql://foo/bar",
+    val params = Map("url" -> "jdbc:postgresql://foo/bar",
       "tempdir" -> "tmp",
-      "redshifttable" -> "test_table",
+      "dbtable" -> "test_table",
       "aws_access_key_id" -> "test1",
       "aws_secret_access_key" -> "test2")
 
@@ -237,9 +237,9 @@ class RedshiftSourceSuite
 
     val jdbcUrl = "jdbc:postgresql://foo/bar"
     val params =
-      Map("jdbcurl" -> jdbcUrl,
+      Map("url" -> jdbcUrl,
           "tempdir" -> tempDir,
-          "redshifttable" -> "test_table",
+          "dbtable" -> "test_table",
           "aws_access_key_id" -> "test1",
           "aws_secret_access_key" -> "test2",
           "postactions" -> "GRANT SELECT ON %s TO jeremy",
@@ -286,9 +286,9 @@ class RedshiftSourceSuite
 
     val jdbcUrl = "jdbc:postgresql://foo/bar"
     val params =
-      Map("jdbcurl" -> jdbcUrl,
+      Map("url" -> jdbcUrl,
         "tempdir" -> tempDir,
-        "redshifttable" -> "test_table",
+        "dbtable" -> "test_table",
         "aws_access_key_id" -> "test1",
         "aws_secret_access_key" -> "test2",
         "usestagingtable" -> "true")
@@ -370,9 +370,9 @@ class RedshiftSourceSuite
 
     val jdbcUrl = "jdbc:postgresql://foo/bar"
     val params =
-      Map("jdbcurl" -> jdbcUrl,
+      Map("url" -> jdbcUrl,
         "tempdir" -> tempDir,
-        "redshifttable" -> "test_table",
+        "dbtable" -> "test_table",
         "aws_access_key_id" -> "test1",
         "aws_secret_access_key" -> "test2")
 
@@ -412,9 +412,9 @@ class RedshiftSourceSuite
 
     val jdbcUrl = "jdbc:postgresql://foo/bar"
     val params =
-      Map("jdbcurl" -> jdbcUrl,
+      Map("url" -> jdbcUrl,
           "tempdir" -> tempDir,
-          "redshifttable" -> "test_table",
+          "dbtable" -> "test_table",
           "aws_access_key_id" -> "test1",
           "aws_secret_access_key" -> "test2")
 
@@ -440,9 +440,9 @@ class RedshiftSourceSuite
 
     val jdbcUrl = "jdbc:postgresql://foo/bar"
     val params =
-      Map("jdbcurl" -> jdbcUrl,
+      Map("url" -> jdbcUrl,
         "tempdir" -> tempDir,
-        "redshifttable" -> "test_table",
+        "dbtable" -> "test_table",
         "aws_access_key_id" -> "test1",
         "aws_secret_access_key" -> "test2")
 
@@ -463,7 +463,7 @@ class RedshiftSourceSuite
   }
 
   test("Public Scala API rejects invalid parameter maps") {
-    val invalid = Map("redshifttable" -> "foo") // missing tempdir and jdbcurl
+    val invalid = Map("dbtable" -> "foo") // missing tempdir and url
 
     val rdd = sc.parallelize(expectedData)
     val testSqlContext = new SQLContext(sc)

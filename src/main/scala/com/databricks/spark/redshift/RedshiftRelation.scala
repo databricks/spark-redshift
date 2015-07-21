@@ -19,6 +19,7 @@ package com.databricks.spark.redshift
 import java.util.Properties
 
 import com.databricks.spark.redshift.Parameters.MergedParameters
+
 import org.apache.spark.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.jdbc.JDBCWrapper
@@ -30,13 +31,9 @@ import org.apache.spark.sql.{DataFrame, Row, SQLContext}
  * Data Source API implementation for Amazon Redshift database tables
  */
 private [redshift]
-case class RedshiftRelation(jdbcWrapper: JDBCWrapper,
-                            params: MergedParameters,
-                            userSchema: Option[StructType])
-                           (@transient val sqlContext: SQLContext)
+case class RedshiftRelation(jdbcWrapper: JDBCWrapper, params: MergedParameters, userSchema: Option[StructType])
+    (@transient val sqlContext: SQLContext)
   extends BaseRelation
-  with TableScan
-  with PrunedScan
   with PrunedFilteredScan
   with InsertableRelation
   with Logging {
@@ -51,17 +48,6 @@ case class RedshiftRelation(jdbcWrapper: JDBCWrapper,
     }
   }
 
-  override def buildScan(): RDD[Row] = {
-    unloadToTemp()
-    makeRdd(schema)
-  }
-
-  override def buildScan(requiredColumns: Array[String]): RDD[Row] = {
-    val columns = columnList(requiredColumns)
-    unloadToTemp(columns)
-    makeRdd(pruneSchema(schema, requiredColumns))
-  }
-
   override def buildScan(requiredColumns: Array[String], filters: Array[Filter]): RDD[Row] = {
     val columns = columnList(requiredColumns)
     val whereClause = buildWhereClause(filters)
@@ -74,7 +60,7 @@ case class RedshiftRelation(jdbcWrapper: JDBCWrapper,
     new RedshiftWriter(jdbcWrapper).saveToRedshift(sqlContext, data, updatedParams)
   }
 
-  def unloadToTemp(columnList: String = "*", whereClause: String = ""): Unit = {
+  protected def unloadToTemp(columnList: String = "*", whereClause: String = ""): Unit = {
     val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, new Properties()).apply()
     val unloadSql = unloadStmnt(columnList, whereClause)
     val statement = conn.prepareStatement(unloadSql)
@@ -83,41 +69,41 @@ case class RedshiftRelation(jdbcWrapper: JDBCWrapper,
     conn.close()
   }
 
-  def unloadStmnt(columnList: String, whereClause: String) : String = {
-    val credsString = params.credentialsString()
+  protected def unloadStmnt(columnList: String, whereClause: String) : String = {
+    val credsString = params.credentialsString(sqlContext.sparkContext.hadoopConfiguration)
     val query = s"SELECT $columnList FROM ${params.table} $whereClause"
     val fixedUrl = Utils.fixS3Url(params.tempPath)
 
     s"UNLOAD ('$query') TO '$fixedUrl' WITH CREDENTIALS '$credsString' ESCAPE ALLOWOVERWRITE"
   }
 
-  def makeRdd(schema: StructType): RDD[Row] = {
+  protected def makeRdd(schema: StructType): RDD[Row] = {
     val sc = sqlContext.sparkContext
     val rdd = sc.newAPIHadoopFile(params.tempPath, classOf[RedshiftInputFormat],
       classOf[java.lang.Long], classOf[Array[String]], sc.hadoopConfiguration)
     rdd.values.map(Conversions.rowConverter(schema))
   }
 
-  def pruneSchema(schema: StructType, columns: Array[String]): StructType = {
-    val fieldMap = Map(schema.fields map { x => x.metadata.getString("name") -> x }: _*)
+  protected def pruneSchema(schema: StructType, columns: Array[String]): StructType = {
+    val fieldMap = Map(schema.fields map { x => x.name -> x }: _*)
     new StructType(columns map { name => fieldMap(name) })
   }
 
-  def sqlQuote(identifier: String) = s""""$identifier""""
+  protected def sqlQuote(identifier: String) = s""""$identifier""""
 
-  def columnList(columns: Seq[String]): String = {
+  protected def columnList(columns: Seq[String]): String = {
     columns map sqlQuote mkString ", "
   }
 
-  def compileValue(value: Any): Any = value match {
+  protected def compileValue(value: Any): Any = value match {
     case stringValue: String => s"\\'${escapeSql(stringValue.toString)}\\'"
     case _ => value
   }
 
-  def escapeSql(value: String): String =
+  protected def escapeSql(value: String): String =
     if (value == null) null else value.replace("'", "''")
 
-  def buildWhereClause(filters: Array[Filter]): String = {
+  protected def buildWhereClause(filters: Array[Filter]): String = {
     val filterClauses = filters map {
       case EqualTo(attr, value) => s"${sqlQuote(attr)} = ${compileValue(value)}"
       case LessThan(attr, value) => s"${sqlQuote(attr)} < ${compileValue(value)}"

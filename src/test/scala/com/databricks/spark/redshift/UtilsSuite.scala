@@ -16,7 +16,7 @@
 
 package com.databricks.spark.redshift
 
-import org.scalatest.{Matchers, FunSuite}
+import org.scalatest.{FunSuite, Matchers}
 
 /**
  * Unit tests for helper functions

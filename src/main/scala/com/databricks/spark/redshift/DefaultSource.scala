@@ -58,10 +58,8 @@ class DefaultSource(jdbcWrapper: JDBCWrapper)
   /**
    * Creates a Relation instance by first writing the contents of the given DataFrame to Redshift
    */
-  override def createRelation(sqlContext: SQLContext,
-                              mode: SaveMode,
-                              parameters: Map[String, String],
-                              data: DataFrame): BaseRelation = {
+  override def createRelation(sqlContext: SQLContext, mode: SaveMode, parameters: Map[String, String],
+    data: DataFrame): BaseRelation = {
     val params = Parameters.mergeParameters(parameters)
 
     def tableExists: Boolean = {

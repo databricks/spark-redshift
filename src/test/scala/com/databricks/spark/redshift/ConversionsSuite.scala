@@ -17,11 +17,10 @@
 package com.databricks.spark.redshift
 
 import java.sql.Timestamp
-import java.util.Calendar
+
+import org.scalatest.FunSuite
 
 import org.apache.spark.sql.Row
-import org.apache.spark.sql.types._
-import org.scalatest.{FunSuite, Matchers}
 
 /**
  * Unit test for data type conversions

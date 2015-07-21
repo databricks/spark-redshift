@@ -16,16 +16,21 @@
 
 package com.databricks.spark.redshift
 
+import java.net.URI
+
 import com.amazonaws.auth.DefaultAWSCredentialsProviderChain
+import org.apache.hadoop.conf.Configuration
+
+import org.apache.spark.Logging
 
 /**
  * All user-specifiable parameters for spark-redshift, along with their validation rules and defaults
  */
-private [redshift] object Parameters {
+private [redshift] object Parameters extends Logging {
 
   val DEFAULT_PARAMETERS = Map(
     // Notes:
-    // * tempdir, redshifttable and jdbcurl have no default and they *must* be provided
+    // * tempdir, dbtable and url have no default and they *must* be provided
     // * sortkeyspec has no default, but is optional
     // * distkey has no default, but is optional unless using diststyle KEY
 
@@ -43,11 +48,11 @@ private [redshift] object Parameters {
     if(! userParameters.contains("tempdir")) {
       sys.error("'tempdir' is required for all Redshift loads and saves")
     }
-    if(! userParameters.contains("redshifttable")) {
-      sys.error("You must specify a Redshift table name with 'redshifttable' parameter")
+    if(! userParameters.contains("dbtable")) {
+      sys.error("You must specify a Redshift table name with 'dbtable' parameter")
     }
-    if(! userParameters.contains("jdbcurl")) {
-      sys.error("A JDBC URL must be provided with 'jdbcurl' parameter")
+    if(! userParameters.contains("url")) {
+      sys.error("A JDBC URL must be provided with 'url' parameter")
     }
 
     MergedParameters(DEFAULT_PARAMETERS ++ userParameters)
@@ -76,7 +81,7 @@ private [redshift] object Parameters {
      * The Redshift table to be used as the target when loading or writing data.
      */
     def table = {
-      parameters("redshifttable")
+      parameters("dbtable")
     }
 
     /**
@@ -91,7 +96,7 @@ private [redshift] object Parameters {
      *  - user and password are credentials to access the database, which must be embedded in this URL for JDBC
      */
     def jdbcUrl = {
-      parameters("jdbcurl")
+      parameters("url")
     }
 
     /**
@@ -160,16 +165,26 @@ private [redshift] object Parameters {
     /**
      * Looks up "aws_access_key_id" and "aws_secret_access_key" in the parameter map
      * and generates a credentials string for Redshift. If no credentials have been provided,
-     * this function will instead try using the AWS DefaultCredentialsProviderChain, which makes
+     * this function will instead try using the Hadoop Configuration fs.* settings for the provided tempDir
+     * scheme, and if that also fails, it finally tries AWS DefaultCredentialsProviderChain, which makes
      * use of standard system properties, environment variables, or IAM role configuration if available.
      */
-    def credentialsString() = {
+    def credentialsString(configuration: Configuration) = {
+
+      val scheme = new URI(tempDir).getScheme
+      val hadoopConfPrefix = s"fs.$scheme}"
 
       val (accessKeyId, secretAccessKey) =
         if(parameters.contains("aws_access_key_id")) {
+          log.info("Using credentials provided in parameter map.")
           (parameters("aws_access_key_id"), parameters("aws_secret_access_key"))
+        } else if (configuration.get(s"$hadoopConfPrefix.awsAccessKeyId") != null) {
+          log.info(s"Using hadoopConfiguration credentials for scheme $scheme}")
+          (configuration.get(s"$hadoopConfPrefix.awsAccessKeyId"),
+            configuration.get(s"$hadoopConfPrefix.awsSecretAccessKey"))
         } else {
           try {
+            log.info(s"Using default provider chain for AWS credentials, as none provided explicitly.")
             val awsCredentials = (new DefaultAWSCredentialsProviderChain).getCredentials
             (awsCredentials.getAWSAccessKeyId, awsCredentials.getAWSSecretKey)
           } catch {

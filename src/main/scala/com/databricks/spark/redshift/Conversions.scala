@@ -20,10 +20,10 @@ import java.sql.Timestamp
 import java.text.{DateFormat, FieldPosition, ParsePosition, SimpleDateFormat}
 import java.util.Date
 
+import scala.util.parsing.combinator.JavaTokenParsers
+
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
-
-import scala.util.parsing.combinator.JavaTokenParsers
 
 /**
  * Simple parser for Redshift's UNLOAD bool syntax
@@ -38,7 +38,7 @@ private object RedshiftBooleanParser extends JavaTokenParsers {
 /**
  * Data type conversions for Redshift unloaded data
  */
-object Conversions {
+private [redshift] object Conversions {
 
   // Imports and exports with Redshift require that timestamps are represented
   // as strings, using the following formats

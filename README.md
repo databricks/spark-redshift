@@ -1,4 +1,4 @@
-# RedshiftInputFormat
+# `spark-redshift`
 
 [![Build Status](https://travis-ci.org/databricks/spark-redshift.svg?branch=master)](https://travis-ci.org/databricks/spark-redshift)
 [![codecov.io](http://codecov.io/github/databricks/spark-redshift/coverage.svg?branch=master)](http://codecov.io/github/databricks/spark-redshift?branch=master)
@@ -45,15 +45,13 @@ import org.apache.spark.sql._
 val sc = // existing SparkContext
 val sqlContext = new SQLContext(sc)
 
-// These three settings are required, see below for full information
-val params = Map("jdbcurl" -> "jdbc:postgresql://redshifthost:5439/database?user=username&password=pass",
-                 "redshifttable" -> "my_table",
-                 "tempdir" -> "s3://path/for/temp/data")
 
 // Get some data from a Redshift table
 val df: DataFrame = sqlContext.read
     .format("com.databricks.spark.redshift")
-    .options(params)
+    .option("url", "jdbc:postgresql://redshifthost:5439/database?user=username&password=pass")
+    .option("dbtable" -> "my_table")
+    .option("tempdir" -> "s3://path/for/temp/data")
     .load()
 
 // Apply some transformations to the data as per normal, then you can use the
@@ -61,7 +59,9 @@ val df: DataFrame = sqlContext.read
 
 df.write
   .format("com.databricks.spark.redshift")
-  .options(params updated ("redshifttable" -> "my_table_copy"))
+    .option("url", "jdbc:postgresql://redshifthost:5439/database?user=username&password=pass")
+    .option("dbtable" -> "my_table_copy")
+    .option("tempdir" -> "s3://path/for/temp/data")
   .mode("error")
   .save()
 ```
@@ -74,23 +74,20 @@ from pyspark.sql import SQLContext
 sc = # existing SparkContext
 sql_context = SQLContext(sc)
 
-# See below for full parameter docs
-params = {
-    "jdbcurl": "jdbc:postgresql://redshifthost:5439/database?user=username&password=pass",
-    "redshifttable": "my_table",
-    "tempdir": "s3://path/for/temp/data"
-}
-
 # Read data from a table
 df = sql_context.read \
     .format("com.databricks.spark.redshift") \
-    .options(params) \
+    .option("url", "jdbc:postgresql://redshifthost:5439/database?user=username&password=pass") \
+    .option("dbtable" -> "my_table") \
+    .option("tempdir" -> "s3://path/for/temp/data") \
     .load()
 
 # Write back to a table
 df.write \
   .format("com.databricks.spark.redshift")
-  .options(params)
+  .option("url", "jdbc:postgresql://redshifthost:5439/database?user=username&password=pass") \
+  .option("dbtable" -> "my_table_copy") \
+  .option("tempdir" -> "s3://path/for/temp/data") \
   .mode("error")
   .save()
 ```
@@ -100,9 +97,9 @@ df.write \
 ```sql
 CREATE TABLE my_table
 USING com.databricks.spark.redshift
-OPTIONS (redshifttable 'my_table',
+OPTIONS (dbtable 'my_table',
          tempdir 's3://my_bucket/tmp',
-         jdbcurl 'jdbc:postgresql://host:port/db?user=username&password=pass');
+         url 'jdbc:postgresql://host:port/db?user=username&password=pass');
 ```
 
 ### Scala helper functions
@@ -159,13 +156,13 @@ The parameter map or <tt>OPTIONS</tt> provided in Spark SQL supports the followi
  </tr>
 
  <tr>
-    <td><tt>redshifttable</tt></td>
+    <td><tt>dbtable</tt></td>
     <td>Yes</td>
     <td>No default</td>
     <td>The table to create or read from in Redshift</td>
  </tr
  <tr>
-    <td><tt>jdbcurl</tt></td>
+    <td><tt>url</tt></td>
     <td>Yes</td>
     <td>No default</td>
     <td>
@@ -214,7 +211,9 @@ and use that as a temp location for this data.
     <td><tt>overwrite</tt></td>
     <td>No</td>
     <td><tt>false</tt></td>
-    <td>If true, drop any existing data before writing new content. See also <tt>usestagingtable</tt></td>
+    <td>
+If true, drop any existing data before writing new content. Only applies when using the Scala `saveAsRedshiftTable` function
+directly, as `SaveMode` will be preferred when using the Data Source API. See also <tt>usestagingtable</tt></td>
  </tr>
  <tr>
     <td><tt>diststyle</tt></td>
@@ -277,10 +276,10 @@ table, the changes will be reverted and the backup table restored if post action
 
 ## AWS Credentials
 
-Note that you can provide AWS credentials in the parameters above, or you can make them available by the usual
-environment variables, system properties or IAM roles, etc. The credentials you provide will be used in Redshift
-<tt>COPY</tt> and <tt>UNLOAD</tt> commands, which means they need write access to the S3 bucket you reference in your <tt>tempdir</tt>
-setting.
+Note that you can provide AWS credentials in the parameters above, with Hadoop `fs.*` configuration settings, 
+or you can make them available by the usual environment variables, system properties or IAM roles, etc. The credentials 
+you provide will be used in Redshift <tt>COPY</tt> and <tt>UNLOAD</tt> commands, which means they need write access 
+to the S3 bucket you reference in your <tt>tempdir</tt> setting.
 
 ## Migration Guide
 
