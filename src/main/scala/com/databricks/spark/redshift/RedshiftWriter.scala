@@ -73,7 +73,9 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
       log.info("Existing data will be backed up in: " + backupTable)
 
       action(tempTable)
-      conn.prepareStatement(s"ALTER TABLE ${params.table} RENAME TO $backupTable").execute()
+      if (jdbcWrapper.tableExists(conn, params.table)) {
+        conn.prepareStatement(s"ALTER TABLE ${params.table} RENAME TO $backupTable").execute()
+      }
       conn.prepareStatement(s"ALTER TABLE $tempTable RENAME TO ${params.table}").execute()
     } catch {
       case e: SQLException =>
@@ -86,7 +88,7 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
         throw new Exception("Error loading data to Redshift, changes reverted.", e)
     }
 
-    conn.prepareStatement(s"DROP TABLE $backupTable").execute()
+    conn.prepareStatement(s"DROP TABLE IF EXISTS $backupTable").execute()
   }
 
   /**
