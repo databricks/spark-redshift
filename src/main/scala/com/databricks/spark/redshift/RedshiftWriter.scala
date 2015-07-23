@@ -180,6 +180,12 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
   def saveToRedshift(sqlContext: SQLContext, data: DataFrame, params: MergedParameters) : Unit = {
     val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, new Properties()).apply()
 
+    if (params.avrocompression != null && params.avrocompression.nonEmpty) {
+      val conf = sqlContext.sparkContext.hadoopConfiguration
+      conf.set("mapred.output.compress", "true")
+      conf.set("mapred.output.compression.type", "BLOCK")
+      conf.set("avro.output.codec", params.avrocompression)
+    }
     try {
       if (params.overwrite && params.useStagingTable) {
         withStagingTable(conn, params, table => {

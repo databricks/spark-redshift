@@ -279,6 +279,16 @@ It may be useful to have some <tt>GRANT</tt> commands or similar run here when l
 table, the changes will be reverted and the backup table restored if post actions fail.</p>
     </td>
  </tr>
+ <tr>
+    <td><tt>avrocompression</tt></td>
+    <td>No</td>
+    <td><tt>snappy</tt></td>
+    <td>
+<p>Sets the compression codec to use on the Avro data to be loaded into Redshift. This overwrites the <tt>avro.output.codec</tt>
+key in the Hadoop configuration with the specified value. To disable this and use the value set in the Hadoop configuration,
+set this to null or an empty string.</p>
+    </td>
+ </tr>
 </table>
 
 ## AWS Credentials

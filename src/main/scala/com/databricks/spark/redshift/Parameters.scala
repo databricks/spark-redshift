@@ -39,7 +39,8 @@ private[redshift] object Parameters extends Logging {
     "overwrite" -> "false",
     "diststyle" -> "EVEN",
     "usestagingtable" -> "true",
-    "postactions" -> ";"
+    "postactions" -> ";",
+    "avrocompression" -> "snappy"
   )
 
   /**
@@ -210,5 +211,12 @@ private[redshift] object Parameters extends Logging {
         credentials
       }
     }
+
+    /**
+     * When nonempty/non-null sets the compression codec to use for writing Avro data.
+     *
+     * Defaults to snappy.
+     */
+    def avrocompression = parameters("avrocompression")
   }
 }
