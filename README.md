@@ -288,7 +288,8 @@ table, the changes will be reverted and the backup table restored if post action
     <td>No compression (unless set in Hadoop config)</td>
     <td>
 <p>Sets the compression codec to use on the Avro data to be loaded into Redshift. This overwrites the <tt>avro.output.codec</tt>
-key in the Hadoop configuration with the specified value. If left unset (or set to null or an empty string) it will leave
+key in the Hadoop configuration with the specified value and also sets <tt>mapred.output.compress = true</tt> and
+<tt>mapred.output.compression.type = BLOCK</tt>. If left unset (or set to null or an empty string) it will leave
 the Hadoop configuration unchanged.</p>
     </td>
  </tr>
