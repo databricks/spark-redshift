@@ -272,6 +272,57 @@ class RedshiftSourceSuite
     checkAnswer(written, TestUtils.expectedDataWithConvertedTimesAndDates)
   }
 
+  test("DefaultSource serializes data as Avro when avrocompression is enabled") {
+
+    val testSqlContext = new SQLContext(sc)
+
+    val jdbcUrl = "jdbc:postgresql://foo/bar"
+    val params =
+      Map("url" -> jdbcUrl,
+          "tempdir" -> tempDir,
+          "dbtable" -> "test_table",
+          "aws_access_key_id" -> "test1",
+          "aws_secret_access_key" -> "test2",
+          "postactions" -> "GRANT SELECT ON %s TO jeremy",
+          "diststyle" -> "KEY",
+          "distkey" -> "testInt",
+          "avrocompression" -> "snappy")
+
+    val rdd = sc.parallelize(expectedData.toSeq)
+    val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
+
+    val expectedCommands =
+      Seq("DROP TABLE IF EXISTS test_table_staging_.*".r,
+          "CREATE TABLE IF NOT EXISTS test_table_staging.* DISTSTYLE KEY DISTKEY \\(testInt\\).*".r,
+          "COPY test_table_staging_.*".r,
+          "GRANT SELECT ON test_table_staging.+ TO jeremy".r,
+          "ALTER TABLE test_table RENAME TO test_table_backup_.*".r,
+          "ALTER TABLE test_table_staging_.* RENAME TO test_table".r,
+          "DROP TABLE test_table_backup.*".r)
+
+    val jdbcWrapper = mockJdbcWrapper(jdbcUrl, expectedCommands)
+
+    (jdbcWrapper.tableExists _)
+      .expects(*, "test_table")
+      .returning(true)
+      .anyNumberOfTimes()
+
+    (jdbcWrapper.schemaString _)
+      .expects(*, jdbcUrl)
+      .returning("schema")
+      .anyNumberOfTimes()
+
+    val relation = RedshiftRelation(jdbcWrapper, Parameters.mergeParameters(params), None)(testSqlContext)
+    relation.asInstanceOf[InsertableRelation].insert(df, true)
+
+    // Make sure we wrote the data out ready for Redshift load, in the expected formats
+    val written = testSqlContext.read.format("com.databricks.spark.avro").load(tempDir)
+    written.collect() zip expectedData foreach {
+      case (loaded, expected) =>
+        loaded shouldBe expected
+    }
+  }
+
   test("Failed copies are handled gracefully when using a staging table") {
     val params = defaultParams ++ Map("usestagingtable" -> "true")
 
