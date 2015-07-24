@@ -215,7 +215,7 @@ private[redshift] object Parameters extends Logging {
     /**
      * When nonempty/non-null sets the compression codec to use for writing Avro data.
      *
-     * Defaults to snappy.
+     * Defaults to disabled (i.e. whatever is set in Hadoop config).
      */
     def avrocompression = parameters("avrocompression")
   }
