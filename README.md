@@ -291,6 +291,13 @@ table, the changes will be reverted and the backup table restored if post action
 key in the Hadoop configuration with the specified value and also sets <tt>mapred.output.compress = true</tt> and
 <tt>mapred.output.compression.type = BLOCK</tt>. If left unset (or set to null or an empty string) it will leave
 the Hadoop configuration unchanged.</p>
+<p>Valid settings are:</p>
+<ul>
+    <li><tt>""</tt> (default): use compression settings from Hadoop config (usually none unless explicitly set).</li>
+    <li><tt>"snappy"</tt>: use snappy compression.</li>
+    <li><tt>"deflate"</tt>: use deflate (zlib) compression (better ratio but more CPU intensive than snappy).</li>
+    <li><tt>"null"</tt>: disable compression.</li>
+</ul>
     </td>
  </tr>
 </table>
