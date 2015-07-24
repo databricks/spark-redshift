@@ -19,7 +19,6 @@ package com.databricks.spark.redshift
 import java.util.Properties
 
 import com.databricks.spark.redshift.Parameters.MergedParameters
-
 import org.apache.spark.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.jdbc.JDBCWrapper
@@ -38,14 +37,11 @@ case class RedshiftRelation(jdbcWrapper: JDBCWrapper, params: MergedParameters, 
   with InsertableRelation
   with Logging {
 
-  override def schema = {
-    userSchema match {
-      case Some(schema) => schema
-      case None => {
-        jdbcWrapper.registerDriver(params.jdbcDriver)
-        jdbcWrapper.resolveTable(params.jdbcUrl, params.table, new Properties())
-      }
-    }
+  override def schema = userSchema match {
+    case Some(schema) => schema
+    case None =>
+      jdbcWrapper.registerDriver(params.jdbcDriver)
+      jdbcWrapper.resolveTable(params.jdbcUrl, params.tableOrQuery, new Properties())
   }
 
   override def buildScan(requiredColumns: Array[String], filters: Array[Filter]): RDD[Row] = {
@@ -56,7 +52,7 @@ case class RedshiftRelation(jdbcWrapper: JDBCWrapper, params: MergedParameters, 
   }
 
   override def insert(data: DataFrame, overwrite: Boolean): Unit = {
-    val updatedParams = Parameters.mergeParameters(params.parameters updated ("overwrite", overwrite.toString))
+    val updatedParams = params.updated("overwrite", overwrite.toString)
     new RedshiftWriter(jdbcWrapper).saveToRedshift(sqlContext, data, updatedParams)
   }
 
@@ -70,11 +66,10 @@ case class RedshiftRelation(jdbcWrapper: JDBCWrapper, params: MergedParameters, 
   }
 
   protected def unloadStmnt(columnList: String, whereClause: String) : String = {
-    val credsString = params.credentialsString(sqlContext.sparkContext.hadoopConfiguration)
-    val query = s"SELECT $columnList FROM ${params.table} $whereClause"
-    val fixedUrl = Utils.fixS3Url(params.tempPath)
+    val unloadTo = params.tempPathForRedshift(sqlContext.sparkContext.hadoopConfiguration)
+    val query = s"SELECT $columnList FROM ${params.tableOrQuery} $whereClause"
 
-    s"UNLOAD ('$query') TO '$fixedUrl' WITH CREDENTIALS '$credsString' ESCAPE ALLOWOVERWRITE"
+    s"UNLOAD ('$query') TO $unloadTo ESCAPE ALLOWOVERWRITE"
   }
 
   protected def makeRdd(schema: StructType): RDD[Row] = {
@@ -110,7 +105,7 @@ case class RedshiftRelation(jdbcWrapper: JDBCWrapper, params: MergedParameters, 
       case GreaterThan(attr, value) => s"${sqlQuote(attr)}) > ${compileValue(value)}"
       case LessThanOrEqual(attr, value) => s"${sqlQuote(attr)} <= ${compileValue(value)}"
       case GreaterThanOrEqual(attr, value) => s"${sqlQuote(attr)} >= ${compileValue(value)}"
-    } mkString "AND"
+    } mkString " AND "
 
     if (filterClauses.isEmpty) "" else "WHERE " + filterClauses
   }

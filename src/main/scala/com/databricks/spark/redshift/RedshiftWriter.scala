@@ -19,13 +19,12 @@ package com.databricks.spark.redshift
 import java.sql.{Connection, SQLException}
 import java.util.Properties
 
-import scala.util.Random
-
 import com.databricks.spark.redshift.Parameters.MergedParameters
-
 import org.apache.spark.Logging
 import org.apache.spark.sql.jdbc.{DefaultJDBCWrapper, JDBCWrapper}
 import org.apache.spark.sql.{DataFrame, SQLContext}
+
+import scala.util.Random
 
 /**
  * Functions to write data to Redshift with intermediate Avro serialisation into S3.
@@ -54,9 +53,8 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
    * Generate the COPY SQL command
    */
   def copySql(sqlContext: SQLContext, params: MergedParameters) = {
-    val creds = params.credentialsString(sqlContext.sparkContext.hadoopConfiguration)
-    val fixedUrl = Utils.fixS3Url(params.tempPath)
-    s"COPY ${params.table} FROM '$fixedUrl' CREDENTIALS '$creds' FORMAT AS AVRO 'auto' TIMEFORMAT 'epochmillisecs'"
+    val copyFrom = params.tempPathForRedshift(sqlContext.sparkContext.hadoopConfiguration)
+    s"COPY ${params.table} FROM $copyFrom FORMAT AS AVRO 'auto' TIMEFORMAT 'epochmillisecs'"
   }
 
   /**
@@ -136,7 +134,7 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
     try {
       if(params.overwrite && params.useStagingTable) {
         withStagingTable(conn, params, table => {
-          val updatedParams = MergedParameters(params.parameters updated ("dbtable", table))
+          val updatedParams = params.updated("dbtable", table)
           unloadData(sqlContext, data, updatedParams.tempPath)
           doRedshiftLoad(conn, data, updatedParams)
         })

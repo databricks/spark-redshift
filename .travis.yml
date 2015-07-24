@@ -1,17 +1,20 @@
 language: scala
 scala:
-  - 2.10.4
+- 2.10.4
 jdk:
-  - openjdk6
+- openjdk6
 sudo: false
 cache:
   directories:
-    - $HOME/.ivy2
+  - $HOME/.ivy2
 env:
+  matrix:
   - HADOOP_VERSION="1.0.4"
   - HADOOP_VERSION="1.2.1"
   - HADOOP_VERSION="2.2.0"
+  global:
+    secure: DtoDPHZ61h5Rb4pRfEryK6llB1qvoPd5hl0l9PU9flmX7irWxOmkjXn05ONa1EGg3i7BTtGymhRwuWNCCegNoZC60k17+EoqBVA/UCAgH01TH9puk8fhJVGfNzUCPGRczUs60NGnFx6V7RYlRMXyybqe5piveavsqThNjR/mMI4=
 script:
-  - sbt -Dhadoop.version=$HADOOP_VERSION coverage test
+- sbt -Dhadoop.version=$HADOOP_VERSION coverage test
 after_success:
-  - bash <(curl -s https://codecov.io/bash)
+- bash <(curl -s https://codecov.io/bash)

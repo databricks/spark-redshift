@@ -29,22 +29,13 @@ object Utils {
    * a temp directory path for S3.
    */
   def joinUrls(a: String, b: String): String = {
-    val aUri = new URI(a)
-    val joinedPath = new File(aUri.getPath, b).toString
-    new URI(aUri.getScheme, aUri.getHost, joinedPath, null).toString + "/"
-  }
-
-  /**
-   * Redshift COPY and UNLOAD commands don't support s3n or s3a, but users may wish to use them
-   * for data loads. This function converts the URL back to the s3:// format.
-   */
-  def fixS3Url(url: String) = {
-    url.replaceAll("s3[an]://", "s3://")
+    val uri = new URI(a)
+    val joinedPath = new File(uri.getPath, b).toString
+    s"${new URI(uri.getScheme, uri.getUserInfo, uri.getHost, uri.getPort, joinedPath, uri.getQuery, uri.getFragment)}/"
   }
 
   /**
    * Creates a randomly named temp directory path for intermediate data
    */
-  def makeTempPath(tempRoot: String) = Utils.joinUrls(tempRoot, UUID.randomUUID().toString)
-
+  def makeTempPath(tempRoot: String): String = Utils.joinUrls(tempRoot, UUID.randomUUID().toString)
 }

@@ -50,7 +50,8 @@ class DefaultSource(jdbcWrapper: JDBCWrapper)
   /**
    * Load a RedshiftRelation using user-provided schema, so no inference over JDBC will be used.
    */
-  override def createRelation(sqlContext: SQLContext, parameters: Map[String, String], schema: StructType): BaseRelation = {
+  override def createRelation(sqlContext: SQLContext, parameters: Map[String, String],
+      schema: StructType): BaseRelation = {
     val params = Parameters.mergeParameters(parameters)
     RedshiftRelation(jdbcWrapper, params, Some(schema))(sqlContext)
   }
@@ -88,8 +89,8 @@ class DefaultSource(jdbcWrapper: JDBCWrapper)
     }
 
     if(doSave) {
-      val updatedParams = parameters updated ("overwrite", dropExisting.toString)
-      new RedshiftWriter(jdbcWrapper).saveToRedshift(sqlContext, data, Parameters.mergeParameters(updatedParams))
+      val updatedParams = params.updated("overwrite", dropExisting.toString)
+      new RedshiftWriter(jdbcWrapper).saveToRedshift(sqlContext, data, updatedParams)
     }
 
     createRelation(sqlContext, parameters)

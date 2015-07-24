@@ -16,14 +16,14 @@
 
 package com.databricks.spark.redshift
 
-import java.sql.Timestamp
+import java.sql.{Date, Timestamp}
 import java.text.{DateFormat, FieldPosition, ParsePosition, SimpleDateFormat}
-import java.util.Date
-
-import scala.util.parsing.combinator.JavaTokenParsers
+import java.util.{Date => utilDate}
 
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
+
+import scala.util.parsing.combinator.JavaTokenParsers
 
 /**
  * Simple parser for Redshift's UNLOAD bool syntax
@@ -38,8 +38,7 @@ private object RedshiftBooleanParser extends JavaTokenParsers {
 /**
  * Data type conversions for Redshift unloaded data
  */
-private [redshift] object Conversions {
-
+private[redshift] object Conversions {
   // Imports and exports with Redshift require that timestamps are represented
   // as strings, using the following formats
   val PATTERN_WITH_MILLIS = "yyyy-MM-dd HH:mm:ss.S"
@@ -52,15 +51,16 @@ private [redshift] object Conversions {
   // apparently not clues about this in the table schema. This format delegates to one of the above
   // formats based on string length.
   val redshiftTimestampFormat = new DateFormat() {
-    override def format(date: Date, toAppendTo: StringBuffer, fieldPosition: FieldPosition): StringBuffer = {
+    override def format(date: utilDate, toAppendTo: StringBuffer, fieldPosition: FieldPosition): StringBuffer = {
       // Always export with milliseconds, as they can just be zero if not specified
       redshiftTimestampFormatWithMillis.format(date, toAppendTo, fieldPosition)
     }
 
-    override def parse(source: String, pos: ParsePosition): Date = {
+    override def parse(source: String, pos: ParsePosition): utilDate = {
       if(source.length < PATTERN_WITH_MILLIS.length) {
         redshiftTimestampFormatWithoutMillis.parse(source, pos)
       } else {
+        println(s"#### $source")
         redshiftTimestampFormatWithMillis.parse(source, pos)
       }
     }
@@ -71,16 +71,12 @@ private [redshift] object Conversions {
   /**
    * Parse a string exported from a Redshift TIMESTAMP column
    */
-  def parseTimestamp(s: String): Timestamp = {
-    new Timestamp(redshiftTimestampFormat.parse(s).getTime)
-  }
+  def parseTimestamp(s: String): Timestamp = new Timestamp(redshiftTimestampFormat.parse(s).getTime)
 
   /**
    * Parse a string exported from a Redshift DATE column
    */
-  def parseDate(s: String): Timestamp = {
-    new Timestamp(redshiftDateFormat.parse(s).getTime)
-  }
+  def parseDate(s: String): Date = new Date(redshiftDateFormat.parse(s).getTime)
 
   /**
    * Construct a Row from the given array of strings, retrieved from Redshift UNLOAD.
@@ -112,8 +108,7 @@ private [redshift] object Conversions {
    * Return a function that will convert arrays of strings conforming to
    * the given schema to Row instances
    */
-  def rowConverter(schema: StructType) = convertRow(schema, _: Array[String])
-
+  def rowConverter(schema: StructType): (Array[String]) => Row = convertRow(schema, _: Array[String])
 
   /**
    * Convert schema representation of Dates to Timestamps, as spark-avro only works with Timestamps

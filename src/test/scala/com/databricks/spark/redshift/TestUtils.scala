@@ -16,7 +16,7 @@
 
 package com.databricks.spark.redshift
 
-import java.sql.Timestamp
+import java.sql.{Date, Timestamp}
 import java.util.Calendar
 
 import org.apache.spark.sql.types._
@@ -39,17 +39,18 @@ object TestUtils {
    */
   lazy val testSchema =
     StructType(
-      Seq(
-        makeField("testByte", ByteType),
-        makeField("testBool", BooleanType),
-        makeField("testDate", DateType),
-        makeField("testDouble", DoubleType),
-        makeField("testFloat", FloatType),
-        makeField("testInt", IntegerType),
-        makeField("testLong", LongType),
-        makeField("testShort", ShortType),
-        makeField("testString", StringType),
-        makeField("testTimestamp", TimestampType)))
+      makeField("testByte", ByteType) ::
+      makeField("testBool", BooleanType) ::
+      makeField("testDate", DateType) ::
+      makeField("testDouble", DoubleType) ::
+      makeField("testFloat", FloatType) ::
+      makeField("testInt", IntegerType) ::
+      makeField("testLong", LongType) ::
+      makeField("testShort", ShortType) ::
+      makeField("testString", StringType) ::
+      makeField("testTimestamp", TimestampType) ::
+      Nil
+    )
 
   /**
    * Convert date components to a millisecond timestamp
@@ -64,7 +65,9 @@ object TestUtils {
   /**
    * Convert date components to a SQL Timestamp
    */
-  def toTimestamp(year: Int, zeroBasedMonth: Int, date: Int, hour: Int, minutes: Int, seconds: Int, millis: Int = 0) = {
+  def toTimestamp(year: Int, zeroBasedMonth: Int, date: Int, hour: Int, minutes: Int, seconds: Int, millis: Int = 0) =
     new Timestamp(toMillis(year, zeroBasedMonth, date, hour, minutes, seconds, millis))
-  }
+
+  def toDate(year: Int, zeroBasedMonth: Int, date: Int) =
+    new Date(toTimestamp(year, zeroBasedMonth, date, 0, 0, 0).getTime)
 }
