@@ -172,7 +172,7 @@ private [redshift] object Parameters extends Logging {
     def credentialsString(configuration: Configuration) = {
 
       val scheme = new URI(tempDir).getScheme
-      val hadoopConfPrefix = s"fs.$scheme}"
+      val hadoopConfPrefix = s"fs.$scheme"
 
       val (accessKeyId, secretAccessKey) =
         if(parameters.contains("aws_access_key_id")) {
