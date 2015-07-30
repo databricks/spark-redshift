@@ -107,7 +107,7 @@ case class RedshiftRelation(jdbcWrapper: JDBCWrapper, params: MergedParameters, 
     val filterClauses = filters map {
       case EqualTo(attr, value) => s"${sqlQuote(attr)} = ${compileValue(value)}"
       case LessThan(attr, value) => s"${sqlQuote(attr)} < ${compileValue(value)}"
-      case GreaterThan(attr, value) => s"${sqlQuote(attr)}) > ${compileValue(value)}"
+      case GreaterThan(attr, value) => s"${sqlQuote(attr)} > ${compileValue(value)}"
       case LessThanOrEqual(attr, value) => s"${sqlQuote(attr)} <= ${compileValue(value)}"
       case GreaterThanOrEqual(attr, value) => s"${sqlQuote(attr)} >= ${compileValue(value)}"
     } mkString "AND"
