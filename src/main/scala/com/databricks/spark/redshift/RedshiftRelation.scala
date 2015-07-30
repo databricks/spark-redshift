@@ -79,6 +79,7 @@ case class RedshiftRelation(jdbcWrapper: JDBCWrapper, params: MergedParameters, 
 
   protected def makeRdd(schema: StructType): RDD[Row] = {
     val sc = sqlContext.sparkContext
+    params.setCredentials(sc.hadoopConfiguration)
     val rdd = sc.newAPIHadoopFile(params.tempPath, classOf[RedshiftInputFormat],
       classOf[java.lang.Long], classOf[Array[String]], sc.hadoopConfiguration)
     rdd.values.map(Conversions.rowConverter(schema))
