@@ -52,9 +52,25 @@ case class RedshiftRelation(jdbcWrapper: JDBCWrapper, params: MergedParameters, 
     makeRdd(pruneSchema(schema, requiredColumns))
   }
 
+  // Redshift COPY using Avro format only supports lowercase columns
+  private[this] def toLowercaseColumns(data: DataFrame): DataFrame = {
+    val allColumns = new collection.mutable.HashSet[String]()
+    val cols = data.schema.fields.map { field =>
+      val lowercase = field.name.toLowerCase
+      if (allColumns.contains(lowercase)) {
+        sys.error("Redshift COPY using Avro format only supports lowercase columns. " +
+          "Converting all column names to lowercase causes ambiguity...")
+      } else {
+        allColumns += lowercase
+      }
+      data.col(field.name).as(lowercase)
+    }
+    data.select(cols: _*)
+  }
+
   override def insert(data: DataFrame, overwrite: Boolean): Unit = {
     val updatedParams = params.updated("overwrite", overwrite.toString)
-    new RedshiftWriter(jdbcWrapper).saveToRedshift(sqlContext, data, updatedParams)
+    new RedshiftWriter(jdbcWrapper).saveToRedshift(sqlContext, toLowercaseColumns(data), updatedParams)
   }
 
   protected def unloadToTemp(columnList: String = "*", whereClause: String = ""): Unit = {

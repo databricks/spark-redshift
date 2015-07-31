@@ -180,23 +180,13 @@ need to be configured to allow access from your driver application.
     </td>
  </tr>
  <tr>
-    <td><tt>aws_access_key_id</tt></td>
-    <td>No, unless also unavailable from environment</td>
-    <td><a href="http://docs.aws.amazon.com/AWSSdkDocsJava/latest/DeveloperGuide/credentials.html">Default Provider Chain</a></td>
-    <td>AWS access key, must have write permissions to the S3 bucket.</td>
- </tr>
- <tr>
-    <td><tt>aws_secret_access_key</tt></td>
-    <td>No, unless also unavailable from environment</td>
-    <td><a href="http://docs.aws.amazon.com/AWSSdkDocsJava/latest/DeveloperGuide/credentials.html">Default Provider Chain</a></td>
-    <td>AWS secret access key corresponding to provided access key.</td>
- </tr>
- <tr>
     <td><tt>tempdir</tt></td>
     <td>Yes</td>
     <td>No default</td>
     <td>A writeable location in Amazon S3, to be used for unloaded data when reading and Avro data to be loaded into
-Redshift when writing. If you're using `spark-redshift` as part of a regular ETL pipeline, it can be useful to
+Redshift when writing. The location url could contain aws access key id and aws secrete access key. Otherwise, the default
+aws key pairs set in the hadoop configuration of the spark context is used. 
+If you're using `spark-redshift` as part of a regular ETL pipeline, it can be useful to
 set a <a href="http://docs.aws.amazon.com/AmazonS3/latest/dev/object-lifecycle-mgmt.html">Lifecycle Policy</a> on a bucket
 and use that as a temp location for this data.
     </td>

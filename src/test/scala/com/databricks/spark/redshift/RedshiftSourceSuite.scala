@@ -25,6 +25,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.jdbc.JDBCWrapper
 import org.apache.spark.sql.sources._
+import org.apache.spark.sql.types.{StructType, StructField}
 import org.apache.spark.sql.{Row, SQLContext, SaveMode}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
@@ -507,5 +508,34 @@ class RedshiftSourceSuite
 
   test("DefaultSource has default constructor, required by Data Source API") {
     new DefaultSource()
+  }
+
+  test("Auto-convert column names to lower case and check any ambiguity") {
+    val testSqlContext = new SQLContext(sc)
+
+    val jdbcUrl = "jdbc:postgresql://foo/bar"
+    val params = Map(
+      "url" -> jdbcUrl,
+      "tempdir" -> tempDir,
+      "dbtable" -> "test_table",
+      "postactions" -> "GRANT SELECT ON %s TO jeremy",
+      "diststyle" -> "KEY",
+      "distkey" -> "testInt"
+    )
+
+    val rdd = sc.parallelize(expectedData.toSeq)
+    val schema = StructType(
+      TestUtils.testSchema.map {
+        case StructField("testLong", dataType, nullable, metadata) =>
+          StructField("testint", dataType, nullable, metadata)
+        case other => other
+      }
+    )
+    val df = testSqlContext.createDataFrame(rdd, schema)
+
+    val relation = RedshiftRelation(mock[JDBCWrapper], Parameters.mergeParameters(params), None)(testSqlContext)
+    intercept[Exception] {
+      relation.asInstanceOf[InsertableRelation].insert(df, overwrite = true)
+    }
   }
 }
