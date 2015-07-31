@@ -23,7 +23,7 @@ licenses += "Apache-2.0" -> url("http://opensource.org/licenses/Apache-2.0")
 credentials += Credentials(Path.userHome / ".ivy2" / ".credentials")
 
 resolvers +=
-  "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
+  "Sonatype OSS Snapshots" at "http://www.eecs.berkeley.edu/~kaizeng/org.apache.spark"
 
 resolvers +=
   "Spark Snapshots" at "http://repository.apache.org/snapshots"
