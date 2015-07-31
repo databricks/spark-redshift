@@ -13,7 +13,7 @@ env:
   - HADOOP_VERSION="1.2.1"
   - HADOOP_VERSION="2.2.0"
   global:
-    secure: DtoDPHZ61h5Rb4pRfEryK6llB1qvoPd5hl0l9PU9flmX7irWxOmkjXn05ONa1EGg3i7BTtGymhRwuWNCCegNoZC60k17+EoqBVA/UCAgH01TH9puk8fhJVGfNzUCPGRczUs60NGnFx6V7RYlRMXyybqe5piveavsqThNjR/mMI4=
+    secure: QvtfF3FXwscaa1rtqAVkRsQt9KdVk7UCLBcIGHDuzx5QO76b7fWBQU8PEO7QzBTfwnEaK5xskhdxWcmm/Llg/mwaWVUz1mvnjWd7rx8GeEwTgrUi3Uf6Zplqp0kVgnZBxAD8/DJ79eORw5IqQQwiKRvleaMuJahDbt9s1R0b7dY=
 script:
 - sbt -Dhadoop.version=$HADOOP_VERSION coverage test
 after_success:
