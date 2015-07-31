@@ -19,13 +19,12 @@ package com.databricks.spark.redshift
 import java.sql.{Connection, SQLException}
 import java.util.Properties
 
-import scala.util.Random
-
 import com.databricks.spark.redshift.Parameters.MergedParameters
-
 import org.apache.spark.Logging
 import org.apache.spark.sql.jdbc.{DefaultJDBCWrapper, JDBCWrapper}
 import org.apache.spark.sql.{DataFrame, SQLContext}
+
+import scala.util.Random
 
 /**
  * Functions to write data to Redshift with intermediate Avro serialisation into S3.
@@ -54,9 +53,8 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
    * Generate the COPY SQL command
    */
   def copySql(sqlContext: SQLContext, params: MergedParameters) = {
-    val creds = params.credentialsString(sqlContext.sparkContext.hadoopConfiguration)
-    val fixedUrl = Utils.fixS3Url(params.tempPath)
-    s"COPY ${params.table} FROM '$fixedUrl' CREDENTIALS '$creds' FORMAT AS AVRO 'auto' TIMEFORMAT 'epochmillisecs'"
+    val copyFrom = params.tempPathForRedshift(sqlContext.sparkContext.hadoopConfiguration)
+    s"COPY ${params.table} FROM $copyFrom FORMAT AS AVRO 'auto' TIMEFORMAT 'epochmillisecs'"
   }
 
   /**
@@ -94,7 +92,6 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
    * and creating the table if it doesn't already exist.
    */
   def doRedshiftLoad(conn: Connection, data: DataFrame, params: MergedParameters) : Unit = {
-
     // Overwrites must drop the table, in case there has been a schema update
     if(params.overwrite) {
       val deleteExisting = conn.prepareStatement(s"DROP TABLE IF EXISTS ${params.table}")
@@ -123,20 +120,19 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
   /**
    * Serialize temporary data to S3, ready for Redshift COPY
    */
-  def unloadData(sqlContext: SQLContext, data: DataFrame, tempPath: String): Unit = {
+  def unloadData(sqlContext: SQLContext, data: DataFrame, tempPath: String): Unit =
     Conversions.datesToTimestamps(sqlContext, data).write.format("com.databricks.spark.avro").save(tempPath)
-  }
 
   /**
    * Write a DataFrame to a Redshift table, using S3 and Avro serialization
    */
   def saveToRedshift(sqlContext: SQLContext, data: DataFrame, params: MergedParameters) : Unit = {
-    val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, new Properties()).apply()
+    val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, new Properties())()
 
     try {
       if(params.overwrite && params.useStagingTable) {
         withStagingTable(conn, params, table => {
-          val updatedParams = MergedParameters(params.parameters updated ("dbtable", table))
+          val updatedParams = params.updated("dbtable", table)
           unloadData(sqlContext, data, updatedParams.tempPath)
           doRedshiftLoad(conn, data, updatedParams)
         })

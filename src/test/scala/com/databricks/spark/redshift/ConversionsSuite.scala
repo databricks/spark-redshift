@@ -18,9 +18,8 @@ package com.databricks.spark.redshift
 
 import java.sql.Timestamp
 
-import org.scalatest.FunSuite
-
 import org.apache.spark.sql.Row
+import org.scalatest.FunSuite
 
 /**
  * Unit test for data type conversions
@@ -40,8 +39,7 @@ class ConversionsSuite extends FunSuite {
     val expectedTimestampMillis = TestUtils.toMillis(2014, 2, 1, 0, 0, 1, 123)
 
     val convertedRow = convertRow(
-      Array("1", "t", "2015-07-01", doubleMin, "1.0", "42",
-        longMax, "23", unicodeString, timestampWithMillis))
+      Array("1", "t", "2015-07-01", doubleMin, "1.0", "42", longMax, "23", unicodeString, timestampWithMillis))
 
     val expectedRow = Row(1.asInstanceOf[Byte], true, new Timestamp(expectedDateMillis),
       Double.MinValue, 1.0f, 42, Long.MaxValue, 23.toShort, unicodeString,

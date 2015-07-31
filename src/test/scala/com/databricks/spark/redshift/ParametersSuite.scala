@@ -16,6 +16,7 @@
 
 package com.databricks.spark.redshift
 
+import org.apache.hadoop.conf.Configuration
 import org.scalatest.{FunSuite, Matchers}
 
 /**
@@ -23,7 +24,7 @@ import org.scalatest.{FunSuite, Matchers}
  */
 class ParametersSuite extends FunSuite with Matchers {
 
-  test("Minimal valid parameter map is accepted") {
+  test("minimal valid parameter map is accepted") {
     val params =
       Map(
         "tempdir" -> "s3://foo/bar",
@@ -32,17 +33,18 @@ class ParametersSuite extends FunSuite with Matchers {
 
     val mergedParams = Parameters.mergeParameters(params)
 
-    mergedParams.tempPath should startWith (params("tempdir"))
+    mergedParams.tempPath should startWith(params("tempdir"))
     mergedParams.jdbcUrl shouldBe params("url")
     mergedParams.table shouldBe params("dbtable")
+    mergedParams.tableOrQuery shouldBe params("dbtable")
 
     // Check that the defaults have been added
     Parameters.DEFAULT_PARAMETERS foreach {
-      case (key, value) => mergedParams.parameters(key) shouldBe value
+      case (k, v) => mergedParams.parameters(k) shouldBe v
     }
   }
 
-  test("New instances have distinct temp paths") {
+  test("new instances have distinct temp paths") {
     val params =
       Map(
         "tempdir" -> "s3://foo/bar",
@@ -55,7 +57,7 @@ class ParametersSuite extends FunSuite with Matchers {
     mergedParams1.tempPath should not equal mergedParams2.tempPath
   }
 
-  test("Errors are thrown when mandatory parameters are not provided") {
+  test("errors are thrown when mandatory parameters are not provided") {
 
     def checkMerge(params: Map[String, String]): Unit = {
       intercept[Exception] {
@@ -66,5 +68,35 @@ class ParametersSuite extends FunSuite with Matchers {
     checkMerge(Map("dbtable" -> "test_table", "url" -> "jdbc:postgresql://foo/bar"))
     checkMerge(Map("tempdir" -> "s3://foo/bar", "url" -> "jdbc:postgresql://foo/bar"))
     checkMerge(Map("dbtable" -> "test_table", "tempdir" -> "s3://foo/bar"))
+  }
+
+  test("credentials coded in tempdir overwrite hadoop configuration") {
+    val params =
+      Map(
+        "tempdir" -> "s3://keyId1:secretKey1@foo/bar",
+        "dbtable" -> "test_table",
+        "url" -> "jdbc:postgresql://foo/bar")
+
+    val hadoopConfiguration = new Configuration()
+    hadoopConfiguration.set("fs.s3.awsAccessKeyId", "keyId2")
+    hadoopConfiguration.set("fs.s3.awsSecretAccessKey", "secretKey2")
+
+    val mergedParams = Parameters.mergeParameters(params)
+
+    mergedParams.tempPathForRedshift(hadoopConfiguration) should fullyMatch
+      "'s3://foo/bar/[0-9a-f\\-]+/' CREDENTIALS 'aws_access_key_id=keyId1;aws_secret_access_key=secretKey1'"
+  }
+
+  test("invalid options with both dbtable and query specified") {
+    val params =
+      Map(
+        "tempdir" -> "s3://keyId1:secretKey1@foo/bar",
+        "dbtable" -> "test_table",
+        "query" -> "select * from test_table",
+        "url" -> "jdbc:postgresql://foo/bar")
+
+    intercept[Exception] {
+      Parameters.mergeParameters(params)
+    }
   }
 }
