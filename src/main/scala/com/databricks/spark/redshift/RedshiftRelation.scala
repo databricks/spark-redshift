@@ -25,6 +25,7 @@ import org.apache.spark.sql.jdbc.JDBCWrapper
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
+import org.apache.spark.unsafe.types.UTF8String
 
 /**
  * Data Source API implementation for Amazon Redshift database tables
@@ -91,12 +92,12 @@ case class RedshiftRelation(jdbcWrapper: JDBCWrapper, params: MergedParameters, 
   }
 
   protected def compileValue(value: Any): Any = value match {
-    case stringValue: String => s"\\'${escapeSql(stringValue.toString)}\\'"
+    case stringValue: UTF8String => s"\\'${escapeSql(stringValue.toString)}\\'"
     case _ => value
   }
 
   protected def escapeSql(value: String): String =
-    if (value == null) null else value.replace("'", "''")
+    if (value == null) null else value.replace("'", "\\'\\'")
 
   protected def buildWhereClause(filters: Array[Filter]): String = {
     val filterClauses = filters map {

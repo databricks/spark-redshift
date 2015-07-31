@@ -92,7 +92,6 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
    * and creating the table if it doesn't already exist.
    */
   def doRedshiftLoad(conn: Connection, data: DataFrame, params: MergedParameters) : Unit = {
-
     // Overwrites must drop the table, in case there has been a schema update
     if(params.overwrite) {
       val deleteExisting = conn.prepareStatement(s"DROP TABLE IF EXISTS ${params.table}")
@@ -121,15 +120,14 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
   /**
    * Serialize temporary data to S3, ready for Redshift COPY
    */
-  def unloadData(sqlContext: SQLContext, data: DataFrame, tempPath: String): Unit = {
+  def unloadData(sqlContext: SQLContext, data: DataFrame, tempPath: String): Unit =
     Conversions.datesToTimestamps(sqlContext, data).write.format("com.databricks.spark.avro").save(tempPath)
-  }
 
   /**
    * Write a DataFrame to a Redshift table, using S3 and Avro serialization
    */
   def saveToRedshift(sqlContext: SQLContext, data: DataFrame, params: MergedParameters) : Unit = {
-    val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, new Properties()).apply()
+    val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, new Properties())()
 
     try {
       if(params.overwrite && params.useStagingTable) {

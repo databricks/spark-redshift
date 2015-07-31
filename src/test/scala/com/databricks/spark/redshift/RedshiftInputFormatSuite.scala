@@ -89,7 +89,6 @@ class RedshiftInputFormatSuite extends FunSuite with BeforeAndAfterAll {
       // TODO: Check this assertion - fails on Travis only, no idea what, or what it's for
       // assert(rdd.partitions.size > records.size) // so there exist at least one empty partition
 
-      println("############" + rdd.values.map(_.toSeq).glom().map(_.toSeq).collect().toSeq)
       val actual = rdd.values.map(_.toSeq).collect()
       assert(actual.size === records.size)
       assert(actual.toSet === records)

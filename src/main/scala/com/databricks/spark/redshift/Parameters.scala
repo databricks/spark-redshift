@@ -102,7 +102,7 @@ private[redshift] object Parameters extends Logging {
           sys.error("No credentials provided.")
         }
 
-      s"'s3://${uri.getHost}${uri.getPath}}'" +
+      s"'s3://${uri.getHost}${uri.getPath}'" +
         s" CREDENTIALS 'aws_access_key_id=$accessKeyId;aws_secret_access_key=$secretAccessKey'"
     }
 

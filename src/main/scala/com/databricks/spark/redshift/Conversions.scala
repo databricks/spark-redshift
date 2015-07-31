@@ -60,7 +60,6 @@ private[redshift] object Conversions {
       if(source.length < PATTERN_WITH_MILLIS.length) {
         redshiftTimestampFormatWithoutMillis.parse(source, pos)
       } else {
-        println(s"#### $source")
         redshiftTimestampFormatWithMillis.parse(source, pos)
       }
     }
@@ -114,12 +113,12 @@ private[redshift] object Conversions {
    * Convert schema representation of Dates to Timestamps, as spark-avro only works with Timestamps
    */
   def datesToTimestamps(sqlContext: SQLContext, df: DataFrame): DataFrame = {
-    val schema = StructType(
-      df.schema map {
-        case StructField(name, DateType, nullable, meta) => StructField(name, TimestampType, nullable, meta)
-        case other => other
-      })
-
-    sqlContext.createDataFrame(df.rdd, schema)
+    val cols = df.schema.fields.map { field =>
+      field.dataType match {
+        case DateType => df.col(field.name).cast(TimestampType).as(field.name)
+        case _ => df.col(field.name)
+      }
+    }
+    df.select(cols: _*)
   }
 }
