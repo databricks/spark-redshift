@@ -38,6 +38,7 @@ private [redshift] object Parameters extends Logging {
     "overwrite" -> "false",
     "diststyle" -> "EVEN",
     "usestagingtable" -> "true",
+    "maxerrors" -> "0",
     "postactions" -> ";"
   )
 
@@ -151,6 +152,13 @@ private [redshift] object Parameters extends Logging {
      * Defaults to true.
      */
     def useStagingTable = parameters("usestagingtable").toBoolean
+
+    /**
+     * The maximum number of errors that the Redshift COPY will accept before failing the full import.
+     *
+     * Defaults to 0.
+     */
+    def maxErrors = parameters("maxerrors")
 
     /**
      * List of semi-colon separated SQL statements to run after successful write operations.
