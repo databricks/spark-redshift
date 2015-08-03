@@ -151,7 +151,7 @@ private[redshift] object Conversions {
   def setStrLength(metadata:Metadata, length:Int) : Metadata = {
     new MetadataBuilder()
       .withMetadata(metadata)
-      .putDouble("maxLength", length)
+      .putLong("maxLength", length)
       .build()
   }
 

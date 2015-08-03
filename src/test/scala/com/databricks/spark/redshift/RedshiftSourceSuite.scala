@@ -486,7 +486,7 @@ class RedshiftSourceSuite
 
     val dfMetaSchema = Conversions.injectMetaSchema(testSqlContext, df)
 
-//    assert(dfMetaSchema.schema("testString").metadata.getDouble("maxLength") == 1.0)
+    assert(dfMetaSchema.schema("testString").metadata.getLong("maxLength") == 10)
   }
 
   test("DefaultSource has default constructor, required by Data Source API") {

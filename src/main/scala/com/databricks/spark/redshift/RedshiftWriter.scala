@@ -19,6 +19,8 @@ package com.databricks.spark.redshift
 import java.sql.{Connection, SQLException}
 import java.util.Properties
 
+import org.apache.spark.sql.types._
+
 import scala.util.Random
 
 import com.databricks.spark.redshift.Parameters.MergedParameters
@@ -35,8 +37,8 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
   /**
    * Generate CREATE TABLE statement for Redshift
    */
-  def createTableSql(data: DataFrame, params: MergedParameters) : String = {
-    val schemaSql = jdbcWrapper.schemaString(data, params.jdbcUrl)
+  def createTableSql(data: DataFrame, params: MergedParameters): String = {
+    val schemaSql = jdbcWrapper.schemaString(data, params.jdbcUrl) // TODO: Replace
     val distStyleDef = params.distStyle match {
       case Some(style) => s"DISTSTYLE $style"
       case None => ""
@@ -63,7 +65,7 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
    * Sets up a staging table then runs the given action, passing the temporary table name
    * as a parameter.
    */
-  def withStagingTable(conn:Connection, params: MergedParameters, action: (String) => Unit) {
+  def withStagingTable(conn: Connection, params: MergedParameters, action: (String) => Unit) {
     val randomSuffix = Math.abs(Random.nextInt()).toString
     val tempTable = s"${params.table}_staging_$randomSuffix"
     val backupTable = s"${params.table}_backup_$randomSuffix"
@@ -93,10 +95,10 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
    * Perform the Redshift load, including deletion of existing data in the case of an overwrite,
    * and creating the table if it doesn't already exist.
    */
-  def doRedshiftLoad(conn: Connection, data: DataFrame, params: MergedParameters) : Unit = {
+  def doRedshiftLoad(conn: Connection, data: DataFrame, params: MergedParameters): Unit = {
 
     // Overwrites must drop the table, in case there has been a schema update
-    if(params.overwrite) {
+    if (params.overwrite) {
       val deleteExisting = conn.prepareStatement(s"DROP TABLE IF EXISTS ${params.table}")
       deleteExisting.execute()
     }
@@ -114,7 +116,7 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
 
     // Execute postActions
     params.postActions.foreach(action => {
-      val actionSql = if(action.contains("%s")) action.format(params.table) else action
+      val actionSql = if (action.contains("%s")) action.format(params.table) else action
       log.info("Executing postAction: " + actionSql)
       conn.prepareStatement(actionSql).execute()
     })
@@ -132,13 +134,13 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
   /**
    * Write a DataFrame to a Redshift table, using S3 and Avro serialization
    */
-  def saveToRedshift(sqlContext: SQLContext, data: DataFrame, params: MergedParameters) : Unit = {
+  def saveToRedshift(sqlContext: SQLContext, data: DataFrame, params: MergedParameters): Unit = {
     val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, new Properties()).apply()
 
     try {
-      if(params.overwrite && params.useStagingTable) {
+      if (params.overwrite && params.useStagingTable) {
         withStagingTable(conn, params, table => {
-          val updatedParams = MergedParameters(params.parameters updated ("dbtable", table))
+          val updatedParams = MergedParameters(params.parameters updated("dbtable", table))
           unloadData(sqlContext, data, updatedParams.tempPath)
           doRedshiftLoad(conn, data, updatedParams)
         })
