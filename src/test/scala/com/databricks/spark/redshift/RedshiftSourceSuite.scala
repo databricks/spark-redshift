@@ -172,7 +172,7 @@ class RedshiftSourceSuite
   }
 
   test("DefaultSource supports simple column filtering") {
-
+    //TODO: DRY ME
     val params = Map("url" -> "jdbc:postgresql://foo/bar",
       "tempdir" -> "tmp",
       "dbtable" -> "test_table",
@@ -201,6 +201,7 @@ class RedshiftSourceSuite
 
   test("DefaultSource supports user schema, pruned and filtered scans") {
 
+    //TODO: DRY ME
     val params = Map("url" -> "jdbc:postgresql://foo/bar",
       "tempdir" -> "tmp",
       "dbtable" -> "test_table",
@@ -478,9 +479,17 @@ class RedshiftSourceSuite
     }
   }
 
+  test("Basic string field extraction") {
+    val rdd = sc.parallelize(expectedData)
+    val testSqlContext = new SQLContext(sc)
+    val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
+
+    val dfMetaSchema = Conversions.injectMetaSchema(testSqlContext, df)
+
+//    assert(dfMetaSchema.schema("testString").metadata.getDouble("maxLength") == 1.0)
+  }
+
   test("DefaultSource has default constructor, required by Data Source API") {
     new DefaultSource()
   }
-
-
 }

@@ -124,7 +124,9 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
    * Serialize temporary data to S3, ready for Redshift COPY
    */
   def unloadData(sqlContext: SQLContext, data: DataFrame, tempPath: String): Unit = {
-    Conversions.datesToTimestamps(sqlContext, data).write.format("com.databricks.spark.avro").save(tempPath)
+    val enrichedData = Conversions.datesToTimestamps(sqlContext, data) // TODO .extractStringColumnLengths
+
+    enrichedData.write.format("com.databricks.spark.avro").save(tempPath)
   }
 
   /**

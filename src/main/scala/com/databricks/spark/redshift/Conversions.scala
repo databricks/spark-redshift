@@ -38,7 +38,7 @@ private object RedshiftBooleanParser extends JavaTokenParsers {
 /**
  * Data type conversions for Redshift unloaded data
  */
-private [redshift] object Conversions {
+private[redshift] object Conversions {
 
   // Imports and exports with Redshift require that timestamps are represented
   // as strings, using the following formats
@@ -58,7 +58,7 @@ private [redshift] object Conversions {
     }
 
     override def parse(source: String, pos: ParsePosition): Date = {
-      if(source.length < PATTERN_WITH_MILLIS.length) {
+      if (source.length < PATTERN_WITH_MILLIS.length) {
         redshiftTimestampFormatWithoutMillis.parse(source, pos)
       } else {
         redshiftTimestampFormatWithMillis.parse(source, pos)
@@ -124,6 +124,49 @@ private [redshift] object Conversions {
         case StructField(name, DateType, nullable, meta) => StructField(name, TimestampType, nullable, meta)
         case other => other
       })
+
+    sqlContext.createDataFrame(df.rdd, schema)
+  }
+
+  def mapStrLengths(df:DataFrame) : Map[String, Int] = {
+    // Calculate maximum string lengths for each row in each respective row
+    val stringLengths = df.flatMap(row =>
+      df.schema collect {
+        case StructField(columnName, StringType, _, _) => (columnName, getStrLength(row, columnName))
+      }
+    ).reduceByKey(Math.max(_, _))
+
+    stringLengths.collect().toMap
+  }
+
+  def getStrLength(row:Row, columnName:String): Int = {
+    row.getAs[String](columnName) match {
+      case field:String => field.length()
+      case _ => 0
+    }
+  }
+
+  def setStrLength(metadata:Metadata, length:Int) : Metadata = {
+    new MetadataBuilder()
+      .withMetadata(metadata)
+      .putDouble("maxLength", length)
+      .build()
+  }
+
+  /**
+   * Iterate through each column in the schema that is a string, storing the longest string length in that columns'
+   * metadata.
+   */
+  def injectMetaSchema(sqlContext: SQLContext, df: DataFrame): DataFrame = {
+    val stringLengthsByColumn = mapStrLengths(df)
+
+    val schema = StructType(
+      df.schema map {
+        case StructField(name, StringType, nullable, meta) =>
+          StructField(name, StringType, nullable, setStrLength(meta, stringLengthsByColumn(name)))
+        case other => other
+      }
+    )
 
     sqlContext.createDataFrame(df.rdd, schema)
   }
