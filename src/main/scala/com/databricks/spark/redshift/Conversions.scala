@@ -129,9 +129,11 @@ private[redshift] object Conversions {
   }
 
   def mapStrLengths(df:DataFrame) : Map[String, Int] = {
+    val schema:StructType = df.schema
+
     // Calculate maximum string lengths for each row in each respective row
     val stringLengths = df.flatMap(row =>
-      df.schema collect {
+      schema.collect {
         case StructField(columnName, StringType, _, _) => (columnName, getStrLength(row, columnName))
       }
     ).reduceByKey(Math.max(_, _))
