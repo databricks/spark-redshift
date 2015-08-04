@@ -103,40 +103,13 @@ class RedshiftSourceSuite
     super.afterAll()
   }
 
-  /**
-   * Prepare the JDBC wrapper for an UNLOAD test.
-   */
-  def prepareUnloadTest(params: Map[String, String]) = {
-    val jdbcUrl = params("url")
-    val jdbcWrapper = mockJdbcWrapper(jdbcUrl, Seq("UNLOAD.*".r))
-
-    // We expect some extra calls to the JDBC wrapper,
-    // to register the driver and retrieve the schema.
-    (jdbcWrapper.registerDriver _)
-      .expects(*)
-      .anyNumberOfTimes()
-    (jdbcWrapper.resolveTable _)
-      .expects(jdbcUrl, "test_table", *)
-      .returning(TestUtils.testSchema)
-      .anyNumberOfTimes()
-
-    jdbcWrapper
-  }
-
   test("DefaultSource can load Redshift UNLOAD output to a DataFrame") {
-
-    val params = Map("url" -> "jdbc:postgresql://foo/bar",
-      "tempdir" -> "tmp",
-      "dbtable" -> "test_table",
-      "aws_access_key_id" -> "test1",
-      "aws_secret_access_key" -> "test2")
-
-    val jdbcWrapper = prepareUnloadTest(params)
+    val jdbcWrapper = prepareUnloadTest(TestUtils.params)
     val testSqlContext = new SQLContext(sc)
 
     // Assert that we've loaded and converted all data in the test file
     val source = new DefaultSource(jdbcWrapper)
-    val relation = source.createRelation(testSqlContext, params)
+    val relation = source.createRelation(testSqlContext, TestUtils.params)
     val df = testSqlContext.baseRelationToDataFrame(relation)
 
     df.rdd.collect() zip expectedData foreach {
@@ -146,19 +119,12 @@ class RedshiftSourceSuite
   }
 
   test("DefaultSource supports simple column filtering") {
-    //TODO: DRY ME
-    val params = Map("url" -> "jdbc:postgresql://foo/bar",
-      "tempdir" -> "tmp",
-      "dbtable" -> "test_table",
-      "aws_access_key_id" -> "test1",
-      "aws_secret_access_key" -> "test2")
-
-    val jdbcWrapper = prepareUnloadTest(params)
+    val jdbcWrapper = prepareUnloadTest(TestUtils.params)
     val testSqlContext = new SQLContext(sc)
 
     // Construct the source with a custom schema
     val source = new DefaultSource(jdbcWrapper)
-    val relation = source.createRelation(testSqlContext, params, TestUtils.testSchema)
+    val relation = source.createRelation(testSqlContext, TestUtils.params, TestUtils.testSchema)
 
     val rdd = relation.asInstanceOf[PrunedFilteredScan].buildScan(Array("testByte", "testBool"), Array.empty[Filter])
     val prunedExpectedValues =
@@ -174,20 +140,12 @@ class RedshiftSourceSuite
   }
 
   test("DefaultSource supports user schema, pruned and filtered scans") {
-
-    //TODO: DRY ME
-    val params = Map("url" -> "jdbc:postgresql://foo/bar",
-      "tempdir" -> "tmp",
-      "dbtable" -> "test_table",
-      "aws_access_key_id" -> "test1",
-      "aws_secret_access_key" -> "test2")
-
-    val jdbcWrapper = prepareUnloadTest(params)
+    val jdbcWrapper = prepareUnloadTest(TestUtils.params)
     val testSqlContext = new SQLContext(sc)
 
     // Construct the source with a custom schema
     val source = new DefaultSource(jdbcWrapper)
-    val relation = source.createRelation(testSqlContext, params, TestUtils.testSchema)
+    val relation = source.createRelation(testSqlContext, TestUtils.params, TestUtils.testSchema)
 
     // Define a simple filter to only include a subset of rows
     val filters: Array[Filter] =
@@ -278,6 +236,7 @@ class RedshiftSourceSuite
       .expects(*, jdbcUrl, *)
       .returning(() => mockedConnection)
 
+    // TODO: extract to outer class
     def successfulStatement(pattern: Regex): PreparedStatement = {
       val mockedStatement = mock[PreparedStatement]
       (mockedConnection.prepareStatement(_: String))
@@ -288,6 +247,7 @@ class RedshiftSourceSuite
       mockedStatement
     }
 
+    // TODO: extract to outer class
     def failedStatement(pattern: Regex) : PreparedStatement = {
       val mockedStatement = mock[PreparedStatement]
       (mockedConnection.prepareStatement(_: String))
@@ -344,12 +304,6 @@ class RedshiftSourceSuite
     val testSqlContext = new SQLContext(sc)
 
     val jdbcUrl = "jdbc:postgresql://foo/bar"
-    val params =
-      Map("url" -> jdbcUrl,
-        "tempdir" -> tempDir,
-        "dbtable" -> "test_table",
-        "aws_access_key_id" -> "test1",
-        "aws_secret_access_key" -> "test2")
 
     val rdd = sc.parallelize(expectedData.toSeq)
     val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
@@ -371,7 +325,7 @@ class RedshiftSourceSuite
       .anyNumberOfTimes()
 
     val source = new DefaultSource(jdbcWrapper)
-    val savedDf = source.createRelation(testSqlContext, SaveMode.Append, params, df)
+    val savedDf = source.createRelation(testSqlContext, SaveMode.Append, TestUtils.params, df)
 
     // This test is "appending" to an empty table, so we expect all our test data to be
     // the only content in the returned data frame

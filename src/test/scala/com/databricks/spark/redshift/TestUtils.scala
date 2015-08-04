@@ -19,6 +19,7 @@ package com.databricks.spark.redshift
 import java.sql.Timestamp
 import java.util.Calendar
 
+import com.databricks.spark.redshift.Parameters.MergedParameters
 import org.apache.spark.sql.types._
 
 /**
@@ -32,6 +33,14 @@ object TestUtils {
   def makeField(name: String, typ: DataType) = {
     val md = (new MetadataBuilder).putString("name", name).build()
     StructField(name, typ, nullable = true, metadata = md)
+  }
+
+  def params: Map[String, String] = {
+    Map("url" -> "jdbc:postgresql://foo/bar",
+      "tempdir" -> "tmp",
+      "dbtable" -> "test_table",
+      "aws_access_key_id" -> "test1",
+      "aws_secret_access_key" -> "test2")
   }
 
   /**
