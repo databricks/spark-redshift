@@ -23,7 +23,7 @@ import scala.util.matching.Regex
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.mapreduce.InputFormat
-import org.scalamock.scalatest.MockFactory
+
 import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
 
 import org.apache.spark.SparkContext
@@ -51,9 +51,8 @@ class TestContext extends SparkContext("local", "RedshiftSourceSuite") {
  * Tests main DataFrame loading and writing functionality
  */
 class RedshiftSourceSuite
-  extends FunSuite
+  extends MockDatabaseSuite
   with Matchers
-  with MockFactory
   with BeforeAndAfterAll {
 
   /**
@@ -102,31 +101,6 @@ class RedshiftSourceSuite
 
     sc.stop()
     super.afterAll()
-  }
-
-  /**
-   * Set up a mocked JDBCWrapper instance that expects a sequence of queries matching the given
-   * regular expressions will be executed, and that the connection returned will be closed.
-   */
-  def mockJdbcWrapper(expectedUrl: String, expectedQueries: Seq[Regex]): JDBCWrapper = {
-    val jdbcWrapper = mock[JDBCWrapper]
-    val mockedConnection = mock[Connection]
-
-    (jdbcWrapper.getConnector _).expects(*, expectedUrl, *).returning(() => mockedConnection)
-
-    inSequence {
-      expectedQueries foreach { r =>
-        val mockedStatement = mock[PreparedStatement]
-        (mockedConnection.prepareStatement(_: String))
-          .expects(where {(sql: String) => r.findFirstMatchIn(sql).nonEmpty})
-          .returning(mockedStatement)
-        (mockedStatement.execute _).expects().returning(true)
-      }
-
-      (mockedConnection.close _).expects()
-    }
-
-    jdbcWrapper
   }
 
   /**
@@ -484,7 +458,7 @@ class RedshiftSourceSuite
     val testSqlContext = new SQLContext(sc)
     val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
 
-    val dfMetaSchema = Conversions.injectMetaSchema(testSqlContext, df)
+    val dfMetaSchema = StringMetaSchema.computeEnhancedDf(df)
 
     assert(dfMetaSchema.schema("testString").metadata.getLong("maxLength") == 10)
   }
