@@ -412,7 +412,7 @@ class RedshiftSourceSuite
     val testSqlContext = new SQLContext(sc)
     val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
 
-    val dfMetaSchema = StringMetaSchema.computeEnhancedDf(df)
+    val dfMetaSchema = MetaSchema.computeEnhancedDf(df)
 
     assert(dfMetaSchema.schema("testString").metadata.getLong("maxLength") == 10)
   }

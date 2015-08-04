@@ -35,11 +35,11 @@ import org.apache.spark.sql.{DataFrame, SQLContext}
 class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
 
   def varcharStr(meta: Metadata): String = {
+    // TODO: Need fallback for max length
     val maxLength: Long = meta.getLong("maxLength")
 
     maxLength match {
       case _: Long => s"VARCHAR($maxLength)"
-      case _ => "VARCHAR(255)"
     }
   }
 
@@ -79,7 +79,7 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
    * Generate CREATE TABLE statement for Redshift
    */
   def createTableSql(data: DataFrame, params: MergedParameters): String = {
-    var schemaSql = schemaString(StringMetaSchema.computeEnhancedDf(data))
+    var schemaSql = schemaString(MetaSchema.computeEnhancedDf(data))
 
     val distStyleDef = params.distStyle match {
       case Some(style) => s"DISTSTYLE $style"
@@ -91,7 +91,7 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
     }
     val sortKeyDef = params.sortKeySpec.getOrElse("")
 
-    s"CREATE TABLE IF NOT EXISTS ${params.table} ($schemaSql) $distStyleDef $distKeyDef $sortKeyDef"
+    s"CREATE TABLE IF NOT EXISTS ${params.table} ($schemaSql) $distStyleDef $distKeyDef $sortKeyDef".trim
   }
 
   /**
