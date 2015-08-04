@@ -34,11 +34,53 @@ import org.apache.spark.sql.{DataFrame, SQLContext}
  */
 class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
 
+  def varcharStr(meta: Metadata): String = {
+    val maxLength: Long = meta.getLong("maxLength")
+
+    maxLength match {
+      case _: Long => s"VARCHAR($maxLength)"
+      case _ => "VARCHAR(255)"
+    }
+  }
+
+  /**
+   * Compute A Redshift compatible schema string for this dataframe.
+   */
+  def schemaString(df: DataFrame): String = {
+    val sb = new StringBuilder()
+
+    df.schema.fields foreach {
+      field => {
+        val name = field.name
+        val typ: String =
+          field match {
+            case StructField(_, IntegerType, _, _) => "INTEGER"
+            case StructField(_, LongType, _, _) => "BIGINT"
+            case StructField(_, DoubleType, _, _) => "DOUBLE PRECISION"
+            case StructField(_, FloatType, _, _) => "REAL"
+            case StructField(_, ShortType, _, _) => "INTEGER"
+            case StructField(_, BooleanType, _, _) => "BOOLEAN"
+            case StructField(_, StringType, _, metadata) => varcharStr(metadata)
+            case StructField(_, TimestampType, _, _) => "TIMESTAMP"
+            case StructField(_, DateType, _, _) => "DATE"
+            case StructField(_, t: DecimalType, _, _) => s"DECIMAL(${t.precision}},${t.scale}})"
+            case StructField(_, ByteType, _, _) => "BYTE" // TODO: REPLACEME (UNSUPPORTED BY REDSHIFT)
+            case StructField(_, BinaryType, _, _) => "BLOB" // TODO: REPLACEME (UNSUPPORTED BY REDSHIFT)
+            case _ => throw new IllegalArgumentException(s"Don't know how to save $field to JDBC")
+          }
+        val nullable = if (field.nullable) "" else "NOT NULL"
+        sb.append(s", $name $typ $nullable")
+      }
+    }
+    if (sb.length < 2) "" else sb.substring(2)
+  }
+
   /**
    * Generate CREATE TABLE statement for Redshift
    */
   def createTableSql(data: DataFrame, params: MergedParameters): String = {
-    val schemaSql = jdbcWrapper.schemaString(data, params.jdbcUrl) // TODO: Replace
+    var schemaSql = schemaString(StringMetaSchema.computeEnhancedDf(data))
+
     val distStyleDef = params.distStyle match {
       case Some(style) => s"DISTSTYLE $style"
       case None => ""
