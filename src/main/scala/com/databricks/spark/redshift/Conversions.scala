@@ -36,9 +36,90 @@ private object RedshiftBooleanParser extends JavaTokenParsers {
 }
 
 /**
+ * Utility methods responsible for extracting information from data contained within dataframe in order to generate
+ * a schema compatible with Redshift.
+ */
+object MetaSchema {
+  /**
+   * Map-Reduce task to calculate the longest string length for each row, in each string column in the dataframe.
+   *
+   * Note: This is used to generate N for the VARCHAR(N) field in the table schema to be loaded into Redshift.
+   *
+   * TODO: This should only be called once per load into Redshift. A cache, TraversableOnce, or some similar
+   *   structure should be used to enforce this function only being called once.
+   *
+   * @param df DataFrame to be processed
+   * @return A Map[String, Int] representing an assocition between the column name and the length of that column's
+   *         longest string
+   */
+  private[redshift] def mapStrLengths(df:DataFrame) : Map[String, Int] = {
+    val schema:StructType = df.schema
+
+    // For each row, filter the string columns and calculate the string length
+    // TODO: Other optimization strategies may be possible
+    val stringLengths = df.flatMap(row =>
+      schema.collect {
+        case StructField(columnName, StringType, _, _) => (columnName, getStrLength(row, columnName))
+      }
+    ).reduceByKey(Math.max(_, _))
+
+    stringLengths.collect().toMap
+  }
+
+  /**
+   * Calculate the string length in columnName for the provided Row. Defensively returns 0 if the provided
+   * columnName is not a string column.
+   *
+   * This is a collaborator method to make the mapStrLengths function more readable, and should not be used elsewhere.
+   *
+   * @param row Reference to a row of a dataframe
+   * @param columnName Name of the column
+   * @return Length of the string in cell, falling back to 0 if null or no string is present.
+   */
+  private[redshift] def getStrLength(row:Row, columnName:String): Int = {
+    row.getAs[String](columnName) match {
+      case field:String => field.length()
+      case _ => 0
+    }
+  }
+
+  /**
+   * Adds a "maxLength" -> Int field to column metadata.
+   *
+   * @param metadata metadata for a dataframe column
+   * @param length Length limit for content within that column
+   * @return new metadata object with added field
+   */
+  private[redshift] def setStrLength(metadata:Metadata, length:Int) : Metadata = {
+    new MetadataBuilder().withMetadata(metadata).putLong("maxLength", length).build()
+  }
+
+  /**
+   * Iterate through each column in the schema that is a string, storing the longest string length in that columns'
+   * metadata for later usage.
+   */
+  def computeEnhancedDf(df: DataFrame): DataFrame = {
+    // 1. Perform a full scan of each string column, storing it's maximum string length within a Map
+    val stringLengthsByColumn = mapStrLengths(df)
+
+    // 2. Generate an enhanced schema, with the metadata for each string column
+    val enhancedSchema = StructType(
+      df.schema map {
+        case StructField(name, StringType, nullable, meta) =>
+          StructField(name, StringType, nullable, setStrLength(meta, stringLengthsByColumn(name)))
+        case other => other
+      }
+    )
+
+    // 3. Construct a new dataframe with a schema containing metadata with string lengths
+    df.sqlContext.createDataFrame(df.rdd, enhancedSchema)
+  }
+}
+
+/**
  * Data type conversions for Redshift unloaded data
  */
-private [redshift] object Conversions {
+private[redshift] object Conversions {
 
   // Imports and exports with Redshift require that timestamps are represented
   // as strings, using the following formats
@@ -58,7 +139,7 @@ private [redshift] object Conversions {
     }
 
     override def parse(source: String, pos: ParsePosition): Date = {
-      if(source.length < PATTERN_WITH_MILLIS.length) {
+      if (source.length < PATTERN_WITH_MILLIS.length) {
         redshiftTimestampFormatWithoutMillis.parse(source, pos)
       } else {
         redshiftTimestampFormatWithMillis.parse(source, pos)

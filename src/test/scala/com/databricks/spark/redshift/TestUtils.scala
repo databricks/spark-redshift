@@ -19,37 +19,20 @@ package com.databricks.spark.redshift
 import java.sql.Timestamp
 import java.util.Calendar
 
+import com.databricks.spark.redshift.Parameters.MergedParameters
 import org.apache.spark.sql.types._
 
 /**
  * Helpers for Redshift tests that require common mocking
  */
 object TestUtils {
-
-  /**
-   * Makes a field for the test schema
-   */
-  def makeField(name: String, typ: DataType) = {
-    val md = (new MetadataBuilder).putString("name", name).build()
-    StructField(name, typ, nullable = true, metadata = md)
+  def params: Map[String, String] = {
+    Map("url" -> "jdbc:postgresql://foo/bar",
+      "tempdir" -> "tmp",
+      "dbtable" -> "test_table",
+      "aws_access_key_id" -> "test1",
+      "aws_secret_access_key" -> "test2")
   }
-
-  /**
-   * Simple schema that includes all data types we support
-   */
-  lazy val testSchema =
-    StructType(
-      Seq(
-        makeField("testByte", ByteType),
-        makeField("testBool", BooleanType),
-        makeField("testDate", DateType),
-        makeField("testDouble", DoubleType),
-        makeField("testFloat", FloatType),
-        makeField("testInt", IntegerType),
-        makeField("testLong", LongType),
-        makeField("testShort", ShortType),
-        makeField("testString", StringType),
-        makeField("testTimestamp", TimestampType)))
 
   /**
    * Convert date components to a millisecond timestamp

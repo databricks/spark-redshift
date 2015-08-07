@@ -19,6 +19,8 @@ package com.databricks.spark.redshift
 import java.sql.{Connection, SQLException}
 import java.util.Properties
 
+import org.apache.spark.sql.types._
+
 import scala.util.Random
 
 import com.databricks.spark.redshift.Parameters.MergedParameters
@@ -32,11 +34,53 @@ import org.apache.spark.sql.{DataFrame, SQLContext}
  */
 class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
 
+  def varcharStr(meta: Metadata): String = {
+    // TODO: Need fallback for max length
+    val maxLength: Long = meta.getLong("maxLength")
+
+    maxLength match {
+      case _: Long => s"VARCHAR($maxLength)"
+    }
+  }
+
+  /**
+   * Compute A Redshift compatible schema string for this dataframe.
+   */
+  def schemaString(df: DataFrame): String = {
+    val sb = new StringBuilder()
+
+    df.schema.fields foreach {
+      field => {
+        val name = field.name
+        val typ: String =
+          field match {
+            case StructField(_, IntegerType, _, _) => "INTEGER"
+            case StructField(_, LongType, _, _) => "BIGINT"
+            case StructField(_, DoubleType, _, _) => "DOUBLE PRECISION"
+            case StructField(_, FloatType, _, _) => "REAL"
+            case StructField(_, ShortType, _, _) => "INTEGER"
+            case StructField(_, BooleanType, _, _) => "BOOLEAN"
+            case StructField(_, StringType, _, metadata) => varcharStr(metadata)
+            case StructField(_, TimestampType, _, _) => "TIMESTAMP"
+            case StructField(_, DateType, _, _) => "DATE"
+            case StructField(_, t: DecimalType, _, _) => s"DECIMAL(${t.precision}},${t.scale}})"
+            case StructField(_, ByteType, _, _) => "BYTE" // TODO: REPLACEME (UNSUPPORTED BY REDSHIFT)
+            case StructField(_, BinaryType, _, _) => "BLOB" // TODO: REPLACEME (UNSUPPORTED BY REDSHIFT)
+            case _ => throw new IllegalArgumentException(s"Don't know how to save $field to JDBC")
+          }
+        val nullable = if (field.nullable) "" else "NOT NULL"
+        sb.append(s", $name $typ $nullable")
+      }
+    }
+    if (sb.length < 2) "" else sb.substring(2)
+  }
+
   /**
    * Generate CREATE TABLE statement for Redshift
    */
-  def createTableSql(data: DataFrame, params: MergedParameters) : String = {
-    val schemaSql = jdbcWrapper.schemaString(data, params.jdbcUrl)
+  def createTableSql(data: DataFrame, params: MergedParameters): String = {
+    var schemaSql = schemaString(MetaSchema.computeEnhancedDf(data))
+
     val distStyleDef = params.distStyle match {
       case Some(style) => s"DISTSTYLE $style"
       case None => ""
@@ -47,7 +91,7 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
     }
     val sortKeyDef = params.sortKeySpec.getOrElse("")
 
-    s"CREATE TABLE IF NOT EXISTS ${params.table} ($schemaSql) $distStyleDef $distKeyDef $sortKeyDef"
+    s"CREATE TABLE IF NOT EXISTS ${params.table} ($schemaSql) $distStyleDef $distKeyDef $sortKeyDef".trim
   }
 
   /**
@@ -63,7 +107,7 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
    * Sets up a staging table then runs the given action, passing the temporary table name
    * as a parameter.
    */
-  def withStagingTable(conn:Connection, params: MergedParameters, action: (String) => Unit) {
+  def withStagingTable(conn: Connection, params: MergedParameters, action: (String) => Unit) {
     val randomSuffix = Math.abs(Random.nextInt()).toString
     val tempTable = s"${params.table}_staging_$randomSuffix"
     val backupTable = s"${params.table}_backup_$randomSuffix"
@@ -93,10 +137,10 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
    * Perform the Redshift load, including deletion of existing data in the case of an overwrite,
    * and creating the table if it doesn't already exist.
    */
-  def doRedshiftLoad(conn: Connection, data: DataFrame, params: MergedParameters) : Unit = {
+  def doRedshiftLoad(conn: Connection, data: DataFrame, params: MergedParameters): Unit = {
 
     // Overwrites must drop the table, in case there has been a schema update
-    if(params.overwrite) {
+    if (params.overwrite) {
       val deleteExisting = conn.prepareStatement(s"DROP TABLE IF EXISTS ${params.table}")
       deleteExisting.execute()
     }
@@ -114,7 +158,7 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
 
     // Execute postActions
     params.postActions.foreach(action => {
-      val actionSql = if(action.contains("%s")) action.format(params.table) else action
+      val actionSql = if (action.contains("%s")) action.format(params.table) else action
       log.info("Executing postAction: " + actionSql)
       conn.prepareStatement(actionSql).execute()
     })
@@ -124,19 +168,21 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
    * Serialize temporary data to S3, ready for Redshift COPY
    */
   def unloadData(sqlContext: SQLContext, data: DataFrame, tempPath: String): Unit = {
-    Conversions.datesToTimestamps(sqlContext, data).write.format("com.databricks.spark.avro").save(tempPath)
+    val enrichedData = Conversions.datesToTimestamps(sqlContext, data) // TODO .extractStringColumnLengths
+
+    enrichedData.write.format("com.databricks.spark.avro").save(tempPath)
   }
 
   /**
    * Write a DataFrame to a Redshift table, using S3 and Avro serialization
    */
-  def saveToRedshift(sqlContext: SQLContext, data: DataFrame, params: MergedParameters) : Unit = {
+  def saveToRedshift(sqlContext: SQLContext, data: DataFrame, params: MergedParameters): Unit = {
     val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, new Properties()).apply()
 
     try {
-      if(params.overwrite && params.useStagingTable) {
+      if (params.overwrite && params.useStagingTable) {
         withStagingTable(conn, params, table => {
-          val updatedParams = MergedParameters(params.parameters updated ("dbtable", table))
+          val updatedParams = MergedParameters(params.parameters updated("dbtable", table))
           unloadData(sqlContext, data, updatedParams.tempPath)
           doRedshiftLoad(conn, data, updatedParams)
         })

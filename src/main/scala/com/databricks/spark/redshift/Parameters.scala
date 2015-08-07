@@ -163,6 +163,21 @@ private [redshift] object Parameters extends Logging {
     def postActions = parameters("postactions").split(";")
 
     /**
+     * How the maximum length for each column containing text is to be inferred (i.e. the 'N' in VARCHAR(N)).
+     * Redshift doesn't support variable length TEXT like other SQL dialects, so columns containing text of unbounded
+     * length must either be processed to determine the longest possible string in all rows for that column, or truncated
+     * to a fixed amount. A number may also be passed to this parameter allowing for the maximum number of characters.
+     *
+     * Examples:
+     *    AUTO
+     *    TRUNCATE(50)
+     *    MAXLENGTH(4096)
+     *
+     * Defaults to 'AUTO'
+     */
+    def stringLengths = parameters("stringlengths").toString().toUpperCase()
+
+    /**
      * Looks up "aws_access_key_id" and "aws_secret_access_key" in the parameter map
      * and generates a credentials string for Redshift. If no credentials have been provided,
      * this function will instead try using the Hadoop Configuration fs.* settings for the provided tempDir

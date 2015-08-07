@@ -23,7 +23,7 @@ import scala.util.matching.Regex
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.mapreduce.InputFormat
-import org.scalamock.scalatest.MockFactory
+
 import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
 
 import org.apache.spark.SparkContext
@@ -51,9 +51,8 @@ class TestContext extends SparkContext("local", "RedshiftSourceSuite") {
  * Tests main DataFrame loading and writing functionality
  */
 class RedshiftSourceSuite
-  extends FunSuite
+  extends MockDatabaseSuite
   with Matchers
-  with MockFactory
   with BeforeAndAfterAll {
 
   /**
@@ -104,65 +103,13 @@ class RedshiftSourceSuite
     super.afterAll()
   }
 
-  /**
-   * Set up a mocked JDBCWrapper instance that expects a sequence of queries matching the given
-   * regular expressions will be executed, and that the connection returned will be closed.
-   */
-  def mockJdbcWrapper(expectedUrl: String, expectedQueries: Seq[Regex]): JDBCWrapper = {
-    val jdbcWrapper = mock[JDBCWrapper]
-    val mockedConnection = mock[Connection]
-
-    (jdbcWrapper.getConnector _).expects(*, expectedUrl, *).returning(() => mockedConnection)
-
-    inSequence {
-      expectedQueries foreach { r =>
-        val mockedStatement = mock[PreparedStatement]
-        (mockedConnection.prepareStatement(_: String))
-          .expects(where {(sql: String) => r.findFirstMatchIn(sql).nonEmpty})
-          .returning(mockedStatement)
-        (mockedStatement.execute _).expects().returning(true)
-      }
-
-      (mockedConnection.close _).expects()
-    }
-
-    jdbcWrapper
-  }
-
-  /**
-   * Prepare the JDBC wrapper for an UNLOAD test.
-   */
-  def prepareUnloadTest(params: Map[String, String]) = {
-    val jdbcUrl = params("url")
-    val jdbcWrapper = mockJdbcWrapper(jdbcUrl, Seq("UNLOAD.*".r))
-
-    // We expect some extra calls to the JDBC wrapper,
-    // to register the driver and retrieve the schema.
-    (jdbcWrapper.registerDriver _)
-      .expects(*)
-      .anyNumberOfTimes()
-    (jdbcWrapper.resolveTable _)
-      .expects(jdbcUrl, "test_table", *)
-      .returning(TestUtils.testSchema)
-      .anyNumberOfTimes()
-
-    jdbcWrapper
-  }
-
   test("DefaultSource can load Redshift UNLOAD output to a DataFrame") {
-
-    val params = Map("url" -> "jdbc:postgresql://foo/bar",
-      "tempdir" -> "tmp",
-      "dbtable" -> "test_table",
-      "aws_access_key_id" -> "test1",
-      "aws_secret_access_key" -> "test2")
-
-    val jdbcWrapper = prepareUnloadTest(params)
+    val jdbcWrapper = prepareUnloadTest(TestUtils.params)
     val testSqlContext = new SQLContext(sc)
 
     // Assert that we've loaded and converted all data in the test file
     val source = new DefaultSource(jdbcWrapper)
-    val relation = source.createRelation(testSqlContext, params)
+    val relation = source.createRelation(testSqlContext, TestUtils.params)
     val df = testSqlContext.baseRelationToDataFrame(relation)
 
     df.rdd.collect() zip expectedData foreach {
@@ -172,19 +119,12 @@ class RedshiftSourceSuite
   }
 
   test("DefaultSource supports simple column filtering") {
-
-    val params = Map("url" -> "jdbc:postgresql://foo/bar",
-      "tempdir" -> "tmp",
-      "dbtable" -> "test_table",
-      "aws_access_key_id" -> "test1",
-      "aws_secret_access_key" -> "test2")
-
-    val jdbcWrapper = prepareUnloadTest(params)
+    val jdbcWrapper = prepareUnloadTest(TestUtils.params)
     val testSqlContext = new SQLContext(sc)
 
     // Construct the source with a custom schema
     val source = new DefaultSource(jdbcWrapper)
-    val relation = source.createRelation(testSqlContext, params, TestUtils.testSchema)
+    val relation = source.createRelation(testSqlContext, TestUtils.params, testSchema)
 
     val rdd = relation.asInstanceOf[PrunedFilteredScan].buildScan(Array("testByte", "testBool"), Array.empty[Filter])
     val prunedExpectedValues =
@@ -200,19 +140,12 @@ class RedshiftSourceSuite
   }
 
   test("DefaultSource supports user schema, pruned and filtered scans") {
-
-    val params = Map("url" -> "jdbc:postgresql://foo/bar",
-      "tempdir" -> "tmp",
-      "dbtable" -> "test_table",
-      "aws_access_key_id" -> "test1",
-      "aws_secret_access_key" -> "test2")
-
-    val jdbcWrapper = prepareUnloadTest(params)
+    val jdbcWrapper = prepareUnloadTest(TestUtils.params)
     val testSqlContext = new SQLContext(sc)
 
     // Construct the source with a custom schema
     val source = new DefaultSource(jdbcWrapper)
-    val relation = source.createRelation(testSqlContext, params, TestUtils.testSchema)
+    val relation = source.createRelation(testSqlContext, TestUtils.params, testSchema)
 
     // Define a simple filter to only include a subset of rows
     val filters: Array[Filter] =
@@ -247,7 +180,7 @@ class RedshiftSourceSuite
           "distkey" -> "testInt")
 
     val rdd = sc.parallelize(expectedData.toSeq)
-    val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
+    val df = testSqlContext.createDataFrame(rdd, testSchema)
 
     val expectedCommands =
       Seq("DROP TABLE IF EXISTS test_table_staging_.*".r,
@@ -294,7 +227,7 @@ class RedshiftSourceSuite
         "usestagingtable" -> "true")
 
     val rdd = sc.parallelize(expectedData.toSeq)
-    val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
+    val df = testSqlContext.createDataFrame(rdd, testSchema)
 
     val jdbcWrapper = mock[JDBCWrapper]
     val mockedConnection = mock[Connection]
@@ -303,6 +236,7 @@ class RedshiftSourceSuite
       .expects(*, jdbcUrl, *)
       .returning(() => mockedConnection)
 
+    // TODO: extract to outer class
     def successfulStatement(pattern: Regex): PreparedStatement = {
       val mockedStatement = mock[PreparedStatement]
       (mockedConnection.prepareStatement(_: String))
@@ -313,6 +247,7 @@ class RedshiftSourceSuite
       mockedStatement
     }
 
+    // TODO: extract to outer class
     def failedStatement(pattern: Regex) : PreparedStatement = {
       val mockedStatement = mock[PreparedStatement]
       (mockedConnection.prepareStatement(_: String))
@@ -369,15 +304,9 @@ class RedshiftSourceSuite
     val testSqlContext = new SQLContext(sc)
 
     val jdbcUrl = "jdbc:postgresql://foo/bar"
-    val params =
-      Map("url" -> jdbcUrl,
-        "tempdir" -> tempDir,
-        "dbtable" -> "test_table",
-        "aws_access_key_id" -> "test1",
-        "aws_secret_access_key" -> "test2")
 
     val rdd = sc.parallelize(expectedData.toSeq)
-    val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
+    val df = testSqlContext.createDataFrame(rdd, testSchema)
 
     val expectedCommands =
       Seq("CREATE TABLE IF NOT EXISTS test_table .*".r,
@@ -396,7 +325,7 @@ class RedshiftSourceSuite
       .anyNumberOfTimes()
 
     val source = new DefaultSource(jdbcWrapper)
-    val savedDf = source.createRelation(testSqlContext, SaveMode.Append, params, df)
+    val savedDf = source.createRelation(testSqlContext, SaveMode.Append, TestUtils.params, df)
 
     // This test is "appending" to an empty table, so we expect all our test data to be
     // the only content in the returned data frame
@@ -419,7 +348,7 @@ class RedshiftSourceSuite
           "aws_secret_access_key" -> "test2")
 
     val rdd = sc.parallelize(expectedData.toSeq)
-    val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
+    val df = testSqlContext.createDataFrame(rdd, testSchema)
 
     // Check that SaveMode.ErrorIfExists throws an exception
 
@@ -447,7 +376,7 @@ class RedshiftSourceSuite
         "aws_secret_access_key" -> "test2")
 
     val rdd = sc.parallelize(expectedData.toSeq)
-    val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
+    val df = testSqlContext.createDataFrame(rdd, testSchema)
 
     // Check that SaveMode.Ignore does nothing
 
@@ -467,7 +396,7 @@ class RedshiftSourceSuite
 
     val rdd = sc.parallelize(expectedData)
     val testSqlContext = new SQLContext(sc)
-    val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
+    val df = testSqlContext.createDataFrame(rdd, testSchema)
 
     intercept[Exception] {
       df.saveAsRedshiftTable(invalid)
@@ -478,9 +407,17 @@ class RedshiftSourceSuite
     }
   }
 
+  test("Basic string field extraction") {
+    val rdd = sc.parallelize(expectedData)
+    val testSqlContext = new SQLContext(sc)
+    val df = testSqlContext.createDataFrame(rdd, testSchema)
+
+    val dfMetaSchema = MetaSchema.computeEnhancedDf(df)
+
+    assert(dfMetaSchema.schema("testString").metadata.getLong("maxLength") == 10)
+  }
+
   test("DefaultSource has default constructor, required by Data Source API") {
     new DefaultSource()
   }
-
-
 }

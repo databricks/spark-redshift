@@ -67,4 +67,29 @@ class ParametersSuite extends FunSuite with Matchers {
     checkMerge(Map("tempdir" -> "s3://foo/bar", "url" -> "jdbc:postgresql://foo/bar"))
     checkMerge(Map("dbtable" -> "test_table", "tempdir" -> "s3://foo/bar"))
   }
+
+  test("Parameters for Redshift text/string column conversions") {
+    val params =
+      Map(
+        "tempdir" -> "s3://foo/bar",
+        "dbtable" -> "test_table",
+        "url" -> "jdbc:postgresql://foo/bar")
+
+    Parameters.mergeParameters(params)
+
+    val auto = params ++ Map("stringlengths" -> "auto")  // Default
+    Parameters.mergeParameters(auto).stringLengths should equal("AUTO")
+
+    val truncate = params ++ Map("stringlengths" -> "truncate")
+    Parameters.mergeParameters(truncate).stringLengths should equal("TRUNCATE")
+
+    val optimistic = params ++ Map("stringlengths" -> "maxlength")
+    Parameters.mergeParameters(optimistic).stringLengths should equal("MAXLENGTH")
+
+    val none = params ++ Map("stringlengths" -> "default")
+    Parameters.mergeParameters(none).stringLengths should equal("DEFAULT")
+
+    val manual = params ++ Map("stringlengths" -> "manual")
+    Parameters.mergeParameters(manual).stringLengths should equal("MANUAL")
+  }
 }
