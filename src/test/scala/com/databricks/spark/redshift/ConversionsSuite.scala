@@ -25,9 +25,9 @@ import org.apache.spark.sql.Row
 /**
  * Unit test for data type conversions
  */
-class ConversionsSuite extends FunSuite {
+class ConversionsSuite extends MockDatabaseSuite {
 
-  val convertRow = Conversions.rowConverter(TestUtils.testSchema)
+  val convertRow = Conversions.rowConverter(testSchema)
 
   test("Data should be correctly converted") {
     val doubleMin = Double.MinValue.toString
@@ -51,7 +51,7 @@ class ConversionsSuite extends FunSuite {
   }
 
   test("Row conversion handles null values") {
-    val emptyRow = List.fill(TestUtils.testSchema.length)(null).toArray[String]
+    val emptyRow = List.fill(testSchema.length)(null).toArray[String]
     assert(convertRow(emptyRow) == Row(emptyRow: _*))
   }
 }

@@ -124,7 +124,7 @@ class RedshiftSourceSuite
 
     // Construct the source with a custom schema
     val source = new DefaultSource(jdbcWrapper)
-    val relation = source.createRelation(testSqlContext, TestUtils.params, TestUtils.testSchema)
+    val relation = source.createRelation(testSqlContext, TestUtils.params, testSchema)
 
     val rdd = relation.asInstanceOf[PrunedFilteredScan].buildScan(Array("testByte", "testBool"), Array.empty[Filter])
     val prunedExpectedValues =
@@ -145,7 +145,7 @@ class RedshiftSourceSuite
 
     // Construct the source with a custom schema
     val source = new DefaultSource(jdbcWrapper)
-    val relation = source.createRelation(testSqlContext, TestUtils.params, TestUtils.testSchema)
+    val relation = source.createRelation(testSqlContext, TestUtils.params, testSchema)
 
     // Define a simple filter to only include a subset of rows
     val filters: Array[Filter] =
@@ -180,7 +180,7 @@ class RedshiftSourceSuite
           "distkey" -> "testInt")
 
     val rdd = sc.parallelize(expectedData.toSeq)
-    val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
+    val df = testSqlContext.createDataFrame(rdd, testSchema)
 
     val expectedCommands =
       Seq("DROP TABLE IF EXISTS test_table_staging_.*".r,
@@ -227,7 +227,7 @@ class RedshiftSourceSuite
         "usestagingtable" -> "true")
 
     val rdd = sc.parallelize(expectedData.toSeq)
-    val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
+    val df = testSqlContext.createDataFrame(rdd, testSchema)
 
     val jdbcWrapper = mock[JDBCWrapper]
     val mockedConnection = mock[Connection]
@@ -306,7 +306,7 @@ class RedshiftSourceSuite
     val jdbcUrl = "jdbc:postgresql://foo/bar"
 
     val rdd = sc.parallelize(expectedData.toSeq)
-    val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
+    val df = testSqlContext.createDataFrame(rdd, testSchema)
 
     val expectedCommands =
       Seq("CREATE TABLE IF NOT EXISTS test_table .*".r,
@@ -348,7 +348,7 @@ class RedshiftSourceSuite
           "aws_secret_access_key" -> "test2")
 
     val rdd = sc.parallelize(expectedData.toSeq)
-    val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
+    val df = testSqlContext.createDataFrame(rdd, testSchema)
 
     // Check that SaveMode.ErrorIfExists throws an exception
 
@@ -376,7 +376,7 @@ class RedshiftSourceSuite
         "aws_secret_access_key" -> "test2")
 
     val rdd = sc.parallelize(expectedData.toSeq)
-    val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
+    val df = testSqlContext.createDataFrame(rdd, testSchema)
 
     // Check that SaveMode.Ignore does nothing
 
@@ -396,7 +396,7 @@ class RedshiftSourceSuite
 
     val rdd = sc.parallelize(expectedData)
     val testSqlContext = new SQLContext(sc)
-    val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
+    val df = testSqlContext.createDataFrame(rdd, testSchema)
 
     intercept[Exception] {
       df.saveAsRedshiftTable(invalid)
@@ -410,7 +410,7 @@ class RedshiftSourceSuite
   test("Basic string field extraction") {
     val rdd = sc.parallelize(expectedData)
     val testSqlContext = new SQLContext(sc)
-    val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
+    val df = testSqlContext.createDataFrame(rdd, testSchema)
 
     val dfMetaSchema = MetaSchema.computeEnhancedDf(df)
 

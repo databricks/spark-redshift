@@ -41,6 +41,8 @@ libraryDependencies += "com.google.guava" % "guava" % "14.0.1" % Test
 
 libraryDependencies += "org.scalatest" %% "scalatest" % "2.1.5" % Test
 
+libraryDependencies += "org.apache.commons" % "commons-csv" % "1.1"
+
 libraryDependencies += "org.scalamock" %% "scalamock-scalatest-support" % "3.2" % Test
 
 ScoverageSbtPlugin.ScoverageKeys.coverageHighlighting := {
