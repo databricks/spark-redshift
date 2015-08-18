@@ -170,7 +170,26 @@ private [redshift] object Parameters extends Logging {
      * use of standard system properties, environment variables, or IAM role configuration if available.
      */
     def credentialsString(configuration: Configuration) = {
+      val ((_, accessKeyId), (_, secretAccessKey)) = credentialsTuple(configuration)
 
+      s"aws_access_key_id=$accessKeyId;aws_secret_access_key=$secretAccessKey"
+    }
+
+    /**
+     * Looks up "aws_access_key_id" and "aws_secret_access_key" in the parameter map
+     * and ensures they are set on the Configuration. If no credentials have been provided,
+     * this function will instead try using the Hadoop Configuration fs.* settings for the provided tempDir
+     * scheme, and if that also fails, it finally tries AWS DefaultCredentialsProviderChain, which makes
+     * use of standard system properties, environment variables, or IAM role configuration if available.
+     */
+    def setCredentials(configuration: Configuration): Unit = {
+      val ((accessKeyIdProp, accessKeyId), (secretAccessKeyProp, secretAccessKey)) = credentialsTuple(configuration)
+
+      configuration.setIfUnset(accessKeyIdProp, accessKeyId)
+      configuration.setIfUnset(secretAccessKeyProp, secretAccessKey)
+    }
+
+    private def credentialsTuple(configuration: Configuration) = {
       val scheme = new URI(tempDir).getScheme
       val hadoopConfPrefix = s"fs.$scheme"
 
@@ -192,7 +211,7 @@ private [redshift] object Parameters extends Logging {
           }
         }
 
-      s"aws_access_key_id=$accessKeyId;aws_secret_access_key=$secretAccessKey"
+      ((s"$hadoopConfPrefix.awsAccessKeyId", accessKeyId), (s"$hadoopConfPrefix.awsSecretAccessKey", secretAccessKey))
     }
   }
 }
