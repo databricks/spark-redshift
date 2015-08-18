@@ -151,7 +151,8 @@ class RedshiftSourceSuite
 
   test("DefaultSource can load Redshift UNLOAD output to a DataFrame") {
 
-    val params = Map("url" -> "jdbc:postgresql://foo/bar",
+    val params = Map(
+      "url" -> "jdbc:redshift://foo/bar",
       "tempdir" -> "tmp",
       "dbtable" -> "test_table",
       "aws_access_key_id" -> "test1",
@@ -173,7 +174,8 @@ class RedshiftSourceSuite
 
   test("DefaultSource supports simple column filtering") {
 
-    val params = Map("url" -> "jdbc:postgresql://foo/bar",
+    val params = Map(
+      "url" -> "jdbc:redshift://foo/bar",
       "tempdir" -> "tmp",
       "dbtable" -> "test_table",
       "aws_access_key_id" -> "test1",
@@ -201,7 +203,8 @@ class RedshiftSourceSuite
 
   test("DefaultSource supports user schema, pruned and filtered scans") {
 
-    val params = Map("url" -> "jdbc:postgresql://foo/bar",
+    val params = Map(
+      "url" -> "jdbc:redshift://foo/bar",
       "tempdir" -> "tmp",
       "dbtable" -> "test_table",
       "aws_access_key_id" -> "test1",
@@ -235,7 +238,7 @@ class RedshiftSourceSuite
 
     val testSqlContext = new SQLContext(sc)
 
-    val jdbcUrl = "jdbc:postgresql://foo/bar"
+    val jdbcUrl = "jdbc:redshift://foo/bar"
     val params =
       Map("url" -> jdbcUrl,
           "tempdir" -> tempDir,
@@ -284,7 +287,7 @@ class RedshiftSourceSuite
   test("Failed copies are handled gracefully when using a staging table") {
     val testSqlContext = new SQLContext(sc)
 
-    val jdbcUrl = "jdbc:postgresql://foo/bar"
+    val jdbcUrl = "jdbc:redshift://foo/bar"
     val params =
       Map("url" -> jdbcUrl,
         "tempdir" -> tempDir,
@@ -368,7 +371,7 @@ class RedshiftSourceSuite
   test("Append SaveMode doesn't destroy existing data") {
     val testSqlContext = new SQLContext(sc)
 
-    val jdbcUrl = "jdbc:postgresql://foo/bar"
+    val jdbcUrl = "jdbc:redshift://foo/bar"
     val params =
       Map("url" -> jdbcUrl,
         "tempdir" -> tempDir,
@@ -410,7 +413,7 @@ class RedshiftSourceSuite
   test("Respect SaveMode.ErrorIfExists when table exists") {
     val testSqlContext = new SQLContext(sc)
 
-    val jdbcUrl = "jdbc:postgresql://foo/bar"
+    val jdbcUrl = "jdbc:redshift://foo/bar"
     val params =
       Map("url" -> jdbcUrl,
           "tempdir" -> tempDir,
@@ -438,7 +441,7 @@ class RedshiftSourceSuite
   test("Do nothing when table exists if SaveMode = Ignore") {
     val testSqlContext = new SQLContext(sc)
 
-    val jdbcUrl = "jdbc:postgresql://foo/bar"
+    val jdbcUrl = "jdbc:redshift://foo/bar"
     val params =
       Map("url" -> jdbcUrl,
         "tempdir" -> tempDir,
