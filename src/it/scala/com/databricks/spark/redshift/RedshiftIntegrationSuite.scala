@@ -35,23 +35,23 @@ class RedshiftIntegrationSuite
   with BeforeAndAfterAll
   with BeforeAndAfterEach {
 
-  // The following configurations must be set in order to run these tests. In Travis, these
-  // environment variables are set using Travis's encrypted environment variables feature:
-  // http://docs.travis-ci.com/user/environment-variables/#Encrypted-Variables
-
-  // JDBC URL listed in the AWS console (should not contain username and password).
-
   private def loadConfigFromEnv(envVarName: String): String = {
     Option(System.getenv(envVarName)).getOrElse {
       fail(s"Must set $envVarName environment variable")
     }
   }
 
+  // The following configurations must be set in order to run these tests. In Travis, these
+  // environment variables are set using Travis's encrypted environment variables feature:
+  // http://docs.travis-ci.com/user/environment-variables/#Encrypted-Variables
+
+  // JDBC URL listed in the AWS console (should not contain username and password).
   private val AWS_REDSHIFT_JDBC_URL: String = loadConfigFromEnv("AWS_REDSHIFT_JDBC_URL")
   private val AWS_REDSHIFT_USER: String = loadConfigFromEnv("AWS_REDSHIFT_USER")
   private val AWS_REDSHIFT_PASSWORD: String = loadConfigFromEnv("AWS_REDSHIFT_PASSWORD")
   private val AWS_ACCESS_KEY_ID: String = loadConfigFromEnv("AWS_ACCESS_KEY_ID")
   private val AWS_SECRET_ACCESS_KEY: String = loadConfigFromEnv("AWS_SECRET_ACCESS_KEY")
+  // Path to a directory in S3 (e.g. 's3n://bucket-name/path/to/scratch/space').
   private val AWS_S3_SCRATCH_SPACE: String = loadConfigFromEnv("AWS_S3_SCRATCH_SPACE")
 
   private val jdbcUrl: String = {
@@ -85,6 +85,8 @@ class RedshiftIntegrationSuite
   override def beforeAll(): Unit = {
     super.beforeAll()
     sc = new SparkContext("local", "RedshiftSourceSuite")
+    sc.hadoopConfiguration.set("fs.s3.awsAccessKeyId", AWS_ACCESS_KEY_ID)
+    sc.hadoopConfiguration.set("fs.s3.awsSecretAccessKey", AWS_SECRET_ACCESS_KEY)
     sc.hadoopConfiguration.set("fs.s3n.awsAccessKeyId", AWS_ACCESS_KEY_ID)
     sc.hadoopConfiguration.set("fs.s3n.awsSecretAccessKey", AWS_SECRET_ACCESS_KEY)
 
@@ -161,7 +163,7 @@ class RedshiftIntegrationSuite
 
   override def afterAll(): Unit = {
     try {
-      val fs = FileSystem.get(new URI(tempDir), sc.hadoopConfiguration)
+      val fs = FileSystem.get(URI.create(tempDir), sc.hadoopConfiguration)
       fs.delete(new Path(tempDir), true)
       fs.close()
     } finally {
@@ -253,7 +255,7 @@ class RedshiftIntegrationSuite
     ).collect()
   }
 
-  test("DefaultSource can load Redshift UNLOAD output to a DataFrame") {
+  ignore("DefaultSource can load Redshift UNLOAD output to a DataFrame") {
     sqlContext.sql("select * from test_table order by testbyte, testbool").collect()
       .zip(expectedData).foreach {
       case (loaded, expected) => loaded shouldBe expected
@@ -275,7 +277,7 @@ class RedshiftIntegrationSuite
     }
   }
 
-  test("DefaultSource supports user schema, pruned and filtered scans") {
+  ignore("DefaultSource supports user schema, pruned and filtered scans") {
     // We should now only have one matching row, with two columns
     val filteredExpectedValues = Array(Row(1, true))
     sqlContext.sql(
@@ -293,7 +295,7 @@ class RedshiftIntegrationSuite
     }
   }
 
-  test("DefaultSource using 'query' supports user schema, pruned and filtered scans") {
+  ignore("DefaultSource using 'query' supports user schema, pruned and filtered scans") {
     // We should now only have one matching row, with two columns
     val filteredExpectedValues = Array(Row(1, true))
     sqlContext.sql(
@@ -311,7 +313,7 @@ class RedshiftIntegrationSuite
     }
   }
 
-  test("DefaultSource serializes data as Avro, then sends Redshift COPY command") {
+  ignore("DefaultSource serializes data as Avro, then sends Redshift COPY command") {
     val extraData = Array(
       Row(2.toByte, false, null, -1234152.12312498, 100000.0f, null, 1239012341823719L, 24.toShort, "___|_123", null))
 
@@ -325,7 +327,7 @@ class RedshiftIntegrationSuite
     }
   }
 
-  test("Append SaveMode doesn't destroy existing data") {
+  ignore("Append SaveMode doesn't destroy existing data") {
     val extraData = Array(
       Row(2.toByte, false, null, -1234152.12312498, 100000.0f, null, 1239012341823719L, 24.toShort, "___|_123", null))
 
@@ -339,7 +341,7 @@ class RedshiftIntegrationSuite
     }
   }
 
-  test("Respect SaveMode.ErrorIfExists when table exists") {
+  ignore("Respect SaveMode.ErrorIfExists when table exists") {
     val rdd = sc.parallelize(expectedData.toSeq)
     val df = sqlContext.createDataFrame(rdd, TestUtils.testSchema)
 
@@ -349,7 +351,7 @@ class RedshiftIntegrationSuite
     }
   }
 
-  test("Do nothing when table exists if SaveMode = Ignore") {
+  ignore("Do nothing when table exists if SaveMode = Ignore") {
     val rdd = sc.parallelize(expectedData.toSeq)
     val df = sqlContext.createDataFrame(rdd, TestUtils.testSchema)
     df.write.format("com.databricks.spark.redshift").mode(SaveMode.Ignore).saveAsTable("test_table")
