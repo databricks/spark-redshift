@@ -256,7 +256,7 @@ class RedshiftSourceSuite
           "GRANT SELECT ON test_table_staging.+ TO jeremy".r,
           "ALTER TABLE test_table RENAME TO test_table_backup_.*".r,
           "ALTER TABLE test_table_staging_.* RENAME TO test_table".r,
-          "DROP TABLE test_table_backup.*".r)
+          "DROP TABLE IF EXISTS test_table_backup.*".r)
 
     val jdbcWrapper = mockJdbcWrapper(jdbcUrl, expectedCommands)
 
