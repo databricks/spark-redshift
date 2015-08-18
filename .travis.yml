@@ -16,7 +16,7 @@ env:
     # AWS_REDSHIFT_JDBC_URL
     - secure: "RNkxdKcaKEYuJqxli8naazp42qO5/pgueIzs+J5rHwl39jcBvJMgW3DX8kT7duzdoBb/qrolj/ttbQ3l/30P45+djn0BEwcJMX7G/FGpZYD23yd03qeq7sOKPQl2Ni/OBttYHJMah5rI6aPmAysBZMQO7Wijdenb/RUiU2YcZp0="
     # AWS_REDSHIFT_PASSWORD
-    - secure: "itewfcs0l3lhWdlAWBZSFoV7jjYyWDWqmbVgSsRNuKTCUeXwaW9S6/ebdzk0vieQULb1kFWIn/vd1SKsWXuZ9qDLWsJYdDFDXthRDejKsHgEUebFqKTBXvz0IyiVUXEGxDsQWu6HrBW1SFPUMt379D5Vs4Ln4eV4tI102yAjTHg="
+    - secure: "Bzre/ohanBt6wrj5asn8+iaIU5qm2QBZ+P/PiAeg55R5sqfyI/pwCYZKdtKSG7SuKzsoiAOtnjvcXMD2hickTLIDz3GmrvFcpx7yn3PEKoLQfT4Ry1/RMOsqa1+sj6zJ7J2dl4w0AURJ7Jb9/7GRylNnL0jkUvqUnWet8PBb7R8="
     # AWS_REDSHIFT_USER
     - secure: "LIkY/ZpBXK3vSFsdpBSRXEsgfD2wDF52X8OZOlyBJOiZpS4y1/obj8b3VQABDPyPH95bGX/LOpM0vVM137rYgF0pskgVEzLMyZOPpwYqNGPf/d4BtQhBRc8f7+jmr6D4Hrox4jCl0cCKaeiTazun2+Y9E+zgCUDvQ8y9qGctR2k="
     # AWS_ACCESS_KEY_ID
