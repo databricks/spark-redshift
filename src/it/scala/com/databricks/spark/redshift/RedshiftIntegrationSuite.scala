@@ -23,12 +23,16 @@ import java.util.Properties
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.jdbc.DefaultJDBCWrapper
 import org.apache.spark.sql.{Row, SQLContext, SaveMode}
-import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
+import org.scalatest.{BeforeAndAfterEach, BeforeAndAfterAll, FunSuite, Matchers}
 
 /**
  * End-to-end tests which run against a real Redshift cluster.
  */
-class RedshiftIntegrationSuite extends FunSuite with Matchers with BeforeAndAfterAll {
+class RedshiftIntegrationSuite
+  extends FunSuite
+  with Matchers
+  with BeforeAndAfterAll
+  with BeforeAndAfterEach {
 
   // The following configurations must be set in order to run these tests. In Travis, these
   // environment variables are set using Travis's encrypted environment variables feature:
@@ -81,7 +85,6 @@ class RedshiftIntegrationSuite extends FunSuite with Matchers with BeforeAndAfte
   override def beforeAll(): Unit = {
     super.beforeAll()
     sc = new SparkContext("local", "RedshiftSourceSuite")
-    sqlContext = new SQLContext(sc)
 
     sc.hadoopConfiguration.set("fs.s3n.awsAccessKeyId", AWS_ACCESS_KEY_ID)
     sc.hadoopConfiguration.set("fs.s3n.awsSecretAccessKey", AWS_SECRET_ACCESS_KEY)
@@ -175,30 +178,79 @@ class RedshiftIntegrationSuite extends FunSuite with Matchers with BeforeAndAfte
     super.afterAll()
   }
 
-  test("DefaultSource can load Redshift UNLOAD output to a DataFrame") {
+  override def beforeEach(): Unit = {
+    sqlContext = new SQLContext(sc)
     sqlContext.sql(
       s"""
-         |create temporary table test_table(
-         |  testbyte tinyint,
-         |  testbool boolean,
-         |  testdate date,
-         |  testdouble double,
-         |  testfloat float,
-         |  testint int,
-         |  testlong bigint,
-         |  testshort smallint,
-         |  teststring string,
-         |  testtimestamp timestamp
-         |)
-         |using com.databricks.spark.redshift
-         |options(
-         |  url \"$jdbcUrl\",
-         |  tempdir \"$tempDir\",
-         |  dbtable \"test_table\"
-         |)
+         | create temporary table test_table(
+         |   testbyte tinyint,
+         |   testbool boolean,
+         |   testdate date,
+         |   testdouble double,
+         |   testfloat float,
+         |   testint int,
+         |   testlong bigint,
+         |   testshort smallint,
+         |   teststring string,
+         |   testtimestamp timestamp
+         | )
+         | using com.databricks.spark.redshift
+         | options(
+         |   url \"$jdbcUrl\",
+         |   tempdir \"$tempDir\",
+         |   dbtable \"test_table\"
+         | )
        """.stripMargin
     ).collect()
 
+    sqlContext.sql(
+      s"""
+         | create temporary table test_table2(
+         |   testbyte smallint,
+         |   testbool boolean,
+         |   testdate date,
+         |   testdouble double,
+         |   testfloat float,
+         |   testint int,
+         |   testlong bigint,
+         |   testshort smallint,
+         |   teststring string,
+         |   testtimestamp timestamp
+         | )
+         | using com.databricks.spark.redshift
+         | options(
+         |   url \"$jdbcUrl\",
+         |   tempdir \"$tempDir\",
+         |   dbtable \"test_table2\"
+         | )
+       """.stripMargin
+    ).collect()
+
+    sqlContext.sql(
+      s"""
+         | create temporary table test_table3(
+         |   testbyte smallint,
+         |   testbool boolean,
+         |   testdate date,
+         |   testdouble double,
+         |   testfloat float,
+         |   testint int,
+         |   testlong bigint,
+         |   testshort smallint,
+         |   teststring string,
+         |   testtimestamp timestamp
+         | )
+         | using com.databricks.spark.redshift
+         | options(
+         |   url \"$jdbcUrl\",
+         |   tempdir \"$tempDir\",
+         |   dbtable \"test_table3\"
+         | )
+       """.stripMargin
+    ).collect()
+  }
+
+  test("DefaultSource can load Redshift UNLOAD output to a DataFrame") {
     sqlContext.sql("select * from test_table order by testbyte, testbool").collect()
       .zip(expectedData).foreach {
       case (loaded, expected) => loaded shouldBe expected
@@ -206,29 +258,6 @@ class RedshiftIntegrationSuite extends FunSuite with Matchers with BeforeAndAfte
   }
 
   test("DefaultSource supports simple column filtering") {
-    sqlContext.sql(
-      s"""
-         |create temporary table test_table(
-         |  testbyte tinyint,
-         |  testbool boolean,
-         |  testdate date,
-         |  testdouble double,
-         |  testfloat float,
-         |  testint int,
-         |  testlong bigint,
-         |  testshort smallint,
-         |  teststring string,
-         |  testtimestamp timestamp
-         |)
-         |using com.databricks.spark.redshift
-         |options(
-         |  url \"$jdbcUrl\",
-         |  tempdir \"$tempDir\",
-         |  dbtable \"test_table\"
-         |)
-       """.stripMargin
-    )
-
     val prunedExpectedValues = Array(
       Row(null, null),
       Row(0.toByte, null),
@@ -244,29 +273,6 @@ class RedshiftIntegrationSuite extends FunSuite with Matchers with BeforeAndAfte
   }
 
   test("DefaultSource supports user schema, pruned and filtered scans") {
-    sqlContext.sql(
-      s"""
-         |create temporary table test_table(
-         |  testbyte tinyint,
-         |  testbool boolean,
-         |  testdate date,
-         |  testdouble double,
-         |  testfloat float,
-         |  testint int,
-         |  testlong bigint,
-         |  testshort smallint,
-         |  teststring string,
-         |  testtimestamp timestamp
-         |)
-         |using com.databricks.spark.redshift
-         |options(
-         |  url \"$jdbcUrl\",
-         |  tempdir \"$tempDir\",
-         |  dbtable \"test_table\"
-         |)
-       """.stripMargin
-    )
-
     // We should now only have one matching row, with two columns
     val filteredExpectedValues = Array(Row(1, true))
     sqlContext.sql(
@@ -285,32 +291,8 @@ class RedshiftIntegrationSuite extends FunSuite with Matchers with BeforeAndAfte
   }
 
   test("DefaultSource using 'query' supports user schema, pruned and filtered scans") {
-    sqlContext.sql(
-      s"""
-         |create temporary table test_table(
-         |  testbyte tinyint,
-         |  testbool boolean,
-         |  testdate date,
-         |  testdouble double,
-         |  testfloat float,
-         |  testint int,
-         |  testlong bigint,
-         |  testshort smallint,
-         |  teststring string,
-         |  testtimestamp timestamp
-         |)
-         |using com.databricks.spark.redshift
-         |options(
-         |  url \"$jdbcUrl\",
-         |  tempdir \"$tempDir\",
-         |  query \"select * from test_table\"
-         |)
-       """.stripMargin
-    )
-
     // We should now only have one matching row, with two columns
     val filteredExpectedValues = Array(Row(1, true))
-
     sqlContext.sql(
       """
         |select testbyte, testbool
@@ -330,29 +312,6 @@ class RedshiftIntegrationSuite extends FunSuite with Matchers with BeforeAndAfte
     val extraData = Array(
       Row(2.toByte, false, null, -1234152.12312498, 100000.0f, null, 1239012341823719L, 24.toShort, "___|_123", null))
 
-    sqlContext.sql(
-      s"""
-         |create temporary table test_table2(
-         |  testbyte smallint,
-         |  testbool boolean,
-         |  testdate date,
-         |  testdouble double,
-         |  testfloat float,
-         |  testint int,
-         |  testlong bigint,
-         |  testshort smallint,
-         |  teststring string,
-         |  testtimestamp timestamp
-         |)
-         |using com.databricks.spark.redshift
-         |options(
-         |  url \"$jdbcUrl\",
-         |  tempdir \"$tempDir\",
-         |  dbtable \"test_table2\"
-         |)
-       """.stripMargin
-    )
-
     val rdd = sc.parallelize(extraData.toSeq)
     val df = sqlContext.createDataFrame(rdd, TestUtils.testSchema)
     df.write.format("com.databricks.spark.redshift").mode(SaveMode.Overwrite).insertInto("test_table2")
@@ -367,29 +326,6 @@ class RedshiftIntegrationSuite extends FunSuite with Matchers with BeforeAndAfte
     val extraData = Array(
       Row(2.toByte, false, null, -1234152.12312498, 100000.0f, null, 1239012341823719L, 24.toShort, "___|_123", null))
 
-    sqlContext.sql(
-      s"""
-         |create temporary table test_table3(
-         |  testbyte smallint,
-         |  testbool boolean,
-         |  testdate date,
-         |  testdouble double,
-         |  testfloat float,
-         |  testint int,
-         |  testlong bigint,
-         |  testshort smallint,
-         |  teststring string,
-         |  testtimestamp timestamp
-         |)
-         |using com.databricks.spark.redshift
-         |options(
-         |  url \"$jdbcUrl\",
-         |  tempdir \"$tempDir\",
-         |  dbtable \"test_table3\"
-         |)
-       """.stripMargin
-    )
-
     val rdd = sc.parallelize(extraData.toSeq)
     val df = sqlContext.createDataFrame(rdd, TestUtils.testSchema)
     df.write.format("com.databricks.spark.redshift").mode(SaveMode.Append).saveAsTable("test_table3")
@@ -401,29 +337,6 @@ class RedshiftIntegrationSuite extends FunSuite with Matchers with BeforeAndAfte
   }
 
   test("Respect SaveMode.ErrorIfExists when table exists") {
-    sqlContext.sql(
-      s"""
-         |create temporary table test_table(
-         |  testbyte smallint,
-         |  testbool boolean,
-         |  testdate date,
-         |  testdouble double,
-         |  testfloat float,
-         |  testint int,
-         |  testlong bigint,
-         |  testshort smallint,
-         |  teststring string,
-         |  testtimestamp timestamp
-         |)
-         |using com.databricks.spark.redshift
-         |options(
-         |  url \"$jdbcUrl\",
-         |  tempdir \"$tempDir\",
-         |  dbtable \"test_table\"
-         |)
-       """.stripMargin
-    )
-
     val rdd = sc.parallelize(expectedData.toSeq)
     val df = sqlContext.createDataFrame(rdd, TestUtils.testSchema)
 
@@ -434,29 +347,6 @@ class RedshiftIntegrationSuite extends FunSuite with Matchers with BeforeAndAfte
   }
 
   test("Do nothing when table exists if SaveMode = Ignore") {
-    sqlContext.sql(
-      s"""
-         |create temporary table test_table(
-         |  testbyte smallint,
-         |  testbool boolean,
-         |  testdate date,
-         |  testdouble double,
-         |  testfloat float,
-         |  testint int,
-         |  testlong bigint,
-         |  testshort smallint,
-         |  teststring string,
-         |  testtimestamp timestamp
-         |)
-         |using com.databricks.spark.redshift
-         |options(
-         |  url \"$jdbcUrl\",
-         |  tempdir \"$tempDir\",
-         |  dbtable \"test_table\"
-         |)
-       """.stripMargin
-    )
-
     val rdd = sc.parallelize(expectedData.toSeq)
     val df = sqlContext.createDataFrame(rdd, TestUtils.testSchema)
     df.write.format("com.databricks.spark.redshift").mode(SaveMode.Ignore).saveAsTable("test_table")
