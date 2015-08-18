@@ -16,10 +16,11 @@
 
 package com.databricks.spark.redshift
 
-import java.io.File
+import java.net.URI
 import java.sql.Connection
 import java.util.Properties
 
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.jdbc.DefaultJDBCWrapper
 import org.apache.spark.sql.{Row, SQLContext, SaveMode}
@@ -73,7 +74,6 @@ class RedshiftIntegrationSuite
       1.0f, 42, 1239012341823719L, 23.toShort, "Unicode's樂趣", TestUtils.toTimestamp(2015, 6, 1, 0, 0, 0, 1))
   )
 
-
   /**
    * Spark Context with Hadoop file overridden to point at our local test data file for this suite,
    * no-matter what temp directory was generated and requested.
@@ -85,7 +85,6 @@ class RedshiftIntegrationSuite
   override def beforeAll(): Unit = {
     super.beforeAll()
     sc = new SparkContext("local", "RedshiftSourceSuite")
-
     sc.hadoopConfiguration.set("fs.s3n.awsAccessKeyId", AWS_ACCESS_KEY_ID)
     sc.hadoopConfiguration.set("fs.s3n.awsSecretAccessKey", AWS_SECRET_ACCESS_KEY)
 
@@ -161,21 +160,25 @@ class RedshiftIntegrationSuite
   }
 
   override def afterAll(): Unit = {
-    val temp = new File(tempDir)
-    val tempFiles = temp.listFiles()
-    if(tempFiles != null) tempFiles foreach {
-      case f => if(f != null) f.delete()
+    try {
+      val fs = FileSystem.get(new URI(tempDir), sc.hadoopConfiguration)
+      fs.delete(new Path(tempDir), true)
+      fs.close()
+    } finally {
+      try {
+        conn.prepareStatement("drop table if exists test_table").executeUpdate()
+        conn.prepareStatement("drop table if exists test_table2").executeUpdate()
+        conn.prepareStatement("drop table if exists test_table3").executeUpdate()
+        conn.commit()
+        conn.close()
+      } finally {
+        try {
+          sc.stop()
+        } finally {
+          super.afterAll()
+        }
+      }
     }
-    temp.delete()
-
-    conn.prepareStatement("drop table if exists test_table").executeUpdate()
-    conn.prepareStatement("drop table if exists test_table2").executeUpdate()
-    conn.prepareStatement("drop table if exists test_table3").executeUpdate()
-    conn.commit()
-    conn.close()
-
-    sc.stop()
-    super.afterAll()
   }
 
   override def beforeEach(): Unit = {
