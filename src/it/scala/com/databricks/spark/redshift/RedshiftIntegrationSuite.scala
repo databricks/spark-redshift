@@ -35,12 +35,19 @@ class RedshiftIntegrationSuite extends FunSuite with Matchers with BeforeAndAfte
   // http://docs.travis-ci.com/user/environment-variables/#Encrypted-Variables
 
   // JDBC URL listed in the AWS console (should not contain username and password).
-  private val AWS_REDSHIFT_JDBC_URL: String = System.getenv("AWS_REDSHIFT_JDBC_URL")
-  private val AWS_REDSHIFT_USER: String = System.getenv("AWS_REDSHIFT_USER")
-  private val AWS_REDSHIFT_PASSWORD: String = System.getenv("AWS_REDSHIFT_PASSWORD")
-  private val AWS_ACCESS_KEY_ID: String = System.getenv("AWS_ACCESS_KEY_ID")
-  private val AWS_SECRET_ACCESS_KEY: String = System.getenv("AWS_SECRET_ACCESS_KEY")
-  private val AWS_S3_SCRATCH_SPACE: String = System.getenv("AWS_S3_SCRATCH_SPACE")
+
+  private def loadConfigFromEnv(envVarName: String): String = {
+    Option(System.getenv(envVarName)).getOrElse {
+      fail(s"Must set $envVarName environment variable")
+    }
+  }
+
+  private val AWS_REDSHIFT_JDBC_URL: String = loadConfigFromEnv("AWS_REDSHIFT_JDBC_URL")
+  private val AWS_REDSHIFT_USER: String = loadConfigFromEnv("AWS_REDSHIFT_USER")
+  private val AWS_REDSHIFT_PASSWORD: String = loadConfigFromEnv("AWS_REDSHIFT_PASSWORD")
+  private val AWS_ACCESS_KEY_ID: String = loadConfigFromEnv("AWS_ACCESS_KEY_ID")
+  private val AWS_SECRET_ACCESS_KEY: String = loadConfigFromEnv("AWS_SECRET_ACCESS_KEY")
+  private val AWS_S3_SCRATCH_SPACE: String = loadConfigFromEnv("AWS_S3_SCRATCH_SPACE")
 
   private val jdbcUrl: String = {
     s"$AWS_REDSHIFT_JDBC_URL?user=$AWS_REDSHIFT_USER&password=$AWS_REDSHIFT_PASSWORD"
