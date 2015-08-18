@@ -22,6 +22,10 @@ import scoverage.ScoverageSbtPlugin
 object SparkRedshiftBuild extends Build {
   val hadoopVersion = settingKey[String]("Hadoop version")
 
+  // Define a custom test configuration so that unit test helper classes can be re-used under
+  // the integration tests configuration; see http://stackoverflow.com/a/20635808.
+  lazy val IntegrationTest = config("it") extend Test
+
   lazy val root = Project("spark-redshift", file("."))
     .configs(IntegrationTest)
     .settings(net.virtualvoid.sbt.graph.Plugin.graphSettings: _*)
@@ -48,9 +52,9 @@ object SparkRedshiftBuild extends Build {
         // For testing, we using a Postgres driver, but it is recommended that the Amazon driver is used
         // in production. See http://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-connection.html
         "postgresql" % "postgresql" % "8.3-606.jdbc4" % "provided",
-        "com.google.guava" % "guava" % "14.0.1" % Test,
-        "org.scalatest" %% "scalatest" % "2.1.5" % Test,
-        "org.scalamock" %% "scalamock-scalatest-support" % "3.2" % Test
+        "com.google.guava" % "guava" % "14.0.1" % "test",
+        "org.scalatest" %% "scalatest" % "2.1.5" % "test",
+        "org.scalamock" %% "scalamock-scalatest-support" % "3.2" % "test"
       ),
       ScoverageSbtPlugin.ScoverageKeys.coverageHighlighting := {
         if (scalaBinaryVersion.value == "2.10") false

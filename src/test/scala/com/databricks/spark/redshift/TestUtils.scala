@@ -16,7 +16,7 @@
 
 package com.databricks.spark.redshift
 
-import java.sql.Timestamp
+import java.sql.{Date, Timestamp}
 import java.util.Calendar
 
 import org.apache.spark.sql.types._
@@ -66,5 +66,13 @@ object TestUtils {
    */
   def toTimestamp(year: Int, zeroBasedMonth: Int, date: Int, hour: Int, minutes: Int, seconds: Int, millis: Int = 0) = {
     new Timestamp(toMillis(year, zeroBasedMonth, date, hour, minutes, seconds, millis))
+  }
+
+
+  /**
+   * Convert date components to a SQL [[Date]].
+   */
+  def toDate(year: Int, zeroBasedMonth: Int, date: Int) = {
+    new Date(toTimestamp(year, zeroBasedMonth, date, 0, 0, 0).getTime)
   }
 }
