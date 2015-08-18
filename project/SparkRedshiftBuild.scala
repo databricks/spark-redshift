@@ -49,9 +49,9 @@ object SparkRedshiftBuild extends Build {
         "com.databricks" %% "spark-avro" % "1.0.0",
         "org.apache.avro" % "avro-mapred" % "1.7.6" % "provided" exclude("org.mortbay.jetty", "servlet-api"),
         // A Redshift-compatible JDBC driver must be present on the classpath for spark-redshift to work.
-        // For testing, we using a Postgres driver, but it is recommended that the Amazon driver is used
-        // in production. See http://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-connection.html
-        "postgresql" % "postgresql" % "8.3-606.jdbc4" % "provided",
+        // For testing, we use an Amazon driver, which is available from
+        // http://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-connection.html
+        "com.amazon.redshift" % "jdbc4" % "1.1.7.1007" % "test" from "https://s3.amazonaws.com/redshift-downloads/drivers/RedshiftJDBC4-1.1.7.1007.jar",
         "com.google.guava" % "guava" % "14.0.1" % "test",
         "org.scalatest" %% "scalatest" % "2.1.5" % "test",
         "org.scalamock" %% "scalamock-scalatest-support" % "3.2" % "test"

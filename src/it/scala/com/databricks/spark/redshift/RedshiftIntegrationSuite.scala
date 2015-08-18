@@ -29,12 +29,24 @@ import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
  * End-to-end tests which run against a real Redshift cluster.
  */
 class RedshiftIntegrationSuite extends FunSuite with Matchers with BeforeAndAfterAll {
-  val jdbcUrl = s"${System.getenv("aws_redshift_jdbc_url")}?" +
-    s"user=${System.getenv("aws_redshift_user")}&password=${System.getenv("aws_redshift_password")}"
-  val tempDir = System.getenv("aws_s3_scratch_space")
 
-  val accessKeyId = System.getenv("aws_access_key_id")
-  val secretAccessKey = System.getenv("aws_secret_access_key")
+  // The following configurations must be set in order to run these tests. In Travis, these
+  // environment variables are set using Travis's encrypted environment variables feature:
+  // http://docs.travis-ci.com/user/environment-variables/#Encrypted-Variables
+
+  // JDBC URL listed in the AWS console (should not contain username and password).
+  private val AWS_REDSHIFT_JDBC_URL: String = System.getenv("AWS_REDSHIFT_JDBC_URL")
+  private val AWS_REDSHIFT_USER: String = System.getenv("AWS_REDSHIFT_USER")
+  private val AWS_REDSHIFT_PASSWORD: String = System.getenv("AWS_REDSHIFT_PASSWORD")
+  private val AWS_ACCESS_KEY_ID: String = System.getenv("AWS_ACCESS_KEY_ID")
+  private val AWS_SECRET_ACCESS_KEY: String = System.getenv("AWS_SECRET_ACCESS_KEY")
+  private val AWS_S3_SCRATCH_SPACE: String = System.getenv("AWS_S3_SCRATCH_SPACE")
+
+  private val jdbcUrl: String = {
+    s"$AWS_REDSHIFT_JDBC_URL?user=$AWS_REDSHIFT_USER&password=$AWS_REDSHIFT_PASSWORD"
+  }
+
+  private val tempDir: String = AWS_S3_SCRATCH_SPACE
 
   /**
    * Expected parsed output corresponding to the output of testData.
@@ -52,20 +64,22 @@ class RedshiftIntegrationSuite extends FunSuite with Matchers with BeforeAndAfte
 
 
   /**
-   * Spark Context with hadoop file overridden to point at our local test data file for this suite,
+   * Spark Context with Hadoop file overridden to point at our local test data file for this suite,
    * no-matter what temp directory was generated and requested.
    */
   private var sc: SparkContext = _
+  private var sqlContext: SQLContext = _
   private var conn: Connection = _
 
   override def beforeAll(): Unit = {
     super.beforeAll()
     sc = new SparkContext("local", "RedshiftSourceSuite")
+    sqlContext = new SQLContext(sc)
 
-    sc.hadoopConfiguration.set("fs.s3n.awsAccessKeyId", accessKeyId)
-    sc.hadoopConfiguration.set("fs.s3n.awsSecretAccessKey", secretAccessKey)
+    sc.hadoopConfiguration.set("fs.s3n.awsAccessKeyId", AWS_ACCESS_KEY_ID)
+    sc.hadoopConfiguration.set("fs.s3n.awsSecretAccessKey", AWS_SECRET_ACCESS_KEY)
 
-    conn = DefaultJDBCWrapper.getConnector("org.postgresql.Driver", jdbcUrl, new Properties())()
+    conn = DefaultJDBCWrapper.getConnector("com.amazon.redshift.jdbc4.Driver", jdbcUrl, new Properties())()
 
     conn.prepareStatement("drop table if exists test_table").executeUpdate()
     conn.prepareStatement("drop table if exists test_table2").executeUpdate()
@@ -155,7 +169,6 @@ class RedshiftIntegrationSuite extends FunSuite with Matchers with BeforeAndAfte
   }
 
   test("DefaultSource can load Redshift UNLOAD output to a DataFrame") {
-    val sqlContext = new SQLContext(sc)
     sqlContext.sql(
       s"""
          |create temporary table test_table(
@@ -186,7 +199,6 @@ class RedshiftIntegrationSuite extends FunSuite with Matchers with BeforeAndAfte
   }
 
   test("DefaultSource supports simple column filtering") {
-    val sqlContext = new SQLContext(sc)
     sqlContext.sql(
       s"""
          |create temporary table test_table(
@@ -225,7 +237,6 @@ class RedshiftIntegrationSuite extends FunSuite with Matchers with BeforeAndAfte
   }
 
   test("DefaultSource supports user schema, pruned and filtered scans") {
-    val sqlContext = new SQLContext(sc)
     sqlContext.sql(
       s"""
          |create temporary table test_table(
@@ -267,7 +278,6 @@ class RedshiftIntegrationSuite extends FunSuite with Matchers with BeforeAndAfte
   }
 
   test("DefaultSource using 'query' supports user schema, pruned and filtered scans") {
-    val sqlContext = new SQLContext(sc)
     sqlContext.sql(
       s"""
          |create temporary table test_table(
@@ -313,7 +323,6 @@ class RedshiftIntegrationSuite extends FunSuite with Matchers with BeforeAndAfte
     val extraData = Array(
       Row(2.toByte, false, null, -1234152.12312498, 100000.0f, null, 1239012341823719L, 24.toShort, "___|_123", null))
 
-    val sqlContext = new SQLContext(sc)
     sqlContext.sql(
       s"""
          |create temporary table test_table2(
@@ -351,7 +360,6 @@ class RedshiftIntegrationSuite extends FunSuite with Matchers with BeforeAndAfte
     val extraData = Array(
       Row(2.toByte, false, null, -1234152.12312498, 100000.0f, null, 1239012341823719L, 24.toShort, "___|_123", null))
 
-    val sqlContext = new SQLContext(sc)
     sqlContext.sql(
       s"""
          |create temporary table test_table3(
@@ -386,7 +394,6 @@ class RedshiftIntegrationSuite extends FunSuite with Matchers with BeforeAndAfte
   }
 
   test("Respect SaveMode.ErrorIfExists when table exists") {
-    val sqlContext = new SQLContext(sc)
     sqlContext.sql(
       s"""
          |create temporary table test_table(
@@ -420,7 +427,6 @@ class RedshiftIntegrationSuite extends FunSuite with Matchers with BeforeAndAfte
   }
 
   test("Do nothing when table exists if SaveMode = Ignore") {
-    val sqlContext = new SQLContext(sc)
     sqlContext.sql(
       s"""
          |create temporary table test_table(
