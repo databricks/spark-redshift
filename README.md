@@ -192,6 +192,12 @@ need to be configured to allow access from your driver application.
     <td>AWS secret access key corresponding to provided access key.</td>
  </tr>
  <tr>
+    <td><tt>aws_security_token</tt></td>
+    <td>No, unless using temporary IAM credentials</td>
+    <td>None</td>
+    <td>AWS security token corresponding to provided access key.</td>
+ </tr>
+ <tr>
     <td><tt>tempdir</tt></td>
     <td>Yes</td>
     <td>No default</td>
