@@ -26,14 +26,20 @@ import org.apache.spark.Logging
 import org.apache.spark.sql.types._
 
 /**
- * Shim which exposes some JDBC helper functions.
+ * Shim which exposes some JDBC helper functions. Most of this code is copied from Spark SQL, with
+ * minor modifications for Redshift-specific features and limitations.
  */
 private[redshift] class JDBCWrapper extends Logging {
 
   def registerDriver(driverClass: String): Unit = {
+    // DriverRegistry.register() is one of the few pieces of private Spark functionality which
+    // we need to rely on. This class was relocated in Spark 1.5.0, so we need to use reflection
+    // in order to support both Spark 1.4.x and 1.5.x.
+    // TODO: once 1.5.0 snapshots are on Maven, update this to switch the class name based on
+    // SPARK_VERSION.
     val classLoader =
       Option(Thread.currentThread().getContextClassLoader).getOrElse(this.getClass.getClassLoader)
-    val className = "org.apache.spark.sql.jdbc.DriverRegistry$"
+    val className = "org.apache.spark.sql.jdbc.package$DriverRegistry$"
     // scalastyle:off
     val driverRegistryClass = Class.forName(className, true, classLoader)
     // scalastyle:on
@@ -122,7 +128,7 @@ private[redshift] class JDBCWrapper extends Logging {
         case FloatType => "REAL"
         case ShortType => "INTEGER"
         case ByteType => "SMALLINT" // Redshift does not support the BYTE type.
-        case BooleanType => "BIT(1)"
+        case BooleanType => "BOOLEAN"
         case StringType => "TEXT"
         case BinaryType => "BLOB"
         case TimestampType => "TIMESTAMP"
@@ -156,6 +162,7 @@ private[redshift] class JDBCWrapper extends Logging {
       precision: Int,
       scale: Int,
       signed: Boolean): DataType = {
+    // TODO: cleanup types which are irrelevant for Redshift.
     val answer = sqlType match {
       // scalastyle:off
       case java.sql.Types.ARRAY         => null
