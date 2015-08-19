@@ -298,6 +298,8 @@ class RedshiftIntegrationSuite
 
     sqlContext.createDataFrame(sc.parallelize(extraData), TestUtils.testSchema).write
       .format("com.databricks.spark.redshift")
+      .option("url", jdbcUrl)
+      .option("tempdir", tempDir)
       .mode(SaveMode.Overwrite)
       .insertInto(test_table2)
 
@@ -313,6 +315,9 @@ class RedshiftIntegrationSuite
 
     sqlContext.createDataFrame(sc.parallelize(extraData), TestUtils.testSchema).write
       .format("com.databricks.spark.redshift")
+      .option("url", jdbcUrl)
+      .option("dbtable", test_table3)
+      .option("tempdir", tempDir)
       .mode(SaveMode.Append)
       .saveAsTable(test_table3)
 
@@ -329,6 +334,9 @@ class RedshiftIntegrationSuite
     intercept[Exception] {
       df.write
         .format("com.databricks.spark.redshift")
+        .option("url", jdbcUrl)
+        .option("dbtable", test_table)
+        .option("tempdir", tempDir)
         .mode(SaveMode.ErrorIfExists)
         .saveAsTable(test_table)
     }
@@ -337,7 +345,13 @@ class RedshiftIntegrationSuite
   test("Do nothing when table exists if SaveMode = Ignore") {
     val rdd = sc.parallelize(expectedData.toSeq)
     val df = sqlContext.createDataFrame(rdd, TestUtils.testSchema)
-    df.write.format("com.databricks.spark.redshift").mode(SaveMode.Ignore).saveAsTable(test_table)
+    df.write
+      .format("com.databricks.spark.redshift")
+      .option("url", jdbcUrl)
+      .option("dbtable", test_table)
+      .option("tempdir", tempDir)
+      .mode(SaveMode.Ignore)
+      .saveAsTable(test_table)
 
     // Check that SaveMode.Ignore does nothing
     QueryTest.checkAnswer(
