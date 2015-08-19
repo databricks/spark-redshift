@@ -53,11 +53,11 @@ object QueryTest {
       case e: Exception =>
         val errorMessage =
           s"""
-             |Exception thrown while executing query:
-             |${df.queryExecution}
-              |== Exception ==
-              |$e
-              |${org.apache.spark.sql.catalyst.util.stackTraceToString(e)}
+            |Exception thrown while executing query:
+            |${df.queryExecution}
+            |== Exception ==
+            |$e
+            |${org.apache.spark.sql.catalyst.util.stackTraceToString(e)}
           """.stripMargin
         return Some(errorMessage)
     }
@@ -65,16 +65,14 @@ object QueryTest {
     if (prepareAnswer(expectedAnswer) != prepareAnswer(sparkAnswer)) {
       val errorMessage =
         s"""
-           |Results do not match for query:
-           |${df.queryExecution}
-            |== Results ==
-            |${
-          sideBySide(
-            s"== Correct Answer - ${expectedAnswer.size} ==" +:
-              prepareAnswer(expectedAnswer).map(_.toString()),
-            s"== Spark Answer - ${sparkAnswer.size} ==" +:
-              prepareAnswer(sparkAnswer).map(_.toString())).mkString("\n")
-        }
+        |Results do not match for query:
+        |${df.queryExecution}
+        |== Results ==
+        |${sideBySide(
+          s"== Correct Answer - ${expectedAnswer.size} ==" +:
+            prepareAnswer(expectedAnswer).map(_.toString()),
+          s"== Spark Answer - ${sparkAnswer.size} ==" +:
+            prepareAnswer(sparkAnswer).map(_.toString())).mkString("\n")}
       """.stripMargin
       return Some(errorMessage)
     }
