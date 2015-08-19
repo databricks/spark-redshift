@@ -30,15 +30,17 @@ import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 /**
  * Data Source API implementation for Amazon Redshift database tables
  */
-private [redshift]
-case class RedshiftRelation(jdbcWrapper: JDBCWrapper, params: MergedParameters, userSchema: Option[StructType])
+private[redshift] case class RedshiftRelation(
+    jdbcWrapper: JDBCWrapper,
+    params: MergedParameters,
+    userSchema: Option[StructType])
     (@transient val sqlContext: SQLContext)
   extends BaseRelation
   with PrunedFilteredScan
   with InsertableRelation
   with Logging {
 
-  override def schema = {
+  override def schema: StructType = {
     userSchema match {
       case Some(schema) => schema
       case None => {
@@ -56,7 +58,8 @@ case class RedshiftRelation(jdbcWrapper: JDBCWrapper, params: MergedParameters, 
   }
 
   override def insert(data: DataFrame, overwrite: Boolean): Unit = {
-    val updatedParams = Parameters.mergeParameters(params.parameters updated ("overwrite", overwrite.toString))
+    val updatedParams =
+      Parameters.mergeParameters(params.parameters updated ("overwrite", overwrite.toString))
     new RedshiftWriter(jdbcWrapper).saveToRedshift(sqlContext, data, updatedParams)
   }
 
@@ -86,14 +89,14 @@ case class RedshiftRelation(jdbcWrapper: JDBCWrapper, params: MergedParameters, 
   }
 
   protected def pruneSchema(schema: StructType, columns: Array[String]): StructType = {
-    val fieldMap = Map(schema.fields map { x => x.name -> x }: _*)
-    new StructType(columns map { name => fieldMap(name) })
+    val fieldMap = Map(schema.fields.map(x => x.name -> x): _*)
+    new StructType(columns.map(name => fieldMap(name)))
   }
 
   protected def sqlQuote(identifier: String) = s""""$identifier""""
 
   protected def columnList(columns: Seq[String]): String = {
-    columns map sqlQuote mkString ", "
+    columns.map(sqlQuote).mkString(", ")
   }
 
   protected def compileValue(value: Any): Any = value match {
@@ -105,13 +108,13 @@ case class RedshiftRelation(jdbcWrapper: JDBCWrapper, params: MergedParameters, 
     if (value == null) null else value.replace("'", "''")
 
   protected def buildWhereClause(filters: Array[Filter]): String = {
-    val filterClauses = filters map {
+    val filterClauses = filters.map {
       case EqualTo(attr, value) => s"${sqlQuote(attr)} = ${compileValue(value)}"
       case LessThan(attr, value) => s"${sqlQuote(attr)} < ${compileValue(value)}"
       case GreaterThan(attr, value) => s"${sqlQuote(attr)} > ${compileValue(value)}"
       case LessThanOrEqual(attr, value) => s"${sqlQuote(attr)} <= ${compileValue(value)}"
       case GreaterThanOrEqual(attr, value) => s"${sqlQuote(attr)} >= ${compileValue(value)}"
-    } mkString "AND"
+    }.mkString(" AND ")
 
     if (filterClauses.isEmpty) "" else "WHERE " + filterClauses
   }

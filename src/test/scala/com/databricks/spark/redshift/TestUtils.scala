@@ -27,34 +27,37 @@ import org.apache.spark.sql.types._
 object TestUtils {
 
   /**
-   * Makes a field for the test schema
-   */
-  def makeField(name: String, typ: DataType) = {
-    val md = (new MetadataBuilder).putString("name", name).build()
-    StructField(name, typ, nullable = true, metadata = md)
-  }
-
-  /**
    * Simple schema that includes all data types we support
    */
-  lazy val testSchema =
-    StructType(
-      Seq(
-        makeField("testByte", ByteType),
-        makeField("testBool", BooleanType),
-        makeField("testDate", DateType),
-        makeField("testDouble", DoubleType),
-        makeField("testFloat", FloatType),
-        makeField("testInt", IntegerType),
-        makeField("testLong", LongType),
-        makeField("testShort", ShortType),
-        makeField("testString", StringType),
-        makeField("testTimestamp", TimestampType)))
+  val testSchema: StructType = {
+    def makeField(name: String, typ: DataType) = {
+      val md = (new MetadataBuilder).putString("name", name).build()
+      StructField(name, typ, nullable = true, metadata = md)
+    }
+    StructType(Seq(
+      makeField("testByte", ByteType),
+      makeField("testBool", BooleanType),
+      makeField("testDate", DateType),
+      makeField("testDouble", DoubleType),
+      makeField("testFloat", FloatType),
+      makeField("testInt", IntegerType),
+      makeField("testLong", LongType),
+      makeField("testShort", ShortType),
+      makeField("testString", StringType),
+      makeField("testTimestamp", TimestampType)))
+  }
 
   /**
    * Convert date components to a millisecond timestamp
    */
-  def toMillis(year: Int, zeroBasedMonth: Int, date: Int, hour: Int, minutes: Int, seconds: Int, millis: Int = 0) = {
+  def toMillis(
+      year: Int,
+      zeroBasedMonth: Int,
+      date: Int,
+      hour: Int,
+      minutes: Int,
+      seconds: Int,
+      millis: Int = 0): Long = {
     val calendar = Calendar.getInstance()
     calendar.set(year, zeroBasedMonth, date, hour, minutes, seconds)
     calendar.set(Calendar.MILLISECOND, millis)
@@ -64,7 +67,14 @@ object TestUtils {
   /**
    * Convert date components to a SQL Timestamp
    */
-  def toTimestamp(year: Int, zeroBasedMonth: Int, date: Int, hour: Int, minutes: Int, seconds: Int, millis: Int = 0) = {
+  def toTimestamp(
+      year: Int,
+      zeroBasedMonth: Int,
+      date: Int,
+      hour: Int,
+      minutes: Int,
+      seconds: Int,
+      millis: Int = 0): Timestamp = {
     new Timestamp(toMillis(year, zeroBasedMonth, date, hour, minutes, seconds, millis))
   }
 
@@ -72,7 +82,7 @@ object TestUtils {
   /**
    * Convert date components to a SQL [[Date]].
    */
-  def toDate(year: Int, zeroBasedMonth: Int, date: Int) = {
+  def toDate(year: Int, zeroBasedMonth: Int, date: Int): Date = {
     new Date(toTimestamp(year, zeroBasedMonth, date, 0, 0, 0).getTime)
   }
 }

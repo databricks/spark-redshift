@@ -21,18 +21,20 @@ import java.sql.Timestamp
 import org.scalatest.FunSuite
 
 import org.apache.spark.sql.Row
+import org.apache.spark.sql.types.{StructField, BooleanType, StructType}
 
 /**
  * Unit test for data type conversions
  */
 class ConversionsSuite extends FunSuite {
 
-  val convertRow = Conversions.rowConverter(TestUtils.testSchema)
-
   test("Data should be correctly converted") {
+    val convertRow = Conversions.rowConverter(TestUtils.testSchema)
     val doubleMin = Double.MinValue.toString
     val longMax = Long.MaxValue.toString
+    // scalastyle:off
     val unicodeString = "Unicode是樂趣"
+    // scalastyle:on
 
     val timestampWithMillis = "2014-03-01 00:00:01.123"
 
@@ -51,7 +53,18 @@ class ConversionsSuite extends FunSuite {
   }
 
   test("Row conversion handles null values") {
+    val convertRow = Conversions.rowConverter(TestUtils.testSchema)
     val emptyRow = List.fill(TestUtils.testSchema.length)(null).toArray[String]
-    assert(convertRow(emptyRow) == Row(emptyRow: _*))
+    assert(convertRow(emptyRow) === Row(emptyRow: _*))
+  }
+
+  test("Booleans are correctly converted") {
+    val convertRow = Conversions.rowConverter(StructType(StructField("a", BooleanType) :: Nil))
+    assert(convertRow(Array("t")) === Row(true))
+    assert(convertRow(Array("f")) === Row(false))
+    assert(convertRow(Array(null)) === Row(null))
+    intercept[IllegalArgumentException] {
+      convertRow(Array("not-a-boolean"))
+    }
   }
 }
