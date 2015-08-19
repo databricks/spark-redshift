@@ -22,7 +22,6 @@ import com.databricks.spark.redshift.Parameters.MergedParameters
 
 import org.apache.spark.Logging
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.jdbc.JDBCWrapper
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}

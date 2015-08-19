@@ -17,8 +17,8 @@
 
 package com.databricks.spark
 
+import com.databricks.spark.redshift.DefaultJDBCWrapper
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.jdbc.DefaultJDBCWrapper
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 
