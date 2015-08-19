@@ -65,7 +65,7 @@ class RedshiftIntegrationSuite
    * Random suffix appended appended to table and directory names in order to avoid collisions
    * between separate Travis builds.
    */
-  private val randomSuffix: String = Random.nextLong().toString
+  private val randomSuffix: String = Math.abs(Random.nextLong()).toString
 
   private val tempDir: String = AWS_S3_SCRATCH_SPACE + randomSuffix + "/"
 

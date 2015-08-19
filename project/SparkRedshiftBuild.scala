@@ -45,7 +45,7 @@ object SparkRedshiftBuild extends Build {
         "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
       libraryDependencies ++= Seq(
         "com.amazonaws" % "aws-java-sdk-core" % "1.9.40" % "provided",
-        // We require spark-avro, but avro-mapred must be provided to match Hadoop version,
+        // We require spark-avro, but avro-mapred must be provided to match Hadoop version:
         "com.databricks" %% "spark-avro" % "1.0.0",
         "org.apache.avro" % "avro-mapred" % "1.7.6" % "provided" exclude("org.mortbay.jetty", "servlet-api"),
         // A Redshift-compatible JDBC driver must be present on the classpath for spark-redshift to work.
@@ -59,6 +59,8 @@ object SparkRedshiftBuild extends Build {
       ScoverageSbtPlugin.ScoverageKeys.coverageHighlighting := {
         if (scalaBinaryVersion.value == "2.10") false
         else false
-      }
+      },
+      // Display full-length stacktraces from ScalaTest:
+      testOptions in Test += Tests.Argument("-oF")
     ): _*)
 }
