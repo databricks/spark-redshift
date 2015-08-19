@@ -19,10 +19,9 @@ package com.databricks.spark.redshift
 import java.io.File
 import java.sql.{Connection, PreparedStatement, SQLException}
 
-import com.google.common.io.Files
-
 import scala.util.matching.Regex
 
+import com.google.common.io.Files
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.mapreduce.InputFormat
 import org.scalamock.scalatest.MockFactory
