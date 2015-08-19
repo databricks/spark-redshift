@@ -33,7 +33,7 @@ private[redshift] class JDBCWrapper extends Logging {
   def registerDriver(driverClass: String): Unit = {
     val classLoader =
       Option(Thread.currentThread().getContextClassLoader).getOrElse(this.getClass.getClassLoader)
-    val className = "org.apache.spark.sql.jdbc.DriverRegistry$"
+    val className = "org.apache.spark.sql.jdbc.package$DriverRegistry$"
     // scalastyle:off
     val driverRegistryClass = Class.forName(className, true, classLoader)
     // scalastyle:on
@@ -122,7 +122,7 @@ private[redshift] class JDBCWrapper extends Logging {
         case FloatType => "REAL"
         case ShortType => "INTEGER"
         case ByteType => "SMALLINT" // Redshift does not support the BYTE type.
-        case BooleanType => "BIT(1)"
+        case BooleanType => "BOOLEAN"
         case StringType => "TEXT"
         case BinaryType => "BLOB"
         case TimestampType => "TIMESTAMP"
