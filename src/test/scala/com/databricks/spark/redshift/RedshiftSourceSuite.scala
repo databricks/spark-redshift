@@ -29,7 +29,6 @@ import org.scalatest.{BeforeAndAfterEach, BeforeAndAfterAll, FunSuite, Matchers}
 
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.jdbc.JDBCWrapper
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext, SaveMode}
 
@@ -273,7 +272,7 @@ class RedshiftSourceSuite
       .anyNumberOfTimes()
 
     (jdbcWrapper.schemaString _)
-      .expects(*, params("url"))
+      .expects(*)
       .returning("schema")
       .anyNumberOfTimes()
 
@@ -325,7 +324,7 @@ class RedshiftSourceSuite
       .anyNumberOfTimes()
 
     (jdbcWrapper.schemaString _)
-      .expects(*, params("url"))
+      .expects(*)
       .anyNumberOfTimes()
 
     inSequence {
@@ -371,7 +370,7 @@ class RedshiftSourceSuite
       .anyNumberOfTimes()
 
     (jdbcWrapper.schemaString _)
-      .expects(*, defaultParams("url"))
+      .expects(*)
       .returning("schema")
       .anyNumberOfTimes()
 

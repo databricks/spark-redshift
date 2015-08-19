@@ -24,7 +24,6 @@ import scala.util.Random
 import com.databricks.spark.redshift.Parameters.MergedParameters
 
 import org.apache.spark.Logging
-import org.apache.spark.sql.jdbc.{DefaultJDBCWrapper, JDBCWrapper}
 import org.apache.spark.sql.{DataFrame, SQLContext}
 
 /**
@@ -36,7 +35,7 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
    * Generate CREATE TABLE statement for Redshift
    */
   def createTableSql(data: DataFrame, params: MergedParameters): String = {
-    val schemaSql = jdbcWrapper.schemaString(data, params.jdbcUrl)
+    val schemaSql = jdbcWrapper.schemaString(data.schema)
     val distStyleDef = params.distStyle match {
       case Some(style) => s"DISTSTYLE $style"
       case None => ""
