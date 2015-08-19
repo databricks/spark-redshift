@@ -43,7 +43,9 @@ private[redshift] class JDBCWrapper extends Logging {
     // scalastyle:off
     val driverRegistryClass = Class.forName(className, true, classLoader)
     // scalastyle:on
-    driverRegistryClass.getMethod("register", classOf[String]).invoke(driverClass)
+    val registerMethod = driverRegistryClass.getDeclaredMethod("register", classOf[String])
+    val companionObject = driverRegistryClass.getDeclaredField("MODULE$").get(null)
+    registerMethod.invoke(companionObject, driverClass)
   }
 
   /**
