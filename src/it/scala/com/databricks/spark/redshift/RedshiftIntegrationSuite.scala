@@ -70,22 +70,6 @@ class RedshiftIntegrationSuite
 
   private val tempDir: String = AWS_S3_SCRATCH_SPACE + randomSuffix + "/"
 
-  // TODO(josh): add style checks for integration tests
-  // TODO(josh): factor this out into a util class and share w/ other suite
-  /**
-   * Expected parsed output corresponding to the output of testData.
-   */
-  val expectedData = Array(
-    Row(List.fill(10)(null): _*),
-    Row(0.toByte, null, TestUtils.toDate(2015, 6, 3), 0.0, -1.0f, 4141214, 1239012341823719L, null, "f",
-      TestUtils.toTimestamp(2015, 6, 3, 0, 0, 0)),
-    Row(0.toByte, false, null, -1234152.12312498, 100000.0f, null, 1239012341823719L, 24.toShort, "___|_123", null),
-    Row(1.toByte, false, TestUtils.toDate(2015, 6, 2), 0.0, 0.0f, 42, 1239012341823719L, -13.toShort, "asdf",
-      TestUtils.toTimestamp(2015, 6, 2, 0, 0, 0, 0)),
-    Row(1.toByte, true, TestUtils.toDate(2015, 6, 1), 1234152.12312498,
-      1.0f, 42, 1239012341823719L, 23.toShort, "Unicode's樂趣", TestUtils.toTimestamp(2015, 6, 1, 0, 0, 0, 1))
-  )
-
   /**
    * Spark Context with Hadoop file overridden to point at our local test data file for this suite,
    * no-matter what temp directory was generated and requested.
@@ -106,7 +90,8 @@ class RedshiftIntegrationSuite
     sc.hadoopConfiguration.set("fs.s3n.awsAccessKeyId", AWS_ACCESS_KEY_ID)
     sc.hadoopConfiguration.set("fs.s3n.awsSecretAccessKey", AWS_SECRET_ACCESS_KEY)
 
-    conn = DefaultJDBCWrapper.getConnector("com.amazon.redshift.jdbc4.Driver", jdbcUrl, new Properties())()
+    conn = DefaultJDBCWrapper.getConnector(
+      "com.amazon.redshift.jdbc4.Driver", jdbcUrl, new Properties())()
 
     conn.prepareStatement("drop table if exists test_table").executeUpdate()
     conn.prepareStatement("drop table if exists test_table2").executeUpdate()
@@ -130,6 +115,7 @@ class RedshiftIntegrationSuite
            |)
       """.stripMargin
       )
+      // scalastyle:off
       conn.createStatement().executeUpdate(
         s"""
            |insert into $tableName values
@@ -140,6 +126,7 @@ class RedshiftIntegrationSuite
            |(1, true, '2015-07-01', 1234152.12312498, 1.0, 42, 1239012341823719, 23, 'Unicode''s樂趣', '2015-07-01 00:00:00.001')
          """.stripMargin
       )
+      // scalastyle:on
       conn.commit()
     }
 
@@ -245,7 +232,7 @@ class RedshiftIntegrationSuite
   test("DefaultSource can load Redshift UNLOAD output to a DataFrame") {
     QueryTest.checkAnswer(
       sqlContext.sql("select * from test_table order by testbyte, testbool"),
-      expectedData)
+      TestUtils.expectedData)
   }
 
   test("DefaultSource supports simple column filtering") {
@@ -260,22 +247,7 @@ class RedshiftIntegrationSuite
   }
 
   test("DefaultSource supports user schema, pruned and filtered scans") {
-    QueryTest.checkAnswer(
-      sqlContext.sql(
-        """
-          |select testbyte, testbool
-          |from test_table
-          |where testbool = true
-          | and teststring = "Unicode's樂趣"
-          | and testdouble = 1234152.12312498
-          | and testfloat = 1.0
-          | and testint = 42
-        """.stripMargin),
-      Seq(Row(1, true))
-    )
-  }
-
-  test("DefaultSource using 'query' supports user schema, pruned and filtered scans") {
+    // scalastyle:off
     QueryTest.checkAnswer(
       sqlContext.sql(
         """
@@ -288,6 +260,24 @@ class RedshiftIntegrationSuite
           | and testint = 42
         """.stripMargin),
       Seq(Row(1, true)))
+    // scalastyle:on
+  }
+
+  test("DefaultSource using 'query' supports user schema, pruned and filtered scans") {
+    // scalastyle:off
+    QueryTest.checkAnswer(
+      sqlContext.sql(
+        """
+          |select testbyte, testbool
+          |from test_table
+          |where testbool = true
+          | and teststring = "Unicode's樂趣"
+          | and testdouble = 1234152.12312498
+          | and testfloat = 1.0
+          | and testint = 42
+        """.stripMargin),
+      Seq(Row(1, true)))
+    // scalastyle:on
   }
 
   test("DefaultSource serializes data as Avro, then sends Redshift COPY command") {
@@ -322,11 +312,11 @@ class RedshiftIntegrationSuite
 
     QueryTest.checkAnswer(
       sqlContext.sql("select * from test_table3 order by testbyte, testbool"),
-      expectedData ++ extraData)
+      TestUtils.expectedData ++ extraData)
   }
 
   test("Respect SaveMode.ErrorIfExists when table exists") {
-    val rdd = sc.parallelize(expectedData.toSeq)
+    val rdd = sc.parallelize(TestUtils.expectedData.toSeq)
     val df = sqlContext.createDataFrame(rdd, TestUtils.testSchema)
 
     // Check that SaveMode.ErrorIfExists throws an exception
@@ -342,7 +332,7 @@ class RedshiftIntegrationSuite
   }
 
   test("Do nothing when table exists if SaveMode = Ignore") {
-    val rdd = sc.parallelize(expectedData.toSeq)
+    val rdd = sc.parallelize(TestUtils.expectedData)
     val df = sqlContext.createDataFrame(rdd, TestUtils.testSchema)
     df.write
       .format("com.databricks.spark.redshift")
@@ -355,6 +345,6 @@ class RedshiftIntegrationSuite
     // Check that SaveMode.Ignore does nothing
     QueryTest.checkAnswer(
       sqlContext.sql("select * from test_table order by testbyte, testbool"),
-      expectedData)
+      TestUtils.expectedData)
   }
 }

@@ -30,5 +30,6 @@ script:
   - if [ "$TRAVIS_SECURE_ENV_VARS" ]; then sbt -Dhadoop.version=$HADOOP_VERSION coverage it:test; fi
   - sbt scalastyle
   - sbt "test:scalastyle"
+  - sbt "it:scalastyle"
 after_success:
   - bash <(curl -s https://codecov.io/bash)

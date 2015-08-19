@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import org.scalastyle.sbt.ScalastylePlugin.rawScalastyleSettings
 import sbt._
 import sbt.Keys._
 import sbtsparkpackage.SparkPackagePlugin.autoImport._
@@ -29,8 +30,9 @@ object SparkRedshiftBuild extends Build {
   lazy val root = Project("spark-redshift", file("."))
     .configs(IntegrationTest)
     .settings(net.virtualvoid.sbt.graph.Plugin.graphSettings: _*)
+    .settings(Project.inConfig(IntegrationTest)(rawScalastyleSettings()): _*)
     .settings(Defaults.itSettings: _*)
-    .settings(Seq(
+    .settings(
       name := "spark-redshift",
       organization := "com.databricks",
       version := "0.4.1-SNAPSHOT",
@@ -62,5 +64,5 @@ object SparkRedshiftBuild extends Build {
       },
       // Display full-length stacktraces from ScalaTest:
       testOptions in Test += Tests.Argument("-oF")
-    ): _*)
+    )
 }
