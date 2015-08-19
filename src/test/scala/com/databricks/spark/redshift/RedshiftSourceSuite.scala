@@ -39,10 +39,12 @@ class TestContext extends SparkContext("local", "RedshiftSourceSuite") {
    */
   val testData = new File("src/test/resources/redshift_unload_data.txt").toURI.toString
 
-  override def newAPIHadoopFile[K, V, F <: InputFormat[K, V]]
-  (path: String, fClass: Class[F], kClass: Class[K],
-   vClass: Class[V], conf: Configuration = hadoopConfiguration):
-  RDD[(K, V)] = {
+  override def newAPIHadoopFile[K, V, F <: InputFormat[K, V]](
+      path: String,
+      fClass: Class[F],
+      kClass: Class[K],
+      vClass: Class[V],
+      conf: Configuration = hadoopConfiguration): RDD[(K, V)] = {
     super.newAPIHadoopFile[K, V, F](testData, fClass, kClass, vClass, conf)
   }
 }
@@ -60,26 +62,28 @@ class RedshiftSourceSuite
    * Temporary folder for unloading data to
    */
   val tempDir = {
-    var dir = File.createTempFile("spark_redshift_tests", "")
+    val dir = File.createTempFile("spark_redshift_tests", "")
     dir.delete()
     dir.mkdirs()
     dir.toURI.toString
   }
 
+  // scalastyle:off
   /**
    * Expected parsed output corresponding to the output of testData.
    */
-  val expectedData =
-    Array(
-      Row(1.toByte, true, TestUtils.toTimestamp(2015, 6, 1, 0, 0, 0), 1234152.123124981,
-        1.0f, 42, 1239012341823719L, 23, "Unicode是樂趣", TestUtils.toTimestamp(2015, 6, 1, 0, 0, 0, 1)),
-      Row(1.toByte, false, TestUtils.toTimestamp(2015, 6, 2, 0, 0, 0), 0.0, 0.0f, 42, 1239012341823719L, -13, "asdf",
-        TestUtils.toTimestamp(2015, 6, 2, 0, 0, 0, 0)),
-      Row(0.toByte, null, TestUtils.toTimestamp(2015, 6, 3, 0, 0, 0), 0.0, -1.0f, 4141214, 1239012341823719L, null, "f",
-        TestUtils.toTimestamp(2015, 6, 3, 0, 0, 0)),
-      Row(0.toByte, false, null, -1234152.123124981, 100000.0f, null, 1239012341823719L, 24, "___|_123", null),
-      Row(List.fill(10)(null): _*))
-
+  val expectedData = Array(
+    Row(1.toByte, true, TestUtils.toTimestamp(2015, 6, 1, 0, 0, 0), 1234152.123124981,
+      1.0f, 42, 1239012341823719L, 23, "Unicode是樂趣",
+      TestUtils.toTimestamp(2015, 6, 1, 0, 0, 0, 1)),
+    Row(1.toByte, false, TestUtils.toTimestamp(2015, 6, 2, 0, 0, 0), 0.0, 0.0f, 42,
+      1239012341823719L, -13, "asdf", TestUtils.toTimestamp(2015, 6, 2, 0, 0, 0, 0)),
+    Row(0.toByte, null, TestUtils.toTimestamp(2015, 6, 3, 0, 0, 0), 0.0, -1.0f, 4141214,
+      1239012341823719L, null, "f", TestUtils.toTimestamp(2015, 6, 3, 0, 0, 0)),
+    Row(0.toByte, false, null, -1234152.123124981, 100000.0f, null, 1239012341823719L, 24,
+      "___|_123", null),
+    Row(List.fill(10)(null): _*))
+  // scalastyle:on
 
   /**
    * Spark Context with hadoop file overridden to point at our local test data file for this suite,
@@ -96,7 +100,7 @@ class RedshiftSourceSuite
     val temp = new File(tempDir)
     val tempFiles = temp.listFiles()
     if(tempFiles != null) tempFiles foreach {
-      case f => if(f != null) f.delete()
+      case f => if (f != null) f.delete()
     }
     temp.delete()
 
@@ -108,7 +112,7 @@ class RedshiftSourceSuite
    * Set up a mocked JDBCWrapper instance that expects a sequence of queries matching the given
    * regular expressions will be executed, and that the connection returned will be closed.
    */
-  def mockJdbcWrapper(expectedUrl: String, expectedQueries: Seq[Regex]): JDBCWrapper = {
+  private def mockJdbcWrapper(expectedUrl: String, expectedQueries: Seq[Regex]): JDBCWrapper = {
     val jdbcWrapper = mock[JDBCWrapper]
     val mockedConnection = mock[Connection]
 
@@ -132,7 +136,7 @@ class RedshiftSourceSuite
   /**
    * Prepare the JDBC wrapper for an UNLOAD test.
    */
-  def prepareUnloadTest(params: Map[String, String]) = {
+  private def prepareUnloadTest(params: Map[String, String]): JDBCWrapper = {
     val jdbcUrl = params("url")
     val jdbcWrapper = mockJdbcWrapper(jdbcUrl, Seq("UNLOAD.*".r))
 
@@ -151,7 +155,8 @@ class RedshiftSourceSuite
 
   test("DefaultSource can load Redshift UNLOAD output to a DataFrame") {
 
-    val params = Map("url" -> "jdbc:postgresql://foo/bar",
+    val params = Map(
+      "url" -> "jdbc:postgresql://foo/bar",
       "tempdir" -> "tmp",
       "dbtable" -> "test_table",
       "aws_access_key_id" -> "test1",
@@ -173,7 +178,8 @@ class RedshiftSourceSuite
 
   test("DefaultSource supports simple column filtering") {
 
-    val params = Map("url" -> "jdbc:postgresql://foo/bar",
+    val params = Map(
+      "url" -> "jdbc:postgresql://foo/bar",
       "tempdir" -> "tmp",
       "dbtable" -> "test_table",
       "aws_access_key_id" -> "test1",
@@ -186,13 +192,14 @@ class RedshiftSourceSuite
     val source = new DefaultSource(jdbcWrapper)
     val relation = source.createRelation(testSqlContext, params, TestUtils.testSchema)
 
-    val rdd = relation.asInstanceOf[PrunedFilteredScan].buildScan(Array("testByte", "testBool"), Array.empty[Filter])
-    val prunedExpectedValues =
-      Array(Row(1.toByte, true),
-            Row(1.toByte, false),
-            Row(0.toByte, null),
-            Row(0.toByte, false),
-            Row(null, null))
+    val rdd = relation.asInstanceOf[PrunedFilteredScan]
+      .buildScan(Array("testByte", "testBool"), Array.empty[Filter])
+    val prunedExpectedValues = Array(
+      Row(1.toByte, true),
+      Row(1.toByte, false),
+      Row(0.toByte, null),
+      Row(0.toByte, false),
+      Row(null, null))
 
     rdd.collect() zip prunedExpectedValues foreach {
       case (loaded, expected) => loaded shouldBe expected
@@ -201,7 +208,8 @@ class RedshiftSourceSuite
 
   test("DefaultSource supports user schema, pruned and filtered scans") {
 
-    val params = Map("url" -> "jdbc:postgresql://foo/bar",
+    val params = Map(
+      "url" -> "jdbc:postgresql://foo/bar",
       "tempdir" -> "tmp",
       "dbtable" -> "test_table",
       "aws_access_key_id" -> "test1",
@@ -215,14 +223,17 @@ class RedshiftSourceSuite
     val relation = source.createRelation(testSqlContext, params, TestUtils.testSchema)
 
     // Define a simple filter to only include a subset of rows
-    val filters: Array[Filter] =
-      Array(EqualTo("testBool", true),
-            EqualTo("testString", "Unicode是樂趣"),
-            GreaterThan("testDouble", 1000.0),
-            LessThan("testDouble", Double.MaxValue),
-            GreaterThanOrEqual("testFloat", 1.0f),
-            LessThanOrEqual("testInt", 43))
-    val rdd = relation.asInstanceOf[PrunedFilteredScan].buildScan(Array("testByte", "testBool"), filters)
+    val filters: Array[Filter] = Array(
+      EqualTo("testBool", true),
+      // scalastyle:off
+      EqualTo("testString", "Unicode是樂趣"),
+      // scalastyle:on
+      GreaterThan("testDouble", 1000.0),
+      LessThan("testDouble", Double.MaxValue),
+      GreaterThanOrEqual("testFloat", 1.0f),
+      LessThanOrEqual("testInt", 43))
+    val rdd = relation.asInstanceOf[PrunedFilteredScan]
+      .buildScan(Array("testByte", "testBool"), filters)
 
     // We should now only have one matching row, with two columns
     val filteredExpectedValues = Array(Row(1, true))
@@ -236,27 +247,27 @@ class RedshiftSourceSuite
     val testSqlContext = new SQLContext(sc)
 
     val jdbcUrl = "jdbc:postgresql://foo/bar"
-    val params =
-      Map("url" -> jdbcUrl,
-          "tempdir" -> tempDir,
-          "dbtable" -> "test_table",
-          "aws_access_key_id" -> "test1",
-          "aws_secret_access_key" -> "test2",
-          "postactions" -> "GRANT SELECT ON %s TO jeremy",
-          "diststyle" -> "KEY",
-          "distkey" -> "testInt")
+    val params = Map(
+      "url" -> jdbcUrl,
+      "tempdir" -> tempDir,
+      "dbtable" -> "test_table",
+      "aws_access_key_id" -> "test1",
+      "aws_secret_access_key" -> "test2",
+      "postactions" -> "GRANT SELECT ON %s TO jeremy",
+      "diststyle" -> "KEY",
+      "distkey" -> "testInt")
 
     val rdd = sc.parallelize(expectedData.toSeq)
     val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
 
-    val expectedCommands =
-      Seq("DROP TABLE IF EXISTS test_table_staging_.*".r,
-          "CREATE TABLE IF NOT EXISTS test_table_staging.* DISTSTYLE KEY DISTKEY \\(testInt\\).*".r,
-          "COPY test_table_staging_.*".r,
-          "GRANT SELECT ON test_table_staging.+ TO jeremy".r,
-          "ALTER TABLE test_table RENAME TO test_table_backup_.*".r,
-          "ALTER TABLE test_table_staging_.* RENAME TO test_table".r,
-          "DROP TABLE test_table_backup.*".r)
+    val expectedCommands = Seq(
+      "DROP TABLE IF EXISTS test_table_staging_.*".r,
+      "CREATE TABLE IF NOT EXISTS test_table_staging.* DISTSTYLE KEY DISTKEY \\(testInt\\).*".r,
+      "COPY test_table_staging_.*".r,
+      "GRANT SELECT ON test_table_staging.+ TO jeremy".r,
+      "ALTER TABLE test_table RENAME TO test_table_backup_.*".r,
+      "ALTER TABLE test_table_staging_.* RENAME TO test_table".r,
+      "DROP TABLE test_table_backup.*".r)
 
     val jdbcWrapper = mockJdbcWrapper(jdbcUrl, expectedCommands)
 
@@ -270,7 +281,8 @@ class RedshiftSourceSuite
       .returning("schema")
       .anyNumberOfTimes()
 
-    val relation = RedshiftRelation(jdbcWrapper, Parameters.mergeParameters(params), None)(testSqlContext)
+    val relation =
+      RedshiftRelation(jdbcWrapper, Parameters.mergeParameters(params), None)(testSqlContext)
     relation.asInstanceOf[InsertableRelation].insert(df, true)
 
     // Make sure we wrote the data out ready for Redshift load, in the expected formats
@@ -285,13 +297,13 @@ class RedshiftSourceSuite
     val testSqlContext = new SQLContext(sc)
 
     val jdbcUrl = "jdbc:postgresql://foo/bar"
-    val params =
-      Map("url" -> jdbcUrl,
-        "tempdir" -> tempDir,
-        "dbtable" -> "test_table",
-        "aws_access_key_id" -> "test1",
-        "aws_secret_access_key" -> "test2",
-        "usestagingtable" -> "true")
+    val params = Map(
+      "url" -> jdbcUrl,
+      "tempdir" -> tempDir,
+      "dbtable" -> "test_table",
+      "aws_access_key_id" -> "test1",
+      "aws_secret_access_key" -> "test2",
+      "usestagingtable" -> "true")
 
     val rdd = sc.parallelize(expectedData.toSeq)
     val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
@@ -369,12 +381,12 @@ class RedshiftSourceSuite
     val testSqlContext = new SQLContext(sc)
 
     val jdbcUrl = "jdbc:postgresql://foo/bar"
-    val params =
-      Map("url" -> jdbcUrl,
-        "tempdir" -> tempDir,
-        "dbtable" -> "test_table",
-        "aws_access_key_id" -> "test1",
-        "aws_secret_access_key" -> "test2")
+    val params = Map(
+      "url" -> jdbcUrl,
+      "tempdir" -> tempDir,
+      "dbtable" -> "test_table",
+      "aws_access_key_id" -> "test1",
+      "aws_secret_access_key" -> "test2")
 
     val rdd = sc.parallelize(expectedData.toSeq)
     val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
@@ -411,12 +423,12 @@ class RedshiftSourceSuite
     val testSqlContext = new SQLContext(sc)
 
     val jdbcUrl = "jdbc:postgresql://foo/bar"
-    val params =
-      Map("url" -> jdbcUrl,
-          "tempdir" -> tempDir,
-          "dbtable" -> "test_table",
-          "aws_access_key_id" -> "test1",
-          "aws_secret_access_key" -> "test2")
+    val params = Map(
+      "url" -> jdbcUrl,
+      "tempdir" -> tempDir,
+      "dbtable" -> "test_table",
+      "aws_access_key_id" -> "test1",
+      "aws_secret_access_key" -> "test2")
 
     val rdd = sc.parallelize(expectedData.toSeq)
     val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
@@ -439,12 +451,12 @@ class RedshiftSourceSuite
     val testSqlContext = new SQLContext(sc)
 
     val jdbcUrl = "jdbc:postgresql://foo/bar"
-    val params =
-      Map("url" -> jdbcUrl,
-        "tempdir" -> tempDir,
-        "dbtable" -> "test_table",
-        "aws_access_key_id" -> "test1",
-        "aws_secret_access_key" -> "test2")
+    val params = Map(
+      "url" -> jdbcUrl,
+      "tempdir" -> tempDir,
+      "dbtable" -> "test_table",
+      "aws_access_key_id" -> "test1",
+      "aws_secret_access_key" -> "test2")
 
     val rdd = sc.parallelize(expectedData.toSeq)
     val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
@@ -481,6 +493,4 @@ class RedshiftSourceSuite
   test("DefaultSource has default constructor, required by Data Source API") {
     new DefaultSource()
   }
-
-
 }

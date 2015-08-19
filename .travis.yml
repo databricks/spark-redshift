@@ -14,5 +14,6 @@ env:
 script:
   - sbt -Dhadoop.version=$HADOOP_VERSION coverage test
   - sbt scalastyle
+  - sbt "test:scalastyle"
 after_success:
   - bash <(curl -s https://codecov.io/bash)

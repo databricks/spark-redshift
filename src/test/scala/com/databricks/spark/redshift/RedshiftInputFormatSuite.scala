@@ -91,7 +91,6 @@ class RedshiftInputFormatSuite extends FunSuite with BeforeAndAfterAll {
       // TODO: Check this assertion - fails on Travis only, no idea what, or what it's for
       // assert(rdd.partitions.size > records.size) // so there exist at least one empty partition
 
-      println("############" + rdd.values.map(_.toSeq).glom().map(_.toSeq).collect().toSeq)
       val actual = rdd.values.map(_.toSeq).collect()
       assert(actual.size === records.size)
       assert(actual.toSet === records)
@@ -134,7 +133,8 @@ class RedshiftInputFormatSuite extends FunSuite with BeforeAndAfterAll {
 
       val srdd = sqlContext.redshiftFile(
         dir.toString,
-        "name varchar(10) state text id integer score float big_score numeric(4, 0) some_long bigint")
+        "name varchar(10) state text id integer score float big_score numeric(4, 0) " +
+          "some_long bigint")
       val expectedSchema = StructType(Seq(
         StructField("name", StringType, nullable = true),
         StructField("state", StringType, nullable = true),
@@ -155,6 +155,5 @@ class RedshiftInputFormatSuite extends FunSuite with BeforeAndAfterAll {
 }
 
 object RedshiftInputFormatSuite {
-
   implicit def charToString(c: Char): String = c.toString
 }

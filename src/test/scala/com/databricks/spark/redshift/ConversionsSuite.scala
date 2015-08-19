@@ -32,7 +32,9 @@ class ConversionsSuite extends FunSuite {
   test("Data should be correctly converted") {
     val doubleMin = Double.MinValue.toString
     val longMax = Long.MaxValue.toString
+    // scalastyle:off
     val unicodeString = "Unicode是樂趣"
+    // scalastyle:on
 
     val timestampWithMillis = "2014-03-01 00:00:01.123"
 
@@ -52,6 +54,6 @@ class ConversionsSuite extends FunSuite {
 
   test("Row conversion handles null values") {
     val emptyRow = List.fill(TestUtils.testSchema.length)(null).toArray[String]
-    assert(convertRow(emptyRow) == Row(emptyRow: _*))
+    assert(convertRow(emptyRow) === Row(emptyRow: _*))
   }
 }
