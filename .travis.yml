@@ -24,7 +24,7 @@ env:
     # AWS_SECRET_ACCESS_KEY
     - secure: "V/Ac0ZkTslNpNc8wszalFqZYWnl910PgSORlA2tyTUCC/xfqX+CdtN9RNuVb3LBrvrkYiOBKF7ANMGOxnc/yazLNFBUmByf+rwEfR7NDCCz+SKXSNwIOPpDraOpNVd1KLyrJ9uKivFojW/IweN9bsJAEji8ql/Lpeb7qKfDbVWY="
     # AWS_S3_SCRATCH_SPACE
-    - secure: "UUSgDkfbKagdgQ/9mXR3iMtWO6URLmQ6QIZoFULaoggp+7LwCKnYWGwOHtomh6EcAbcru0efY1dZBhGXsI/WR4TnZ1LlYX/noKHo0/ymZnnVNcfMr1aOJULSK6UWl+IHXTTM/RRinrEkvq7vRixUYLrxlpTb83aTJXfPKSN+mao="
+    - secure: "LvndQIW6dHs6nyaMHtblGI/oL+s460lOezFs2BoD0Isenb/O/IM+nY5K9HepTXjJIcq8qvUYnojZX1FCrxxOXX2/+/Iihiq7GzJYdmdMC6hLg9bJYeAFk0dWYT88/AwadrJCBOa3ockRLhiO3dkai7Ki5+M1erfaFiAHHMpJxYQ="
 script:
   - sbt -Dhadoop.version=$HADOOP_VERSION coverage test
   - if [ "$TRAVIS_SECURE_ENV_VARS" ]; then sbt -Dhadoop.version=$HADOOP_VERSION coverage it:test; fi
