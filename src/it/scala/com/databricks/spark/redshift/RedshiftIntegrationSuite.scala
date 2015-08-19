@@ -280,22 +280,7 @@ class RedshiftIntegrationSuite
     // scalastyle:on
   }
 
-  test("DefaultSource serializes data as Avro, then sends Redshift COPY command") {
-    val extraData = Seq(
-      Row(2.toByte, false, null, -1234152.12312498, 100000.0f, null,
-        1239012341823719L, 24.toShort, "___|_123", null))
-
-    sqlContext.createDataFrame(sc.parallelize(extraData), TestUtils.testSchema).write
-      .format("com.databricks.spark.redshift")
-      .option("url", jdbcUrl)
-      .option("tempdir", tempDir)
-      .mode(SaveMode.Overwrite)
-      .insertInto(test_table2)
-
-    QueryTest.checkAnswer(
-      sqlContext.sql("select * from test_table2"),
-      extraData)
-  }
+  // TODO: test overwrite; test overwite that fails.
 
   test("Append SaveMode doesn't destroy existing data") {
     val extraData = Seq(
