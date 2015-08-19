@@ -22,11 +22,13 @@ import java.util.Properties
 
 import scala.util.Random
 
+import org.scalatest.{BeforeAndAfterEach, BeforeAndAfterAll, FunSuite, Matchers}
 import org.apache.hadoop.fs.{FileSystem, Path}
+
 import org.apache.spark.SparkContext
+import org.apache.spark.sql.hive.HiveContext
 import org.apache.spark.sql.jdbc.DefaultJDBCWrapper
 import org.apache.spark.sql.{Row, SQLContext, SaveMode}
-import org.scalatest.{BeforeAndAfterEach, BeforeAndAfterAll, FunSuite, Matchers}
 
 /**
  * End-to-end tests which run against a real Redshift cluster.
@@ -170,7 +172,7 @@ class RedshiftIntegrationSuite
   }
 
   override def beforeEach(): Unit = {
-    sqlContext = new SQLContext(sc)
+    sqlContext = new HiveContext(sc)
     sqlContext.sql(
       s"""
          | create temporary table test_table(

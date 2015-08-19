@@ -38,7 +38,7 @@ object SparkRedshiftBuild extends Build {
       sparkVersion := sys.props.get("spark.version").getOrElse("1.4.1"),
       hadoopVersion := sys.props.get("hadoop.version").getOrElse("2.2.0"),
       spName := "databricks/spark-redshift",
-      sparkComponents += "sql",
+      sparkComponents ++= Seq("sql", "hive"),
       licenses += "Apache-2.0" -> url("http://opensource.org/licenses/Apache-2.0"),
       credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"),
       resolvers +=
