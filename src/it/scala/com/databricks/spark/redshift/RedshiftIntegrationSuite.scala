@@ -20,6 +20,8 @@ import java.net.URI
 import java.sql.Connection
 import java.util.Properties
 
+import scala.util.Random
+
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.jdbc.DefaultJDBCWrapper
@@ -59,7 +61,13 @@ class RedshiftIntegrationSuite
     s"$AWS_REDSHIFT_JDBC_URL?user=$AWS_REDSHIFT_USER&password=$AWS_REDSHIFT_PASSWORD"
   }
 
-  private val tempDir: String = AWS_S3_SCRATCH_SPACE
+  /**
+   * Random suffix appended appended to table and directory names in order to avoid collisions
+   * between separate Travis builds.
+   */
+  private val randomSuffix: String = Random.nextLong().toString
+
+  private val tempDir: String = AWS_S3_SCRATCH_SPACE + randomSuffix + "/"
 
   /**
    * Expected parsed output corresponding to the output of testData.
@@ -82,6 +90,10 @@ class RedshiftIntegrationSuite
   private var sc: SparkContext = _
   private var sqlContext: SQLContext = _
   private var conn: Connection = _
+
+  private val test_table: String = s"test_table_$randomSuffix"
+  private val test_table2: String = s"test_table2_$randomSuffix"
+  private val test_table3: String = s"test_table3_$randomSuffix"
 
   override def beforeAll(): Unit = {
     super.beforeAll()
@@ -155,11 +167,9 @@ class RedshiftIntegrationSuite
       conn.commit()
     }
 
-    createTable("test_table")
-    createTable("test_table2")
-    createTable("test_table3")
-
-    conn.commit()
+    createTable(test_table)
+    createTable(test_table2)
+    createTable(test_table3)
   }
 
   override def afterAll(): Unit = {
@@ -169,9 +179,9 @@ class RedshiftIntegrationSuite
       fs.close()
     } finally {
       try {
-        conn.prepareStatement("drop table if exists test_table").executeUpdate()
-        conn.prepareStatement("drop table if exists test_table2").executeUpdate()
-        conn.prepareStatement("drop table if exists test_table3").executeUpdate()
+        conn.prepareStatement(s"drop table if exists $test_table").executeUpdate()
+        conn.prepareStatement(s"drop table if exists $test_table2").executeUpdate()
+        conn.prepareStatement(s"drop table if exists $test_table3").executeUpdate()
         conn.commit()
         conn.close()
       } finally {
@@ -204,7 +214,7 @@ class RedshiftIntegrationSuite
          | options(
          |   url \"$jdbcUrl\",
          |   tempdir \"$tempDir\",
-         |   dbtable \"test_table\"
+         |   dbtable \"$test_table\"
          | )
        """.stripMargin
     ).collect()
@@ -227,7 +237,7 @@ class RedshiftIntegrationSuite
          | options(
          |   url \"$jdbcUrl\",
          |   tempdir \"$tempDir\",
-         |   dbtable \"test_table2\"
+         |   dbtable \"$test_table2\"
          | )
        """.stripMargin
     ).collect()
@@ -250,7 +260,7 @@ class RedshiftIntegrationSuite
          | options(
          |   url \"$jdbcUrl\",
          |   tempdir \"$tempDir\",
-         |   dbtable \"test_table3\"
+         |   dbtable \"$test_table3\"
          | )
        """.stripMargin
     ).collect()
@@ -320,7 +330,7 @@ class RedshiftIntegrationSuite
 
     val rdd = sc.parallelize(extraData.toSeq)
     val df = sqlContext.createDataFrame(rdd, TestUtils.testSchema)
-    df.write.format("com.databricks.spark.redshift").mode(SaveMode.Overwrite).insertInto("test_table2")
+    df.write.format("com.databricks.spark.redshift").mode(SaveMode.Overwrite).insertInto(test_table2)
 
     sqlContext.sql("select * from test_table2").collect()
       .zip(extraData).foreach {
@@ -334,7 +344,7 @@ class RedshiftIntegrationSuite
 
     val rdd = sc.parallelize(extraData.toSeq)
     val df = sqlContext.createDataFrame(rdd, TestUtils.testSchema)
-    df.write.format("com.databricks.spark.redshift").mode(SaveMode.Append).saveAsTable("test_table3")
+    df.write.format("com.databricks.spark.redshift").mode(SaveMode.Append).saveAsTable(test_table3)
 
     sqlContext.sql("select * from test_table3 order by testbyte, testbool").collect()
       .zip(expectedData ++ extraData).foreach {
@@ -348,14 +358,14 @@ class RedshiftIntegrationSuite
 
     // Check that SaveMode.ErrorIfExists throws an exception
     intercept[Exception] {
-      df.write.format("com.databricks.spark.redshift").mode(SaveMode.ErrorIfExists).saveAsTable("test_table")
+      df.write.format("com.databricks.spark.redshift").mode(SaveMode.ErrorIfExists).saveAsTable(test_table)
     }
   }
 
   ignore("Do nothing when table exists if SaveMode = Ignore") {
     val rdd = sc.parallelize(expectedData.toSeq)
     val df = sqlContext.createDataFrame(rdd, TestUtils.testSchema)
-    df.write.format("com.databricks.spark.redshift").mode(SaveMode.Ignore).saveAsTable("test_table")
+    df.write.format("com.databricks.spark.redshift").mode(SaveMode.Ignore).saveAsTable(test_table)
 
     // Check that SaveMode.Ignore does nothing
     sqlContext.sql("select * from test_table order by testbyte, testbool").collect()
