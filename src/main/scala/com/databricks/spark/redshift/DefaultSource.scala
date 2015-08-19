@@ -39,10 +39,12 @@ class DefaultSource(jdbcWrapper: JDBCWrapper)
   def this() = this(DefaultJDBCWrapper)
 
   /**
-   * Create a new RedshiftRelation instance using parameters from Spark SQL DDL. Resolves the schema using
-   * JDBC connection over provided URL, which must contain credentials.
+   * Create a new RedshiftRelation instance using parameters from Spark SQL DDL. Resolves the schema
+   * using JDBC connection over provided URL, which must contain credentials.
    */
-  override def createRelation(sqlContext: SQLContext, parameters: Map[String, String]): BaseRelation = {
+  override def createRelation(
+      sqlContext: SQLContext,
+      parameters: Map[String, String]): BaseRelation = {
     val params = Parameters.mergeParameters(parameters)
     RedshiftRelation(jdbcWrapper, params, None)(sqlContext)
   }
@@ -50,7 +52,10 @@ class DefaultSource(jdbcWrapper: JDBCWrapper)
   /**
    * Load a RedshiftRelation using user-provided schema, so no inference over JDBC will be used.
    */
-  override def createRelation(sqlContext: SQLContext, parameters: Map[String, String], schema: StructType): BaseRelation = {
+  override def createRelation(
+      sqlContext: SQLContext,
+      parameters: Map[String, String],
+      schema: StructType): BaseRelation = {
     val params = Parameters.mergeParameters(parameters)
     RedshiftRelation(jdbcWrapper, params, Some(schema))(sqlContext)
   }
@@ -58,12 +63,16 @@ class DefaultSource(jdbcWrapper: JDBCWrapper)
   /**
    * Creates a Relation instance by first writing the contents of the given DataFrame to Redshift
    */
-  override def createRelation(sqlContext: SQLContext, mode: SaveMode, parameters: Map[String, String],
-    data: DataFrame): BaseRelation = {
+  override def createRelation(
+      sqlContext: SQLContext,
+      mode: SaveMode,
+      parameters: Map[String, String],
+      data: DataFrame): BaseRelation = {
     val params = Parameters.mergeParameters(parameters)
 
     def tableExists: Boolean = {
-      val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, new Properties()).apply()
+      val conn =
+        jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, new Properties()).apply()
       val exists = jdbcWrapper.tableExists(conn, params.table)
       conn.close()
       exists
@@ -73,13 +82,13 @@ class DefaultSource(jdbcWrapper: JDBCWrapper)
       case SaveMode.Append => (true, false)
       case SaveMode.Overwrite => (true, true)
       case SaveMode.ErrorIfExists =>
-        if(tableExists) {
+        if (tableExists) {
           sys.error(s"Table ${params.table} already exists! (SaveMode is set to ErrorIfExists)")
         } else {
           (true, false)
         }
       case SaveMode.Ignore =>
-        if(tableExists) {
+        if (tableExists) {
           log.info(s"Table ${params.table} already exists -- ignoring save request.")
           (false, false)
         } else {
@@ -87,9 +96,10 @@ class DefaultSource(jdbcWrapper: JDBCWrapper)
         }
     }
 
-    if(doSave) {
-      val updatedParams = parameters updated ("overwrite", dropExisting.toString)
-      new RedshiftWriter(jdbcWrapper).saveToRedshift(sqlContext, data, Parameters.mergeParameters(updatedParams))
+    if (doSave) {
+      val updatedParams = parameters.updated("overwrite", dropExisting.toString)
+      new RedshiftWriter(jdbcWrapper).saveToRedshift(
+        sqlContext, data, Parameters.mergeParameters(updatedParams))
     }
 
     createRelation(sqlContext, parameters)

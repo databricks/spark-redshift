@@ -166,10 +166,11 @@ private[redshift] class RedshiftRecordReader extends RecordReader[JavaLong, Arra
    * @return the start position of the next record
    */
   private def findNext(fs: FileSystem, file: Path, size: Long, offset: Long): Long = {
-    if (offset == 0L)
+    if (offset == 0L) {
       return 0L
-    else if (offset >= size)
+    } else if (offset >= size) {
       return size
+    }
     val in = fs.open(file)
     var pos = offset
     in.seek(pos)

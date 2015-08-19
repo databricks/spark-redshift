@@ -23,7 +23,7 @@ import java.util.UUID
 /**
  * Various arbitrary helper functions
  */
-object Utils {
+private[redshift] object Utils {
   /**
    * Joins prefix URL a to path suffix b, and appends a trailing /, in order to create
    * a temp directory path for S3.
@@ -38,13 +38,13 @@ object Utils {
    * Redshift COPY and UNLOAD commands don't support s3n or s3a, but users may wish to use them
    * for data loads. This function converts the URL back to the s3:// format.
    */
-  def fixS3Url(url: String) = {
+  def fixS3Url(url: String): String = {
     url.replaceAll("s3[an]://", "s3://")
   }
 
   /**
    * Creates a randomly named temp directory path for intermediate data
    */
-  def makeTempPath(tempRoot: String) = Utils.joinUrls(tempRoot, UUID.randomUUID().toString)
+  def makeTempPath(tempRoot: String): String = Utils.joinUrls(tempRoot, UUID.randomUUID().toString)
 
 }
