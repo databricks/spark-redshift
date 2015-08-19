@@ -153,9 +153,11 @@ class RedshiftSourceSuite
   /**
    * Prepare the JDBC wrapper for an UNLOAD test.
    */
-  private def prepareUnloadTest(params: Map[String, String]): JDBCWrapper = {
+  private def prepareUnloadTest(
+      params: Map[String, String],
+      expectedQueries: Seq[Regex]): JDBCWrapper = {
     val jdbcUrl = params("url")
-    val jdbcWrapper = mockJdbcWrapper(jdbcUrl, Seq("UNLOAD.*".r))
+    val jdbcWrapper = mockJdbcWrapper(jdbcUrl, expectedQueries)
 
     // We expect some extra calls to the JDBC wrapper,
     // to register the driver and retrieve the schema.
@@ -171,7 +173,15 @@ class RedshiftSourceSuite
   }
 
   test("DefaultSource can load Redshift UNLOAD output to a DataFrame") {
-    val jdbcWrapper = prepareUnloadTest(defaultParams)
+    val expectedQuery = (
+      "UNLOAD \\('SELECT \"testByte\", \"testBool\", \"testDate\", \"testDouble\"," +
+      " \"testFloat\", \"testInt\", \"testLong\", \"testShort\", \"testString\", " +
+      "\"testTimestamp\" " +
+      "FROM test_table '\\) " +
+      "TO '.*' " +
+      "WITH CREDENTIALS 'aws_access_key_id=test1;aws_secret_access_key=test2' " +
+      "ESCAPE ALLOWOVERWRITE").r
+    val jdbcWrapper = prepareUnloadTest(defaultParams, Seq(expectedQuery))
 
     // Assert that we've loaded and converted all data in the test file
     val source = new DefaultSource(jdbcWrapper)
@@ -181,8 +191,12 @@ class RedshiftSourceSuite
   }
 
   test("DefaultSource supports simple column filtering") {
-    val jdbcWrapper = prepareUnloadTest(defaultParams)
-
+    val expectedQuery = (
+      "UNLOAD \\('SELECT \"testByte\", \"testBool\" FROM test_table '\\) " +
+      "TO '.*' " +
+      "WITH CREDENTIALS 'aws_access_key_id=test1;aws_secret_access_key=test2' " +
+      "ESCAPE ALLOWOVERWRITE").r
+    val jdbcWrapper = prepareUnloadTest(defaultParams, Seq(expectedQuery))
     // Construct the source with a custom schema
     val source = new DefaultSource(jdbcWrapper)
     val relation = source.createRelation(testSqlContext, defaultParams, TestUtils.testSchema)
@@ -199,7 +213,21 @@ class RedshiftSourceSuite
   }
 
   test("DefaultSource supports user schema, pruned and filtered scans") {
-    val jdbcWrapper = prepareUnloadTest(defaultParams)
+    // scalastyle:off
+    val expectedQuery = (
+      "UNLOAD \\('SELECT \"testByte\", \"testBool\" " +
+        "FROM test_table " +
+        "WHERE \"testBool\" = true " +
+        "AND \"testString\" = \\\\'Unicode是樂趣\\\\' " +
+        "AND \"testDouble\" > 1000.0 " +
+        "AND \"testDouble\" < 1.7976931348623157E308 " +
+        "AND \"testFloat\" >= 1.0 " +
+        "AND \"testInt\" <= 43'\\) " +
+      "TO '.*' " +
+      "WITH CREDENTIALS 'aws_access_key_id=test1;aws_secret_access_key=test2' " +
+      "ESCAPE ALLOWOVERWRITE").r
+    // scalastyle:on
+    val jdbcWrapper = prepareUnloadTest(defaultParams, Seq(expectedQuery))
 
     // Construct the source with a custom schema
     val source = new DefaultSource(jdbcWrapper)
@@ -218,7 +246,9 @@ class RedshiftSourceSuite
     val rdd = relation.asInstanceOf[PrunedFilteredScan]
       .buildScan(Array("testByte", "testBool"), filters)
 
-    assert(rdd.collect() === Array(Row(1, true)))
+    // Technically this assertion should check that the RDD only returns a single row, but
+    // since we've mocked out Redshift our WHERE clause won't have had any effect.
+    assert(rdd.collect().contains(Row(1, true)))
   }
 
   test("DefaultSource serializes data as Avro, then sends Redshift COPY command") {
