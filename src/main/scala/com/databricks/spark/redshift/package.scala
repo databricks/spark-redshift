@@ -59,9 +59,10 @@ package object redshift {
      * Read a Redshift table into a DataFrame, using S3 for data transfer and JDBC
      * to control Redshift and resolve the schema
      */
-    def redshiftTable(parameters: Map[String, String]) = {
+    def redshiftTable(parameters: Map[String, String]): DataFrame = {
       val params = Parameters.mergeParameters(parameters)
-      sqlContext.baseRelationToDataFrame(RedshiftRelation(DefaultJDBCWrapper, params, None)(sqlContext))
+      sqlContext.baseRelationToDataFrame(
+        RedshiftRelation(DefaultJDBCWrapper, params, None)(sqlContext))
     }
   }
 
