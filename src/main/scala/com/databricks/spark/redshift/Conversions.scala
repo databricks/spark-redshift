@@ -20,20 +20,8 @@ import java.sql.Timestamp
 import java.text.{DateFormat, FieldPosition, ParsePosition, SimpleDateFormat}
 import java.util.Date
 
-import scala.util.parsing.combinator.JavaTokenParsers
-
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
-
-/**
- * Simple parser for Redshift's UNLOAD bool syntax
- */
-private object RedshiftBooleanParser extends JavaTokenParsers {
-  val TRUE: Parser[Boolean] = "t" ^^ Function.const(true)
-  val FALSE: Parser[Boolean] = "f" ^^ Function.const(false)
-
-  def parseRedshiftBoolean(s: String): Boolean = parse(TRUE | FALSE, s).get
-}
 
 /**
  * Data type conversions for Redshift unloaded data
@@ -86,6 +74,15 @@ private[redshift] object Conversions {
   }
 
   /**
+   * Parse a boolean using Redshift's UNLOAD bool syntax
+   */
+  private def parseBoolean(s: String): Boolean = {
+    if (s == "t") true
+    else if (s == "f") false
+    else throw new IllegalArgumentException(s"Expected 't' or 'f' but got '$s'")
+  }
+
+  /**
    * Construct a Row from the given array of strings, retrieved from Redshift UNLOAD.
    * The schema will be used for type mappings.
    */
@@ -95,7 +92,7 @@ private[redshift] object Conversions {
         if (data == null || data.isEmpty) null
         else field.dataType match {
           case ByteType => data.toByte
-          case BooleanType => RedshiftBooleanParser.parseRedshiftBoolean(data)
+          case BooleanType => parseBoolean(data)
           case DateType => parseDate(data)
           case DoubleType => data.toDouble
           case FloatType => data.toFloat
