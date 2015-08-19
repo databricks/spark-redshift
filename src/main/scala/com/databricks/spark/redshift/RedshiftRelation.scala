@@ -113,7 +113,7 @@ private[redshift] case class RedshiftRelation(
       case GreaterThan(attr, value) => s"${sqlQuote(attr)} > ${compileValue(value)}"
       case LessThanOrEqual(attr, value) => s"${sqlQuote(attr)} <= ${compileValue(value)}"
       case GreaterThanOrEqual(attr, value) => s"${sqlQuote(attr)} >= ${compileValue(value)}"
-    }.mkString("AND")
+    }.mkString(" AND ")
 
     if (filterClauses.isEmpty) "" else "WHERE " + filterClauses
   }
