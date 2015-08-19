@@ -69,6 +69,8 @@ class RedshiftIntegrationSuite
 
   private val tempDir: String = AWS_S3_SCRATCH_SPACE + randomSuffix + "/"
 
+  // TODO(josh): add style checks for integration tests
+  // TODO(josh): factor this out into a util class and share w/ other suite
   /**
    * Expected parsed output corresponding to the output of testData.
    */
@@ -239,111 +241,105 @@ class RedshiftIntegrationSuite
     ).collect()
   }
 
-  ignore("DefaultSource can load Redshift UNLOAD output to a DataFrame") {
-    sqlContext.sql("select * from test_table order by testbyte, testbool").collect()
-      .zip(expectedData).foreach {
-      case (loaded, expected) => loaded shouldBe expected
-    }
+  test("DefaultSource can load Redshift UNLOAD output to a DataFrame") {
+    QueryTest.checkAnswer(
+      sqlContext.sql("select * from test_table order by testbyte, testbool"),
+      expectedData)
   }
 
   test("DefaultSource supports simple column filtering") {
-    val prunedExpectedValues = Array(
-      Row(null, null),
-      Row(0.toByte, null),
-      Row(0.toByte, false),
-      Row(1.toByte, false),
-      Row(1.toByte, true)
+    QueryTest.checkAnswer(
+      sqlContext.sql("select testbyte, testbool from test_table order by testbyte, testbool"),
+      Seq(
+        Row(null, null),
+        Row(0.toByte, null),
+        Row(0.toByte, false),
+        Row(1.toByte, false),
+        Row(1.toByte, true)))
+  }
+
+  test("DefaultSource supports user schema, pruned and filtered scans") {
+    QueryTest.checkAnswer(
+      sqlContext.sql(
+        """
+          |select testbyte, testbool
+          |from test_table
+          |where testbool = true
+          | and teststring = "Unicode's樂趣"
+          | and testdouble = 1234152.12312498
+          | and testfloat = 1.0
+          | and testint = 42
+        """.stripMargin),
+      Seq(Row(1, true))
     )
-
-    sqlContext.sql("select testbyte, testbool from test_table order by testbyte, testbool").collect()
-      .zip(prunedExpectedValues).foreach {
-      case (loaded, expected) => loaded shouldBe expected
-    }
   }
 
-  ignore("DefaultSource supports user schema, pruned and filtered scans") {
-    // We should now only have one matching row, with two columns
-    val filteredExpectedValues = Array(Row(1, true))
-    sqlContext.sql(
-      """
-        |select testbyte, testbool
-        |from test_table
-        |where testbool = true
-        | and teststring = "Unicode's樂趣"
-        | and testdouble = 1234152.12312498
-        | and testfloat = 1.0
-        | and testint = 42
-      """.stripMargin
-    ).collect().zip(filteredExpectedValues).foreach {
-      case (loaded, expected) => loaded shouldBe expected
-    }
+  test("DefaultSource using 'query' supports user schema, pruned and filtered scans") {
+    QueryTest.checkAnswer(
+      sqlContext.sql(
+        """
+          |select testbyte, testbool
+          |from test_table
+          |where testbool = true
+          | and teststring = "Unicode's樂趣"
+          | and testdouble = 1234152.12312498
+          | and testfloat = 1.0
+          | and testint = 42
+        """.stripMargin),
+      Seq(Row(1, true)))
   }
 
-  ignore("DefaultSource using 'query' supports user schema, pruned and filtered scans") {
-    // We should now only have one matching row, with two columns
-    val filteredExpectedValues = Array(Row(1, true))
-    sqlContext.sql(
-      """
-        |select testbyte, testbool
-        |from test_table
-        |where testbool = true
-        | and teststring = "Unicode's樂趣"
-        | and testdouble = 1234152.12312498
-        | and testfloat = 1.0
-        | and testint = 42
-      """.stripMargin
-    ).collect().zip(filteredExpectedValues).foreach {
-      case (loaded, expected) => loaded shouldBe expected
-    }
+  test("DefaultSource serializes data as Avro, then sends Redshift COPY command") {
+    val extraData = Seq(
+      Row(2.toByte, false, null, -1234152.12312498, 100000.0f, null,
+        1239012341823719L, 24.toShort, "___|_123", null))
+
+    sqlContext.createDataFrame(sc.parallelize(extraData), TestUtils.testSchema).write
+      .format("com.databricks.spark.redshift")
+      .mode(SaveMode.Overwrite)
+      .insertInto(test_table2)
+
+    QueryTest.checkAnswer(
+      sqlContext.sql("select * from test_table2"),
+      extraData)
   }
 
-  ignore("DefaultSource serializes data as Avro, then sends Redshift COPY command") {
-    val extraData = Array(
-      Row(2.toByte, false, null, -1234152.12312498, 100000.0f, null, 1239012341823719L, 24.toShort, "___|_123", null))
+  test("Append SaveMode doesn't destroy existing data") {
+    val extraData = Seq(
+      Row(2.toByte, false, null, -1234152.12312498, 100000.0f, null, 1239012341823719L,
+        24.toShort, "___|_123", null))
 
-    val rdd = sc.parallelize(extraData.toSeq)
-    val df = sqlContext.createDataFrame(rdd, TestUtils.testSchema)
-    df.write.format("com.databricks.spark.redshift").mode(SaveMode.Overwrite).insertInto(test_table2)
+    sqlContext.createDataFrame(sc.parallelize(extraData), TestUtils.testSchema).write
+      .format("com.databricks.spark.redshift")
+      .mode(SaveMode.Append)
+      .saveAsTable(test_table3)
 
-    sqlContext.sql("select * from test_table2").collect()
-      .zip(extraData).foreach {
-      case (loaded, expected) => loaded shouldBe expected
-    }
+    QueryTest.checkAnswer(
+      sqlContext.sql("select * from test_table3 order by testbyte, testbool"),
+      expectedData ++ extraData)
   }
 
-  ignore("Append SaveMode doesn't destroy existing data") {
-    val extraData = Array(
-      Row(2.toByte, false, null, -1234152.12312498, 100000.0f, null, 1239012341823719L, 24.toShort, "___|_123", null))
-
-    val rdd = sc.parallelize(extraData.toSeq)
-    val df = sqlContext.createDataFrame(rdd, TestUtils.testSchema)
-    df.write.format("com.databricks.spark.redshift").mode(SaveMode.Append).saveAsTable(test_table3)
-
-    sqlContext.sql("select * from test_table3 order by testbyte, testbool").collect()
-      .zip(expectedData ++ extraData).foreach {
-      case (loaded, expected) => loaded shouldBe expected
-    }
-  }
-
-  ignore("Respect SaveMode.ErrorIfExists when table exists") {
+  test("Respect SaveMode.ErrorIfExists when table exists") {
     val rdd = sc.parallelize(expectedData.toSeq)
     val df = sqlContext.createDataFrame(rdd, TestUtils.testSchema)
 
     // Check that SaveMode.ErrorIfExists throws an exception
     intercept[Exception] {
-      df.write.format("com.databricks.spark.redshift").mode(SaveMode.ErrorIfExists).saveAsTable(test_table)
+      df.write
+        .format("com.databricks.spark.redshift")
+        .mode(SaveMode.ErrorIfExists)
+        .saveAsTable(test_table)
     }
   }
 
-  ignore("Do nothing when table exists if SaveMode = Ignore") {
+  test("Do nothing when table exists if SaveMode = Ignore") {
     val rdd = sc.parallelize(expectedData.toSeq)
     val df = sqlContext.createDataFrame(rdd, TestUtils.testSchema)
     df.write.format("com.databricks.spark.redshift").mode(SaveMode.Ignore).saveAsTable(test_table)
 
     // Check that SaveMode.Ignore does nothing
-    sqlContext.sql("select * from test_table order by testbyte, testbool").collect()
-      .zip(expectedData).foreach {
-      case (loaded, expected) => loaded shouldBe expected
-    }
+    QueryTest.checkAnswer(
+      sqlContext.sql("select * from test_table order by testbyte, testbool"),
+      expectedData)
   }
 }
