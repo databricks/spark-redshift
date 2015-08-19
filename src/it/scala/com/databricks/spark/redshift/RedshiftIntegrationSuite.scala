@@ -111,7 +111,7 @@ class RedshiftIntegrationSuite
     conn.commit()
 
     def createTable(tableName: String): Unit = {
-      conn.prepareStatement(
+      conn.createStatement().executeUpdate(
         s"""
            |create table $tableName (
            |testbyte int2,
@@ -126,44 +126,17 @@ class RedshiftIntegrationSuite
            |testtimestamp timestamp
            |)
       """.stripMargin
-      ).executeUpdate()
-
-      conn.prepareStatement(
+      )
+      conn.createStatement().executeUpdate(
         s"""
-           |insert into $tableName values (
-           |null, null, null, null, null, null, null, null, null, null)
-        """.stripMargin
-      ).executeUpdate()
-
-      conn.prepareStatement(
-        s"""
-           |insert into $tableName values (
-           |0, null, '2015-07-03', 0.0, -1.0, 4141214, 1239012341823719, null, 'f', '2015-07-03 00:00:00.000')
-        """.stripMargin
-      ).executeUpdate()
-
-      conn.prepareStatement(
-        s"""
-           |insert into $tableName values (
-           |0, false, null, -1234152.12312498, 100000.0, null, 1239012341823719, 24, '___|_123', null)
-        """.stripMargin
-      ).executeUpdate()
-
-      conn.prepareStatement(
-        s"""
-           |insert into $tableName values (
-           |1, false, '2015-07-02', 0.0, 0.0, 42, 1239012341823719, -13, 'asdf', '2015-07-02 00:00:00.000')
-        """.stripMargin
-      ).executeUpdate()
-
-      conn.prepareStatement(
-        s"""
-           |insert into $tableName values (
-           |1, true, '2015-07-01', 1234152.12312498, 1.0, 42,
-           |1239012341823719, 23, 'Unicode''s樂趣', '2015-07-01 00:00:00.001')
-        """.stripMargin
-      ).executeUpdate()
-
+           |insert into $tableName values
+           |(null, null, null, null, null, null, null, null, null, null),
+           |(0, null, '2015-07-03', 0.0, -1.0, 4141214, 1239012341823719, null, 'f', '2015-07-03 00:00:00.000'),
+           |(0, false, null, -1234152.12312498, 100000.0, null, 1239012341823719, 24, '___|_123', null),
+           |(1, false, '2015-07-02', 0.0, 0.0, 42, 1239012341823719, -13, 'asdf', '2015-07-02 00:00:00.000'),
+           |(1, true, '2015-07-01', 1234152.12312498, 1.0, 42, 1239012341823719, 23, 'Unicode''s樂趣', '2015-07-01 00:00:00.001')
+         """.stripMargin
+      )
       conn.commit()
     }
 
