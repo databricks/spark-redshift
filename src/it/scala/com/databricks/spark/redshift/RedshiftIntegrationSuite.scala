@@ -26,7 +26,7 @@ import org.scalatest.{BeforeAndAfterEach, BeforeAndAfterAll, FunSuite, Matchers}
 import org.apache.hadoop.fs.{FileSystem, Path}
 
 import org.apache.spark.SparkContext
-import org.apache.spark.sql.hive.HiveContext
+import org.apache.spark.sql.hive.test.TestHiveContext
 import org.apache.spark.sql.jdbc.DefaultJDBCWrapper
 import org.apache.spark.sql.{Row, SQLContext, SaveMode}
 
@@ -172,7 +172,7 @@ class RedshiftIntegrationSuite
   }
 
   override def beforeEach(): Unit = {
-    sqlContext = new HiveContext(sc)
+    sqlContext = new TestHiveContext(sc)
     sqlContext.sql(
       s"""
          | create temporary table test_table(
