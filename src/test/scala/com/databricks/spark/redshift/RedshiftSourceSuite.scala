@@ -164,11 +164,7 @@ class RedshiftSourceSuite
     val source = new DefaultSource(jdbcWrapper)
     val relation = source.createRelation(testSqlContext, params)
     val df = testSqlContext.baseRelationToDataFrame(relation)
-
-    df.rdd.collect() zip expectedData foreach {
-      case (loaded, expected) =>
-        loaded shouldBe expected
-    }
+    QueryTest.checkAnswer(df, expectedData)
   }
 
   test("DefaultSource supports simple column filtering") {
@@ -193,10 +189,7 @@ class RedshiftSourceSuite
             Row(0.toByte, null),
             Row(0.toByte, false),
             Row(null, null))
-
-    rdd.collect() zip prunedExpectedValues foreach {
-      case (loaded, expected) => loaded shouldBe expected
-    }
+    assert(rdd.collect() === prunedExpectedValues)
   }
 
   test("DefaultSource supports user schema, pruned and filtered scans") {
@@ -224,11 +217,7 @@ class RedshiftSourceSuite
             LessThanOrEqual("testInt", 43))
     val rdd = relation.asInstanceOf[PrunedFilteredScan].buildScan(Array("testByte", "testBool"), filters)
 
-    // We should now only have one matching row, with two columns
-    val filteredExpectedValues = Array(Row(1, true))
-    rdd.collect() zip filteredExpectedValues foreach {
-      case (loaded, expected) => loaded shouldBe expected
-    }
+    assert(rdd.collect() === Array(Row(1, true)))
   }
 
   test("DefaultSource serializes data as Avro, then sends Redshift COPY command") {
@@ -275,10 +264,7 @@ class RedshiftSourceSuite
 
     // Make sure we wrote the data out ready for Redshift load, in the expected formats
     val written = testSqlContext.read.format("com.databricks.spark.avro").load(tempDir)
-    written.collect() zip expectedData foreach {
-      case (loaded, expected) =>
-        loaded shouldBe expected
-    }
+    QueryTest.checkAnswer(written, expectedData)
   }
 
   test("Failed copies are handled gracefully when using a staging table") {
@@ -401,10 +387,7 @@ class RedshiftSourceSuite
     // This test is "appending" to an empty table, so we expect all our test data to be
     // the only content in the returned data frame
     val written = testSqlContext.read.format("com.databricks.spark.avro").load(tempDir)
-    written.collect() zip expectedData foreach {
-      case (loaded, expected) =>
-        loaded shouldBe expected
-    }
+    QueryTest.checkAnswer(written, expectedData)
   }
 
   test("Respect SaveMode.ErrorIfExists when table exists") {
