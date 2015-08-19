@@ -32,7 +32,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.jdbc.JDBCWrapper
 import org.apache.spark.sql.sources._
-import org.apache.spark.sql.{Row, SQLContext, SaveMode}
+import org.apache.spark.sql.{DataFrame, Row, SQLContext, SaveMode}
 
 private class TestContext extends SparkContext("local", "RedshiftSourceSuite") {
 
@@ -89,6 +89,8 @@ class RedshiftSourceSuite
   /** Temporary folder for unloading data; reset after each test. */
   private var tempDir: File = _
 
+  private var expectedDataDF: DataFrame = _
+
   // Parameters common to most tests. Some parameters are overridden in specific tests.
   private def defaultParams: Map[String, String] = Map(
     "url" -> "jdbc:postgresql://foo/bar",
@@ -106,11 +108,14 @@ class RedshiftSourceSuite
     super.beforeEach()
     testSqlContext = new SQLContext(sc)
     tempDir = Files.createTempDir()
+    expectedDataDF =
+      testSqlContext.createDataFrame(sc.parallelize(expectedData), TestUtils.testSchema)
   }
 
   override def afterEach(): Unit = {
     super.afterEach()
     testSqlContext = null
+    expectedDataDF = null
     Option(tempDir.listFiles()).getOrElse(Array.empty).foreach(_.delete())
     tempDir.delete()
   }
@@ -222,9 +227,6 @@ class RedshiftSourceSuite
       "diststyle" -> "KEY",
       "distkey" -> "testInt")
 
-    val rdd = sc.parallelize(expectedData.toSeq)
-    val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
-
     val expectedCommands = Seq(
       "DROP TABLE IF EXISTS test_table_staging_.*".r,
       "CREATE TABLE IF NOT EXISTS test_table_staging.* DISTSTYLE KEY DISTKEY \\(testInt\\).*".r,
@@ -248,7 +250,7 @@ class RedshiftSourceSuite
 
     val relation =
       RedshiftRelation(jdbcWrapper, Parameters.mergeParameters(params), None)(testSqlContext)
-    relation.asInstanceOf[InsertableRelation].insert(df, true)
+    relation.asInstanceOf[InsertableRelation].insert(expectedDataDF, true)
 
     // Make sure we wrote the data out ready for Redshift load, in the expected formats
     val written = testSqlContext.read.format("com.databricks.spark.avro").load(params("tempdir"))
@@ -257,9 +259,6 @@ class RedshiftSourceSuite
 
   test("Failed copies are handled gracefully when using a staging table") {
     val params = defaultParams ++ Map("usestagingtable" -> "true")
-
-    val rdd = sc.parallelize(expectedData.toSeq)
-    val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
 
     val jdbcWrapper = mock[JDBCWrapper]
     val mockedConnection = mock[Connection]
@@ -326,14 +325,11 @@ class RedshiftSourceSuite
 
     val source = new DefaultSource(jdbcWrapper)
     intercept[Exception] {
-      source.createRelation(testSqlContext, SaveMode.Overwrite, params, df)
+      source.createRelation(testSqlContext, SaveMode.Overwrite, params, expectedDataDF)
     }
   }
 
   test("Append SaveMode doesn't destroy existing data") {
-    val rdd = sc.parallelize(expectedData.toSeq)
-    val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
-
     val expectedCommands =
       Seq("CREATE TABLE IF NOT EXISTS test_table .*".r,
           "COPY test_table .*".r)
@@ -351,7 +347,8 @@ class RedshiftSourceSuite
       .anyNumberOfTimes()
 
     val source = new DefaultSource(jdbcWrapper)
-    val savedDf = source.createRelation(testSqlContext, SaveMode.Append, defaultParams, df)
+    val savedDf =
+      source.createRelation(testSqlContext, SaveMode.Append, defaultParams, expectedDataDF)
 
     // This test is "appending" to an empty table, so we expect all our test data to be
     // the only content in the returned data frame
@@ -361,11 +358,6 @@ class RedshiftSourceSuite
   }
 
   test("Respect SaveMode.ErrorIfExists when table exists") {
-    val rdd = sc.parallelize(expectedData.toSeq)
-    val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
-
-    // Check that SaveMode.ErrorIfExists throws an exception
-
     val errIfExistsWrapper = mockJdbcWrapper(defaultParams("url"), Seq.empty[Regex])
 
     (errIfExistsWrapper.tableExists _)
@@ -374,16 +366,12 @@ class RedshiftSourceSuite
 
     val errIfExistsSource = new DefaultSource(errIfExistsWrapper)
     intercept[Exception] {
-      errIfExistsSource.createRelation(testSqlContext, SaveMode.ErrorIfExists, defaultParams, df)
+      errIfExistsSource.createRelation(
+        testSqlContext, SaveMode.ErrorIfExists, defaultParams, expectedDataDF)
     }
   }
 
   test("Do nothing when table exists if SaveMode = Ignore") {
-    val rdd = sc.parallelize(expectedData.toSeq)
-    val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
-
-    // Check that SaveMode.Ignore does nothing
-
     val ignoreWrapper = mockJdbcWrapper(defaultParams("url"), Seq.empty[Regex])
 
     (ignoreWrapper.tableExists _)
@@ -392,17 +380,14 @@ class RedshiftSourceSuite
 
     // Note: Assertions covered by mocks
     val ignoreSource = new DefaultSource(ignoreWrapper)
-    ignoreSource.createRelation(testSqlContext, SaveMode.Ignore, defaultParams, df)
+    ignoreSource.createRelation(testSqlContext, SaveMode.Ignore, defaultParams, expectedDataDF)
   }
 
   test("Public Scala API rejects invalid parameter maps") {
     val invalidParams = Map("dbtable" -> "foo") // missing tempdir and url
 
-    val rdd = sc.parallelize(expectedData)
-    val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
-
     intercept[Exception] {
-      df.saveAsRedshiftTable(invalidParams)
+      expectedDataDF.saveAsRedshiftTable(invalidParams)
     }
 
     intercept[Exception] {
