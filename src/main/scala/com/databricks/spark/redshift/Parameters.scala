@@ -177,7 +177,6 @@ private[redshift] object Parameters extends Logging {
      * available.
      */
     def credentialsString(configuration: Configuration): String = {
-
       val scheme = new URI(tempDir).getScheme
       val hadoopConfPrefix = s"fs.$scheme"
 
