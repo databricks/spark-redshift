@@ -176,7 +176,7 @@ private[redshift] object Parameters extends Logging {
      * use of standard system properties, environment variables, or IAM role configuration if
      * available.
      */
-    def credentialsString(configuration: Configuration) = {
+    def credentialsString(configuration: Configuration): String = {
 
       val scheme = new URI(tempDir).getScheme
       val hadoopConfPrefix = s"fs.$scheme"
