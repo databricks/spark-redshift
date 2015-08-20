@@ -232,6 +232,36 @@ class RedshiftSourceSuite
     assert(rdd.collect().contains(Row(1, true)))
   }
 
+  test("DefaultSource filter pushdown ignores unexpected Filter subclasses") {
+    val expectedQuery = (
+      "UNLOAD \\('SELECT \"testByte\", \"testBool\" " +
+        "FROM test_table " +
+        "WHERE \"testBool\" = true'\\) " +
+        "TO '.*' " +
+        "WITH CREDENTIALS 'aws_access_key_id=test1;aws_secret_access_key=test2' " +
+        "ESCAPE ALLOWOVERWRITE").r
+    val jdbcWrapper = prepareUnloadTest(defaultParams, Seq(expectedQuery))
+
+    // Construct the source with a custom schema
+    val source = new DefaultSource(jdbcWrapper)
+    val relation = source.createRelation(testSqlContext, defaultParams, TestUtils.testSchema)
+
+    // This is a new filter subclasss which our DefaultSource does not know how to handle
+    case object NewFilter extends Filter
+
+    val filters: Array[Filter] = Array(
+      EqualTo("testBool", true),
+      NewFilter
+    )
+
+    val rdd = relation.asInstanceOf[PrunedFilteredScan]
+      .buildScan(Array("testByte", "testBool"), filters)
+
+    // Technically this assertion should check that the RDD only returns a single row, but
+    // since we've mocked out Redshift our WHERE clause won't have had any effect.
+    assert(rdd.collect().contains(Row(1, true)))
+  }
+
   test("DefaultSource serializes data as Avro, then sends Redshift COPY command") {
     val params = defaultParams ++ Map(
       "postactions" -> "GRANT SELECT ON %s TO jeremy",

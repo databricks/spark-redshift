@@ -106,7 +106,7 @@ private[redshift] case class RedshiftRelation(
     if (value == null) null else value.replace("'", "''")
 
   protected def buildWhereClause(filters: Array[Filter]): String = {
-    val filterClauses = filters.map {
+    val filterClauses = filters.collect {
       case EqualTo(attr, value) => s"${sqlQuote(attr)} = ${compileValue(value)}"
       case LessThan(attr, value) => s"${sqlQuote(attr)} < ${compileValue(value)}"
       case GreaterThan(attr, value) => s"${sqlQuote(attr)} > ${compileValue(value)}"
