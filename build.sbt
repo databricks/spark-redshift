@@ -33,9 +33,13 @@ libraryDependencies += "com.databricks" %% "spark-avro" % "1.0.0"
 libraryDependencies += "org.apache.avro" % "avro-mapred" % "1.7.6" % "provided" exclude("org.mortbay.jetty", "servlet-api")
 
 // A Redshift-compatible JDBC driver must be present on the classpath for spark-redshift to work.
-// For testing, we using a Postgres driver, but it is recommended that the Amazon driver is used
-// in production. See http://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-connection.html
-libraryDependencies += "postgresql" % "postgresql" % "8.3-606.jdbc4" % "provided"
+// The Amazon driver is recommended for production use; it can be obtained from
+// http://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-connection.html
+
+// A Redshift-compatible JDBC driver must be present on the classpath for spark-redshift to work.
+// For testing, we use an Amazon driver, which is available from
+// http://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-connection.html
+libraryDependencies += "com.amazon.redshift" % "jdbc4" % "1.1.7.1007" % "test" from "https://s3.amazonaws.com/redshift-downloads/drivers/RedshiftJDBC4-1.1.7.1007.jar"
 
 libraryDependencies += "com.google.guava" % "guava" % "14.0.1" % Test
 

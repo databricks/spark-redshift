@@ -28,8 +28,9 @@ Further, as Redshift is an AWS product, some AWS libraries will be required. Thi
 your deployment environment will include `hadoop-aws`, or other things necessary to access S3, credentials,
 etc. Check the dependencies with "provided" scope in <tt>build.sbt</tt> if you're at all unclear.
 
-You're also going to need a JDBC driver that is compatible with Redshift. The one used for testing can be
-found in <tt>build.sbt</tt>, however Amazon recommend that you use [their driver](http://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-connection.html).
+You're also going to need a JDBC driver that is compatible with Redshift. Amazon recommend that you
+use [their driver](http://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-connection.html),
+although this library has also been successfully tested using the Postgres JDBC driver.
 
 ## Usage
 
@@ -49,7 +50,7 @@ val sqlContext = new SQLContext(sc)
 // Get some data from a Redshift table
 val df: DataFrame = sqlContext.read
     .format("com.databricks.spark.redshift")
-    .option("url", "jdbc:postgresql://redshifthost:5439/database?user=username&password=pass")
+    .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass")
     .option("dbtable" -> "my_table")
     .option("tempdir" -> "s3://path/for/temp/data")
     .load()
@@ -59,7 +60,7 @@ val df: DataFrame = sqlContext.read
 
 df.write
   .format("com.databricks.spark.redshift")
-    .option("url", "jdbc:postgresql://redshifthost:5439/database?user=username&password=pass")
+    .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass")
     .option("dbtable" -> "my_table_copy")
     .option("tempdir" -> "s3://path/for/temp/data")
   .mode("error")
@@ -77,7 +78,7 @@ sql_context = SQLContext(sc)
 # Read data from a table
 df = sql_context.read \
     .format("com.databricks.spark.redshift") \
-    .option("url", "jdbc:postgresql://redshifthost:5439/database?user=username&password=pass") \
+    .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass") \
     .option("dbtable" -> "my_table") \
     .option("tempdir" -> "s3://path/for/temp/data") \
     .load()
@@ -85,7 +86,7 @@ df = sql_context.read \
 # Write back to a table
 df.write \
   .format("com.databricks.spark.redshift")
-  .option("url", "jdbc:postgresql://redshifthost:5439/database?user=username&password=pass") \
+  .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass") \
   .option("dbtable" -> "my_table_copy") \
   .option("tempdir" -> "s3://path/for/temp/data") \
   .mode("error")
@@ -99,7 +100,7 @@ CREATE TABLE my_table
 USING com.databricks.spark.redshift
 OPTIONS (dbtable 'my_table',
          tempdir 's3://my_bucket/tmp',
-         url 'jdbc:postgresql://host:port/db?user=username&password=pass');
+         url 'jdbc:redshift://host:port/db?user=username&password=pass');
 ```
 
 ### Scala helper functions
@@ -204,7 +205,7 @@ and use that as a temp location for this data.
  <tr>
     <td><tt>jdbcdriver</tt></td>
     <td>No</td>
-    <td><tt>org.postgresql.Driver</tt></td>
+    <td><tt>com.amazon.redshift.jdbc4.Driver</tt></td>
     <td>The class name of the JDBC driver to load before JDBC operations. Must be on classpath.</td>
  </tr>
  <tr>

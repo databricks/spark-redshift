@@ -35,7 +35,7 @@ private[redshift] object Parameters extends Logging {
     // * sortkeyspec has no default, but is optional
     // * distkey has no default, but is optional unless using diststyle KEY
 
-    "jdbcdriver" -> "org.postgresql.Driver",
+    "jdbcdriver" -> "com.amazon.redshift.jdbc4.Driver",
     "overwrite" -> "false",
     "diststyle" -> "EVEN",
     "usestagingtable" -> "true",
@@ -100,7 +100,7 @@ private[redshift] object Parameters extends Logging {
 
     /**
      * The JDBC driver class name. This is used to make sure the driver is registered before
-     * connecting over JDBC. Default is "org.postgresql.Driver"
+     * connecting over JDBC. Default is "com.amazon.redshift.jdbc4.Driver"
      */
     def jdbcDriver: String = parameters("jdbcdriver")
 
