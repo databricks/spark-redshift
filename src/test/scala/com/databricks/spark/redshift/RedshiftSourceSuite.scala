@@ -59,23 +59,6 @@ class RedshiftSourceSuite
   with BeforeAndAfterAll
   with BeforeAndAfterEach {
 
-  // scalastyle:off
-  /**
-   * Expected parsed output corresponding to the output of testData.
-   */
-  private val expectedData: Seq[Row] = Seq(
-    Row(1.toByte, true, TestUtils.toTimestamp(2015, 6, 1, 0, 0, 0), 1234152.123124981,
-      1.0f, 42, 1239012341823719L, 23, "Unicode是樂趣",
-      TestUtils.toTimestamp(2015, 6, 1, 0, 0, 0, 1)),
-    Row(1.toByte, false, TestUtils.toTimestamp(2015, 6, 2, 0, 0, 0), 0.0, 0.0f, 42,
-      1239012341823719L, -13, "asdf", TestUtils.toTimestamp(2015, 6, 2, 0, 0, 0, 0)),
-    Row(0.toByte, null, TestUtils.toTimestamp(2015, 6, 3, 0, 0, 0), 0.0, -1.0f, 4141214,
-      1239012341823719L, null, "f", TestUtils.toTimestamp(2015, 6, 3, 0, 0, 0)),
-    Row(0.toByte, false, null, -1234152.123124981, 100000.0f, null, 1239012341823719L, 24,
-      "___|_123", null),
-    Row(List.fill(10)(null): _*))
-  // scalastyle:on
-
   /**
    * Spark Context with Hadoop file overridden to point at our local test data file for this suite,
    * no matter what temp directory was generated and requested.
@@ -91,7 +74,7 @@ class RedshiftSourceSuite
 
   // Parameters common to most tests. Some parameters are overridden in specific tests.
   private def defaultParams: Map[String, String] = Map(
-    "url" -> "jdbc:postgresql://foo/bar",
+    "url" -> "jdbc:redshift://foo/bar",
     "tempdir" -> tempDir.toURI.toString,
     "dbtable" -> "test_table",
     "aws_access_key_id" -> "test1",
@@ -107,7 +90,7 @@ class RedshiftSourceSuite
     testSqlContext = new SQLContext(sc)
     tempDir = Files.createTempDir()
     expectedDataDF =
-      testSqlContext.createDataFrame(sc.parallelize(expectedData), TestUtils.testSchema)
+      testSqlContext.createDataFrame(sc.parallelize(TestUtils.expectedData), TestUtils.testSchema)
   }
 
   override def afterEach(): Unit = {
@@ -185,7 +168,7 @@ class RedshiftSourceSuite
     val source = new DefaultSource(jdbcWrapper)
     val relation = source.createRelation(testSqlContext, defaultParams)
     val df = testSqlContext.baseRelationToDataFrame(relation)
-    QueryTest.checkAnswer(df, expectedData)
+    QueryTest.checkAnswer(df, TestUtils.expectedData)
   }
 
   test("DefaultSource supports simple column filtering") {
@@ -282,7 +265,7 @@ class RedshiftSourceSuite
 
     // Make sure we wrote the data out ready for Redshift load, in the expected formats
     val written = testSqlContext.read.format("com.databricks.spark.avro").load(params("tempdir"))
-    QueryTest.checkAnswer(written, expectedData)
+    QueryTest.checkAnswer(written, TestUtils.expectedData)
   }
 
   test("Failed copies are handled gracefully when using a staging table") {
@@ -382,7 +365,7 @@ class RedshiftSourceSuite
     // the only content in the returned data frame
     val written =
       testSqlContext.read.format("com.databricks.spark.avro").load(defaultParams("tempdir"))
-    QueryTest.checkAnswer(written, expectedData)
+    QueryTest.checkAnswer(written, TestUtils.expectedData)
   }
 
   test("Respect SaveMode.ErrorIfExists when table exists") {
@@ -414,13 +397,15 @@ class RedshiftSourceSuite
   test("Public Scala API rejects invalid parameter maps") {
     val invalidParams = Map("dbtable" -> "foo") // missing tempdir and url
 
-    intercept[Exception] {
+    val e1 = intercept[Exception] {
       expectedDataDF.saveAsRedshiftTable(invalidParams)
     }
+    assert(e1.getMessage.contains("tempdir"))
 
-    intercept[Exception] {
+    val e2 = intercept[Exception] {
       testSqlContext.redshiftTable(invalidParams)
     }
+    assert(e2.getMessage.contains("tempdir"))
   }
 
   test("DefaultSource has default constructor, required by Data Source API") {
