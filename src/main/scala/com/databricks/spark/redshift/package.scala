@@ -17,8 +17,8 @@
 
 package com.databricks.spark
 
+import com.databricks.spark.redshift.DefaultJDBCWrapper
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.jdbc.DefaultJDBCWrapper
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 
@@ -59,9 +59,10 @@ package object redshift {
      * Read a Redshift table into a DataFrame, using S3 for data transfer and JDBC
      * to control Redshift and resolve the schema
      */
-    def redshiftTable(parameters: Map[String, String]) = {
+    def redshiftTable(parameters: Map[String, String]): DataFrame = {
       val params = Parameters.mergeParameters(parameters)
-      sqlContext.baseRelationToDataFrame(RedshiftRelation(DefaultJDBCWrapper, params, None)(sqlContext))
+      sqlContext.baseRelationToDataFrame(
+        RedshiftRelation(DefaultJDBCWrapper, params, None)(sqlContext))
     }
   }
 

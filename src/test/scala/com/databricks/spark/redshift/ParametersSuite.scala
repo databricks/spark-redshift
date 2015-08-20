@@ -24,11 +24,10 @@ import org.scalatest.{FunSuite, Matchers}
 class ParametersSuite extends FunSuite with Matchers {
 
   test("Minimal valid parameter map is accepted") {
-    val params =
-      Map(
-        "tempdir" -> "s3://foo/bar",
-        "dbtable" -> "test_table",
-        "url" -> "jdbc:redshift://foo/bar")
+    val params = Map(
+      "tempdir" -> "s3://foo/bar",
+      "dbtable" -> "test_table",
+      "url" -> "jdbc:redshift://foo/bar")
 
     val mergedParams = Parameters.mergeParameters(params)
 
@@ -43,11 +42,10 @@ class ParametersSuite extends FunSuite with Matchers {
   }
 
   test("New instances have distinct temp paths") {
-    val params =
-      Map(
-        "tempdir" -> "s3://foo/bar",
-        "dbtable" -> "test_table",
-        "url" -> "jdbc:redshift://foo/bar")
+    val params = Map(
+      "tempdir" -> "s3://foo/bar",
+      "dbtable" -> "test_table",
+      "url" -> "jdbc:redshift://foo/bar")
 
     val mergedParams1 = Parameters.mergeParameters(params)
     val mergedParams2 = Parameters.mergeParameters(params)
