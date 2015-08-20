@@ -27,7 +27,7 @@ import org.apache.hadoop.fs.{FileSystem, Path}
 
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.hive.test.TestHiveContext
-import org.apache.spark.sql.{Row, SQLContext, SaveMode}
+import org.apache.spark.sql.{AnalysisException, Row, SQLContext, SaveMode}
 
 /**
  * End-to-end tests which run against a real Redshift cluster.
@@ -303,9 +303,10 @@ class RedshiftIntegrationSuite
   test("Respect SaveMode.ErrorIfExists when table exists") {
     val rdd = sc.parallelize(TestUtils.expectedData.toSeq)
     val df = sqlContext.createDataFrame(rdd, TestUtils.testSchema)
+    df.registerTempTable(test_table) // to ensure that the table already exists
 
     // Check that SaveMode.ErrorIfExists throws an exception
-    intercept[Exception] {
+    intercept[AnalysisException] {
       df.write
         .format("com.databricks.spark.redshift")
         .option("url", jdbcUrl)

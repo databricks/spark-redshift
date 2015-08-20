@@ -397,13 +397,15 @@ class RedshiftSourceSuite
   test("Public Scala API rejects invalid parameter maps") {
     val invalidParams = Map("dbtable" -> "foo") // missing tempdir and url
 
-    intercept[Exception] {
+    val e1 = intercept[Exception] {
       expectedDataDF.saveAsRedshiftTable(invalidParams)
     }
+    assert(e1.getMessage.contains("tempdir"))
 
-    intercept[Exception] {
+    val e2 = intercept[Exception] {
       testSqlContext.redshiftTable(invalidParams)
     }
+    assert(e2.getMessage.contains("tempdir"))
   }
 
   test("DefaultSource has default constructor, required by Data Source API") {
