@@ -28,18 +28,19 @@ import org.apache.spark.sql.{DataFrame, Row, SQLContext}
  */
 private[redshift] object Conversions {
 
-  // Imports and exports with Redshift require that timestamps are represented
-  // as strings, using the following formats
-  private val PATTERN_WITH_MILLIS = "yyyy-MM-dd HH:mm:ss.S"
-  private val PATTERN_WITHOUT_MILLIS = "yyyy-MM-dd HH:mm:ss"
-
-  private val redshiftTimestampFormatWithMillis = new SimpleDateFormat(PATTERN_WITH_MILLIS)
-  private val redshiftTimestampFormatWithoutMillis = new SimpleDateFormat(PATTERN_WITHOUT_MILLIS)
-
   // Redshift may or may not include the fraction component in the UNLOAD data, and there are
   // apparently not clues about this in the table schema. This format delegates to one of the above
   // formats based on string length.
   private val redshiftTimestampFormat: DateFormat = new DateFormat() {
+
+    // Imports and exports with Redshift require that timestamps are represented
+    // as strings, using the following formats
+    private val PATTERN_WITH_MILLIS = "yyyy-MM-dd HH:mm:ss.S"
+    private val PATTERN_WITHOUT_MILLIS = "yyyy-MM-dd HH:mm:ss"
+
+    private val redshiftTimestampFormatWithMillis = new SimpleDateFormat(PATTERN_WITH_MILLIS)
+    private val redshiftTimestampFormatWithoutMillis = new SimpleDateFormat(PATTERN_WITHOUT_MILLIS)
+
     override def format(
         date: Date,
         toAppendTo: StringBuffer,
