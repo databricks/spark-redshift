@@ -98,12 +98,13 @@ private[redshift] case class RedshiftRelation(
   }
 
   protected def compileValue(value: Any): Any = value match {
-    case stringValue: String => s"\\'${escapeSql(stringValue.toString)}\\'"
-    case _ => value
+    case stringValue: String => s"\\'${escapeSql(stringValue)}\\'"
+    case stringValue: UTF8String => s"\\'${escapeSql(stringValue.toString())}\\'"
+    case v => v
   }
 
   protected def escapeSql(value: String): String =
-    if (value == null) null else value.replace("'", "''")
+    if (value == null) null else value.replace("'", "\\'\\'")
 
   protected def buildWhereClause(filters: Array[Filter]): String = {
     val filterClauses = filters.collect {
