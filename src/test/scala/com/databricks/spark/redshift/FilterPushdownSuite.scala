@@ -41,12 +41,12 @@ class FilterPushdownSuite extends FunSuite {
   test("buildWhereClause with string literals that contain Unicode characters") {
     // scalastyle:off
     val whereClause = buildWhereClause(testSchema, Seq(EqualTo("test_string", "Unicode's樂趣")))
-    // scalastyle:on
     // Here, the apostrophe in the string needs to be replaced with two single quotes, '', but we
     // also need to escape those quotes with backslashes because this WHERE clause is going to
     // eventually be embedded inside of a single-quoted string that's embedded inside of a larger
     // Redshift query.
     assert(whereClause === """WHERE "test_string" = \'Unicode\'\'s樂趣\'""")
+    // scalastyle:on
   }
 
   test("buildWhereClause with multiple filters") {
