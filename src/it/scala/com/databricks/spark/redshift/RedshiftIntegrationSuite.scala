@@ -246,24 +246,7 @@ class RedshiftIntegrationSuite
         Row(1.toByte, true)))
   }
 
-  test("DefaultSource supports user schema, pruned and filtered scans") {
-    // scalastyle:off
-    QueryTest.checkAnswer(
-      sqlContext.sql(
-        """
-          |select testbyte, testbool
-          |from test_table
-          |where testbool = true
-          | and teststring = "Unicode's樂趣"
-          | and testdouble = 1234152.12312498
-          | and testfloat = 1.0
-          | and testint = 42
-        """.stripMargin),
-      Seq(Row(1, true)))
-    // scalastyle:on
-  }
-
-  test("DefaultSource using 'query' supports user schema, pruned and filtered scans") {
+  test("query with pruned and filtered scans") {
     // scalastyle:off
     QueryTest.checkAnswer(
       sqlContext.sql(
