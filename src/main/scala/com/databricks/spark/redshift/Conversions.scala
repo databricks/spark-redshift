@@ -35,7 +35,7 @@ private[redshift] object Conversions {
 
     // Imports and exports with Redshift require that timestamps are represented
     // as strings, using the following formats
-    private val PATTERN_WITH_MILLIS = "yyyy-MM-dd HH:mm:ss.S"
+    private val PATTERN_WITH_MILLIS = "yyyy-MM-dd HH:mm:ss.SSS"
     private val PATTERN_WITHOUT_MILLIS = "yyyy-MM-dd HH:mm:ss"
 
     private val redshiftTimestampFormatWithMillis = new SimpleDateFormat(PATTERN_WITH_MILLIS)
