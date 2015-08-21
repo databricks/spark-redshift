@@ -16,7 +16,7 @@
 
 package com.databricks.spark.redshift
 
-import java.sql.{Connection, SQLException}
+import java.sql.{Connection, Date, SQLException, Timestamp}
 import java.util.Properties
 
 import scala.util.Random
@@ -24,7 +24,9 @@ import scala.util.Random
 import com.databricks.spark.redshift.Parameters.MergedParameters
 
 import org.apache.spark.Logging
-import org.apache.spark.sql.{DataFrame, SQLContext}
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.{DataFrame, Row, SQLContext}
+import org.apache.spark.sql.types._
 
 /**
  * Functions to write data to Redshift with intermediate Avro serialisation into S3.
@@ -56,7 +58,7 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
     val creds = params.credentialsString(sqlContext.sparkContext.hadoopConfiguration)
     val fixedUrl = Utils.fixS3Url(params.tempPath)
     s"COPY ${params.table} FROM '$fixedUrl' CREDENTIALS '$creds' FORMAT AS " +
-      "AVRO 'auto' TIMEFORMAT 'epochmillisecs'"
+      "AVRO 'auto' DATEFORMAT 'YYYY-MM-DD HH:MI:SS'"
   }
 
   /**
@@ -123,8 +125,48 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
   /**
    * Serialize temporary data to S3, ready for Redshift COPY
    */
-  def unloadData(sqlContext: SQLContext, data: DataFrame, tempPath: String): Unit = {
-    Conversions.datesToTimestamps(sqlContext, data)
+  private def unloadData(sqlContext: SQLContext, data: DataFrame, tempPath: String): Unit = {
+    // spark-avro does not support Date types. In addition, it converts Timestamps into longs
+    // (milliseconds since the Unix epoch). Redshift is capable of loading timestamps in
+    // 'epochmillisecs' format but there's no equivalent format for dates. To work around this, we
+    // choose to write out both dates and timestamps as strings using the same timestamp format.
+    // For additional background and discussion, see #39.
+
+    // Convert the rows so that timestamps and dates become formatted strings:
+    val conversionFunctions: Array[Any => Any] = data.schema.fields.map { field =>
+      field.dataType match {
+        case DateType => (v: Any) => v match {
+          case null => null
+          case t: Timestamp => Conversions.formatTimestamp(t)
+          case d: Date => Conversions.formatDate(d)
+        }
+        case TimestampType => (v: Any) => {
+          if (v == null) null else Conversions.formatTimestamp(v.asInstanceOf[Timestamp])
+        }
+        case _ => (v: Any) => v
+      }
+    }
+    val convertedRows: RDD[Row] = data.map { row =>
+      val convertedValues: Array[Any] = new Array(conversionFunctions.length)
+      var i = 0
+      while (i < conversionFunctions.length) {
+        convertedValues(i) = conversionFunctions(i)(row(i))
+        i += 1
+      }
+      Row.fromSeq(convertedValues)
+    }
+
+    // Update the schema so that Avro writes these columns as strings:
+    val convertedSchema: StructType = StructType(
+      data.schema.map {
+        case StructField(name, DateType, nullable, meta) =>
+          StructField(name, StringType, nullable, meta)
+        case StructField(name, TimestampType, nullable, meta) =>
+          StructField(name, StringType, nullable, meta)
+        case other => other
+      })
+
+    sqlContext.createDataFrame(convertedRows, convertedSchema)
       .write
       .format("com.databricks.spark.avro")
       .save(tempPath)

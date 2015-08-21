@@ -199,7 +199,7 @@ class RedshiftSourceSuite
       "UNLOAD \\('SELECT \"testByte\", \"testBool\" " +
         "FROM test_table " +
         "WHERE \"testBool\" = true " +
-        "AND \"testString\" = \\\\'Unicode是樂趣\\\\' " +
+        "AND \"testString\" = \\\\'Unicode\\\\'\\\\'s樂趣\\\\' " +
         "AND \"testDouble\" > 1000.0 " +
         "AND \"testDouble\" < 1.7976931348623157E308 " +
         "AND \"testFloat\" >= 1.0 " +
@@ -218,7 +218,7 @@ class RedshiftSourceSuite
     val filters: Array[Filter] = Array(
       EqualTo("testBool", true),
       // scalastyle:off
-      EqualTo("testString", "Unicode是樂趣"),
+      EqualTo("testString", "Unicode's樂趣"),
       // scalastyle:on
       GreaterThan("testDouble", 1000.0),
       LessThan("testDouble", Double.MaxValue),
@@ -269,7 +269,7 @@ class RedshiftSourceSuite
     assert(tempDir.list().length === 1)
     val dirWithAvroFiles = tempDir.listFiles().head.toURI.toString
     val written = testSqlContext.read.format("com.databricks.spark.avro").load(dirWithAvroFiles)
-    checkAnswer(written, TestUtils.expectedDataEpochMillis)
+    checkAnswer(written, TestUtils.expectedDataWithConvertedTimesAndDates)
   }
 
   test("Failed copies are handled gracefully when using a staging table") {
@@ -372,7 +372,7 @@ class RedshiftSourceSuite
     assert(tempDir.list().length === 1)
     val dirWithAvroFiles = tempDir.listFiles().head.toURI.toString
     val written = testSqlContext.read.format("com.databricks.spark.avro").load(dirWithAvroFiles)
-    checkAnswer(written, TestUtils.expectedDataEpochMillis)
+    checkAnswer(written, TestUtils.expectedDataWithConvertedTimesAndDates)
   }
 
   test("Respect SaveMode.ErrorIfExists when table exists") {

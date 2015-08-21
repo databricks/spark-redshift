@@ -231,13 +231,13 @@ class RedshiftIntegrationSuite
 
   test("DefaultSource can load Redshift UNLOAD output to a DataFrame") {
     checkAnswer(
-      sqlContext.sql("select * from test_table order by testbyte, testbool"),
+      sqlContext.sql("select * from test_table"),
       TestUtils.expectedData)
   }
 
   test("DefaultSource supports simple column filtering") {
     checkAnswer(
-      sqlContext.sql("select testbyte, testbool from test_table order by testbyte, testbool"),
+      sqlContext.sql("select testbyte, testbool from test_table"),
       Seq(
         Row(null, null),
         Row(0.toByte, null),
@@ -263,6 +263,32 @@ class RedshiftIntegrationSuite
     // scalastyle:on
   }
 
+  test("roundtrip save and load") {
+    val tableName = s"roundtrip_save_and_load_$randomSuffix"
+    try {
+      sqlContext.createDataFrame(sc.parallelize(TestUtils.expectedData), TestUtils.testSchema)
+        .write
+        .format("com.databricks.spark.redshift")
+        .option("url", jdbcUrl)
+        .option("dbtable", tableName)
+        .option("tempdir", tempDir)
+        .mode(SaveMode.ErrorIfExists)
+        .save()
+
+      assert(DefaultJDBCWrapper.tableExists(conn, tableName))
+      val loadedDf = sqlContext.read
+        .format("com.databricks.spark.redshift")
+        .option("url", jdbcUrl)
+        .option("dbtable", tableName)
+        .option("tempdir", tempDir)
+        .load()
+      checkAnswer(loadedDf, TestUtils.expectedData)
+    } finally {
+      conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
+      conn.commit()
+    }
+  }
+
   // TODO: test overwrite; test overwite that fails.
 
   test("Append SaveMode doesn't destroy existing data") {
@@ -279,7 +305,7 @@ class RedshiftIntegrationSuite
       .saveAsTable(test_table3)
 
     checkAnswer(
-      sqlContext.sql("select * from test_table3 order by testbyte, testbool"),
+      sqlContext.sql("select * from test_table3"),
       TestUtils.expectedData ++ extraData)
   }
 
@@ -301,7 +327,7 @@ class RedshiftIntegrationSuite
   }
 
   test("Do nothing when table exists if SaveMode = Ignore") {
-    val rdd = sc.parallelize(TestUtils.expectedData)
+    val rdd = sc.parallelize(TestUtils.expectedData.drop(1))
     val df = sqlContext.createDataFrame(rdd, TestUtils.testSchema)
     df.write
       .format("com.databricks.spark.redshift")
@@ -313,7 +339,7 @@ class RedshiftIntegrationSuite
 
     // Check that SaveMode.Ignore does nothing
     checkAnswer(
-      sqlContext.sql("select * from test_table order by testbyte, testbool"),
+      sqlContext.sql("select * from test_table"),
       TestUtils.expectedData)
   }
 }

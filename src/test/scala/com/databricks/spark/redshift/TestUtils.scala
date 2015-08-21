@@ -35,17 +35,18 @@ object TestUtils {
       val md = (new MetadataBuilder).putString("name", name).build()
       StructField(name, typ, nullable = true, metadata = md)
     }
+    // These column names need to be lowercase; see #51
     StructType(Seq(
-      makeField("testByte", ByteType),
-      makeField("testBool", BooleanType),
-      makeField("testDate", DateType),
-      makeField("testDouble", DoubleType),
-      makeField("testFloat", FloatType),
-      makeField("testInt", IntegerType),
-      makeField("testLong", LongType),
-      makeField("testShort", ShortType),
-      makeField("testString", StringType),
-      makeField("testTimestamp", TimestampType)))
+      makeField("testbyte", ByteType),
+      makeField("testbool", BooleanType),
+      makeField("testdate", DateType),
+      makeField("testdouble", DoubleType),
+      makeField("testfloat", FloatType),
+      makeField("testint", IntegerType),
+      makeField("testlong", LongType),
+      makeField("testshort", ShortType),
+      makeField("teststring", StringType),
+      makeField("testtimestamp", TimestampType)))
   }
 
   // scalastyle:off
@@ -53,25 +54,26 @@ object TestUtils {
    * Expected parsed output corresponding to the output of testData.
    */
   val expectedData: Seq[Row] = Seq(
-    Row(1.toByte, true, TestUtils.toTimestamp(2015, 6, 1, 0, 0, 0), 1234152.123124981,
-      1.0f, 42, 1239012341823719L, 23, "Unicode是樂趣",
+    Row(1.toByte, true, TestUtils.toDate(2015, 6, 1), 1234152.12312498,
+      1.0f, 42, 1239012341823719L, 23, "Unicode's樂趣",
       TestUtils.toTimestamp(2015, 6, 1, 0, 0, 0, 1)),
-    Row(1.toByte, false, TestUtils.toTimestamp(2015, 6, 2, 0, 0, 0), 0.0, 0.0f, 42,
+    Row(1.toByte, false, TestUtils.toDate(2015, 6, 2), 0.0, 0.0f, 42,
       1239012341823719L, -13, "asdf", TestUtils.toTimestamp(2015, 6, 2, 0, 0, 0, 0)),
-    Row(0.toByte, null, TestUtils.toTimestamp(2015, 6, 3, 0, 0, 0), 0.0, -1.0f, 4141214,
+    Row(0.toByte, null, TestUtils.toDate(2015, 6, 3), 0.0, -1.0f, 4141214,
       1239012341823719L, null, "f", TestUtils.toTimestamp(2015, 6, 3, 0, 0, 0)),
-    Row(0.toByte, false, null, -1234152.123124981, 100000.0f, null, 1239012341823719L, 24,
+    Row(0.toByte, false, null, -1234152.12312498, 100000.0f, null, 1239012341823719L, 24,
       "___|_123", null),
     Row(List.fill(10)(null): _*))
   // scalastyle:on
 
   /**
-   * The same as `expectedData`, but with timestamps converted into epochmillis format.
+   * The same as `expectedData`, but with dates and timestamps converted into string format.
    * See #39 for context.
    */
-  val expectedDataEpochMillis: Seq[Row] = expectedData.map { row =>
+  val expectedDataWithConvertedTimesAndDates: Seq[Row] = expectedData.map { row =>
     Row.fromSeq(row.toSeq.map {
-      case ts: Timestamp => ts.getTime
+      case t: Timestamp => Conversions.formatTimestamp(t)
+      case d: Date => Conversions.formatDate(d)
       case other => other
     })
   }
