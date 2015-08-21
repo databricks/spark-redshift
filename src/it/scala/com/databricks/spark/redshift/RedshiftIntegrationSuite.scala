@@ -22,18 +22,19 @@ import java.util.Properties
 
 import scala.util.Random
 
-import org.scalatest.{BeforeAndAfterEach, BeforeAndAfterAll, FunSuite, Matchers}
+import org.scalatest.{BeforeAndAfterEach, BeforeAndAfterAll, Matchers}
 import org.apache.hadoop.fs.{FileSystem, Path}
 
 import org.apache.spark.SparkContext
-import org.apache.spark.sql.hive.test.TestHiveContext
 import org.apache.spark.sql.{AnalysisException, Row, SQLContext, SaveMode}
+import org.apache.spark.sql.hive.test.TestHiveContext
+import org.apache.spark.sql.types._
 
 /**
  * End-to-end tests which run against a real Redshift cluster.
  */
 class RedshiftIntegrationSuite
-  extends FunSuite
+  extends QueryTest
   with Matchers
   with BeforeAndAfterAll
   with BeforeAndAfterEach {
@@ -230,13 +231,13 @@ class RedshiftIntegrationSuite
   }
 
   test("DefaultSource can load Redshift UNLOAD output to a DataFrame") {
-    QueryTest.checkAnswer(
+    checkAnswer(
       sqlContext.sql("select * from test_table order by testbyte, testbool"),
       TestUtils.expectedData)
   }
 
   test("DefaultSource supports simple column filtering") {
-    QueryTest.checkAnswer(
+    checkAnswer(
       sqlContext.sql("select testbyte, testbool from test_table order by testbyte, testbool"),
       Seq(
         Row(null, null),
@@ -248,7 +249,7 @@ class RedshiftIntegrationSuite
 
   test("query with pruned and filtered scans") {
     // scalastyle:off
-    QueryTest.checkAnswer(
+    checkAnswer(
       sqlContext.sql(
         """
           |select testbyte, testbool
@@ -278,7 +279,7 @@ class RedshiftIntegrationSuite
       .mode(SaveMode.Append)
       .saveAsTable(test_table3)
 
-    QueryTest.checkAnswer(
+    checkAnswer(
       sqlContext.sql("select * from test_table3 order by testbyte, testbool"),
       TestUtils.expectedData ++ extraData)
   }
@@ -312,7 +313,7 @@ class RedshiftIntegrationSuite
       .saveAsTable(test_table)
 
     // Check that SaveMode.Ignore does nothing
-    QueryTest.checkAnswer(
+    checkAnswer(
       sqlContext.sql("select * from test_table order by testbyte, testbool"),
       TestUtils.expectedData)
   }

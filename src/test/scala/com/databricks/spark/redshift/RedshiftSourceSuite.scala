@@ -25,7 +25,7 @@ import com.google.common.io.Files
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.mapreduce.InputFormat
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{BeforeAndAfterEach, BeforeAndAfterAll, FunSuite, Matchers}
+import org.scalatest.{BeforeAndAfterEach, BeforeAndAfterAll, Matchers}
 
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
@@ -53,7 +53,7 @@ private class TestContext extends SparkContext("local", "RedshiftSourceSuite") {
  * Tests main DataFrame loading and writing functionality
  */
 class RedshiftSourceSuite
-  extends FunSuite
+  extends QueryTest
   with Matchers
   with MockFactory
   with BeforeAndAfterAll
@@ -168,7 +168,7 @@ class RedshiftSourceSuite
     val source = new DefaultSource(jdbcWrapper)
     val relation = source.createRelation(testSqlContext, defaultParams)
     val df = testSqlContext.baseRelationToDataFrame(relation)
-    QueryTest.checkAnswer(df, TestUtils.expectedData)
+    checkAnswer(df, TestUtils.expectedData)
   }
 
   test("DefaultSource supports simple column filtering") {
@@ -295,7 +295,7 @@ class RedshiftSourceSuite
 
     // Make sure we wrote the data out ready for Redshift load, in the expected formats
     val written = testSqlContext.read.format("com.databricks.spark.avro").load(params("tempdir"))
-    QueryTest.checkAnswer(written, TestUtils.expectedData)
+    checkAnswer(written, TestUtils.expectedData)
   }
 
   test("Failed copies are handled gracefully when using a staging table") {
@@ -395,7 +395,7 @@ class RedshiftSourceSuite
     // the only content in the returned data frame
     val written =
       testSqlContext.read.format("com.databricks.spark.avro").load(defaultParams("tempdir"))
-    QueryTest.checkAnswer(written, TestUtils.expectedData)
+    checkAnswer(written, TestUtils.expectedData)
   }
 
   test("Respect SaveMode.ErrorIfExists when table exists") {

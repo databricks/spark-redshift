@@ -19,20 +19,18 @@ package com.databricks.spark.redshift
 
 import org.apache.spark.sql.catalyst.plans.logical
 import org.apache.spark.sql.{Row, DataFrame}
+import org.scalatest.FunSuite
 
 /**
- * Copy of Spark SQL's `QueryTest` object.
+ * Copy of Spark SQL's `QueryTest` trait.
  */
-object QueryTest {
+trait QueryTest extends FunSuite {
   /**
    * Runs the plan and makes sure the answer matches the expected result.
-   * If there was exception during the execution or the contents of the DataFrame does not
-   * match the expected result, an error message will be returned. Otherwise, a [[None]] will
-   * be returned.
    * @param df the [[DataFrame]] to be executed
    * @param expectedAnswer the expected result in a [[Seq]] of [[Row]]s.
    */
-  def checkAnswer(df: DataFrame, expectedAnswer: Seq[Row]): Option[String] = {
+  def checkAnswer(df: DataFrame, expectedAnswer: Seq[Row]): Unit = {
     val isSorted = df.queryExecution.logical.collect { case s: logical.Sort => s }.nonEmpty
     def prepareAnswer(answer: Seq[Row]): Seq[Row] = {
       // Converts data to types that we can do equality comparison using Scala collections.
@@ -59,7 +57,7 @@ object QueryTest {
             |$e
             |${org.apache.spark.sql.catalyst.util.stackTraceToString(e)}
           """.stripMargin
-        return Some(errorMessage)
+        fail(errorMessage)
     }
 
     if (prepareAnswer(expectedAnswer) != prepareAnswer(sparkAnswer)) {
@@ -74,19 +72,17 @@ object QueryTest {
           s"== Spark Answer - ${sparkAnswer.size} ==" +:
             prepareAnswer(sparkAnswer).map(_.toString())).mkString("\n")}
       """.stripMargin
-      return Some(errorMessage)
+      fail(errorMessage)
     }
-
-    None
   }
 
   private def sideBySide(left: Seq[String], right: Seq[String]): Seq[String] = {
-    val maxLeftSize = left.map(_.size).max
+    val maxLeftSize = left.map(_.length).max
     val leftPadded = left ++ Seq.fill(math.max(right.size - left.size, 0))("")
     val rightPadded = right ++ Seq.fill(math.max(left.size - right.size, 0))("")
 
     leftPadded.zip(rightPadded).map {
-      case (l, r) => (if (l == r) " " else "!") + l + (" " * ((maxLeftSize - l.size) + 3)) + r
+      case (l, r) => (if (l == r) " " else "!") + l + (" " * ((maxLeftSize - l.length) + 3)) + r
     }
   }
 }
