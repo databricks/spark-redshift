@@ -51,7 +51,7 @@ private[redshift] case class RedshiftRelation(
 
   override def buildScan(requiredColumns: Array[String], filters: Array[Filter]): RDD[Row] = {
     // Always quote column names:
-    val columns = requiredColumns.map(col => """"$col"""").mkString(", ")
+    val columns = requiredColumns.map(col => s""""$col"""").mkString(", ")
     val whereClause = FilterPushdown.buildWhereClause(schema, filters)
     unloadToTemp(columns, whereClause)
     makeRdd(pruneSchema(schema, requiredColumns))
