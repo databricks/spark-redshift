@@ -16,9 +16,10 @@
 
 package com.databricks.spark.redshift
 
+import org.scalatest.FunSuite
+
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types._
-import org.scalatest.FunSuite
 
 import com.databricks.spark.redshift.FilterPushdown._
 

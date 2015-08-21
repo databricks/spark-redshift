@@ -17,7 +17,7 @@
 package com.databricks.spark.redshift
 
 import org.apache.spark.sql.sources._
-import org.apache.spark.sql.types.{UTF8String, StructType}
+import org.apache.spark.sql.types.{DataType, StringType, StructType}
 
 /**
  * Helper methods for pushing filters into Redshift queries.
@@ -33,25 +33,43 @@ private[redshift] object FilterPushdown {
    *                scan.
    */
   def buildWhereClause(schema: StructType, filters: Seq[Filter]): String = {
-    val filterClauses = filters.collect {
-      case EqualTo(attr, value) => s"${sqlQuote(attr)} = ${compileValue(value)}"
-      case LessThan(attr, value) => s"${sqlQuote(attr)} < ${compileValue(value)}"
-      case GreaterThan(attr, value) => s"${sqlQuote(attr)} > ${compileValue(value)}"
-      case LessThanOrEqual(attr, value) => s"${sqlQuote(attr)} <= ${compileValue(value)}"
-      case GreaterThanOrEqual(attr, value) => s"${sqlQuote(attr)} >= ${compileValue(value)}"
-    }.mkString(" AND ")
-
-    if (filterClauses.isEmpty) "" else "WHERE " + filterClauses
+    val filterExpressions = filters.flatMap(f => buildFilterExpression(schema, f)).mkString(" AND ")
+    if (filterExpressions.isEmpty) "" else "WHERE " + filterExpressions
   }
 
-  private def sqlQuote(identifier: String) = s""""$identifier""""
-
-  private def compileValue(value: Any): Any = value match {
-    case stringValue: String => s"\\'${escapeSql(stringValue)}\\'"
-    case stringValue: UTF8String => s"\\'${escapeSql(stringValue.toString())}\\'"
-    case v => v
+  /**
+   * Attempt to convert the given filter into a SQL expression. Returns None if the expression
+   * could not be converted.
+   */
+  private def buildFilterExpression(schema: StructType, filter: Filter): Option[String] = {
+    def buildComparison(attr: String, value: Any, comparisonOp: String): Option[String] = {
+     getTypeForAttribute(schema, attr).map { dataType =>
+       val sqlEscapedValue: String = dataType match {
+         case StringType => s"\\'${value.toString.replace("'", "\\'\\'")}\\'"
+         case _ => value.toString
+       }
+       s""""$attr" $comparisonOp $sqlEscapedValue"""
+     }
+    }
+    filter match {
+      case EqualTo(attr, value) => buildComparison(attr, value, "=")
+      case LessThan(attr, value) => buildComparison(attr, value, "<")
+      case GreaterThan(attr, value) => buildComparison(attr, value, ">")
+      case LessThanOrEqual(attr, value) => buildComparison(attr, value, "<=")
+      case GreaterThanOrEqual(attr, value) => buildComparison(attr, value, ">=")
+      case _ => None
+    }
   }
 
-  private def escapeSql(value: String): String =
-    if (value == null) null else value.replace("'", "\\'\\'")
+  /**
+   * Use the given schema to look up the attribute's data type. Returns None if the attribute could
+   * not be resolved.
+   */
+  private def getTypeForAttribute(schema: StructType, attribute: String): Option[DataType] = {
+    if (schema.fieldNames.contains(attribute)) {
+      Some(schema(attribute).dataType)
+    } else {
+      None
+    }
+  }
 }
