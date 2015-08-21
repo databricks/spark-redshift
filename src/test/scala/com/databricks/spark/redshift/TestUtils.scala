@@ -66,6 +66,17 @@ object TestUtils {
   // scalastyle:on
 
   /**
+   * The same as `expectedData`, but with timestamps converted into epochmillis format.
+   * See #39 for context.
+   */
+  val expectedDataEpochMillis: Seq[Row] = expectedData.map { row =>
+    Row.fromSeq(row.toSeq.map {
+      case ts: Timestamp => ts.getTime
+      case other => other
+    })
+  }
+
+  /**
    * Convert date components to a millisecond timestamp
    */
   def toMillis(

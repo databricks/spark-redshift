@@ -293,9 +293,13 @@ class RedshiftSourceSuite
       RedshiftRelation(jdbcWrapper, Parameters.mergeParameters(params), None)(testSqlContext)
     relation.asInstanceOf[InsertableRelation].insert(expectedDataDF, true)
 
-    // Make sure we wrote the data out ready for Redshift load, in the expected formats
-    val written = testSqlContext.read.format("com.databricks.spark.avro").load(params("tempdir"))
-    checkAnswer(written, TestUtils.expectedData)
+    // Make sure we wrote the data out ready for Redshift load, in the expected formats.
+    // The data should have been written to a random subdirectory of `tempdir`. Since we clear
+    // `tempdir` between every unit test, there should only be one directory here.
+    assert(tempDir.list().length === 1)
+    val dirWithAvroFiles = tempDir.listFiles().head.toURI.toString
+    val written = testSqlContext.read.format("com.databricks.spark.avro").load(dirWithAvroFiles)
+    checkAnswer(written, TestUtils.expectedDataEpochMillis)
   }
 
   test("Failed copies are handled gracefully when using a staging table") {
@@ -392,10 +396,13 @@ class RedshiftSourceSuite
       source.createRelation(testSqlContext, SaveMode.Append, defaultParams, expectedDataDF)
 
     // This test is "appending" to an empty table, so we expect all our test data to be
-    // the only content in the returned data frame
-    val written =
-      testSqlContext.read.format("com.databricks.spark.avro").load(defaultParams("tempdir"))
-    checkAnswer(written, TestUtils.expectedData)
+    // the only content in the returned data frame.
+    // The data should have been written to a random subdirectory of `tempdir`. Since we clear
+    // `tempdir` between every unit test, there should only be one directory here.
+    assert(tempDir.list().length === 1)
+    val dirWithAvroFiles = tempDir.listFiles().head.toURI.toString
+    val written = testSqlContext.read.format("com.databricks.spark.avro").load(dirWithAvroFiles)
+    checkAnswer(written, TestUtils.expectedDataEpochMillis)
   }
 
   test("Respect SaveMode.ErrorIfExists when table exists") {
