@@ -155,9 +155,9 @@ class RedshiftSourceSuite
 
   test("DefaultSource can load Redshift UNLOAD output to a DataFrame") {
     val expectedQuery = (
-      "UNLOAD \\('SELECT \"testByte\", \"testBool\", \"testDate\", \"testDouble\"," +
-      " \"testFloat\", \"testInt\", \"testLong\", \"testShort\", \"testString\", " +
-      "\"testTimestamp\" " +
+      "UNLOAD \\('SELECT \"testbyte\", \"testbool\", \"testdate\", \"testdouble\"," +
+      " \"testfloat\", \"testint\", \"testlong\", \"testshort\", \"teststring\", " +
+      "\"testtimestamp\" " +
       "FROM test_table '\\) " +
       "TO '.*' " +
       "WITH CREDENTIALS 'aws_access_key_id=test1;aws_secret_access_key=test2' " +
@@ -173,7 +173,7 @@ class RedshiftSourceSuite
 
   test("DefaultSource supports simple column filtering") {
     val expectedQuery = (
-      "UNLOAD \\('SELECT \"testByte\", \"testBool\" FROM test_table '\\) " +
+      "UNLOAD \\('SELECT \"testbyte\", \"testbool\" FROM test_table '\\) " +
       "TO '.*' " +
       "WITH CREDENTIALS 'aws_access_key_id=test1;aws_secret_access_key=test2' " +
       "ESCAPE ALLOWOVERWRITE").r
@@ -183,7 +183,7 @@ class RedshiftSourceSuite
     val relation = source.createRelation(testSqlContext, defaultParams, TestUtils.testSchema)
 
     val rdd = relation.asInstanceOf[PrunedFilteredScan]
-      .buildScan(Array("testByte", "testBool"), Array.empty[Filter])
+      .buildScan(Array("testbyte", "testbool"), Array.empty[Filter])
     val prunedExpectedValues = Array(
       Row(1.toByte, true),
       Row(1.toByte, false),
@@ -196,14 +196,14 @@ class RedshiftSourceSuite
   test("DefaultSource supports user schema, pruned and filtered scans") {
     // scalastyle:off
     val expectedQuery = (
-      "UNLOAD \\('SELECT \"testByte\", \"testBool\" " +
+      "UNLOAD \\('SELECT \"testbyte\", \"testbool\" " +
         "FROM test_table " +
-        "WHERE \"testBool\" = true " +
-        "AND \"testString\" = \\\\'Unicode\\\\'\\\\'s樂趣\\\\' " +
-        "AND \"testDouble\" > 1000.0 " +
-        "AND \"testDouble\" < 1.7976931348623157E308 " +
-        "AND \"testFloat\" >= 1.0 " +
-        "AND \"testInt\" <= 43'\\) " +
+        "WHERE \"testbool\" = true " +
+        "AND \"teststring\" = \\\\'Unicode\\\\'\\\\'s樂趣\\\\' " +
+        "AND \"testdouble\" > 1000.0 " +
+        "AND \"testdouble\" < 1.7976931348623157E308 " +
+        "AND \"testfloat\" >= 1.0 " +
+        "AND \"testint\" <= 43'\\) " +
       "TO '.*' " +
       "WITH CREDENTIALS 'aws_access_key_id=test1;aws_secret_access_key=test2' " +
       "ESCAPE ALLOWOVERWRITE").r
@@ -216,16 +216,16 @@ class RedshiftSourceSuite
 
     // Define a simple filter to only include a subset of rows
     val filters: Array[Filter] = Array(
-      EqualTo("testBool", true),
+      EqualTo("testbool", true),
       // scalastyle:off
-      EqualTo("testString", "Unicode's樂趣"),
+      EqualTo("teststring", "Unicode's樂趣"),
       // scalastyle:on
-      GreaterThan("testDouble", 1000.0),
-      LessThan("testDouble", Double.MaxValue),
-      GreaterThanOrEqual("testFloat", 1.0f),
-      LessThanOrEqual("testInt", 43))
+      GreaterThan("testdouble", 1000.0),
+      LessThan("testdouble", Double.MaxValue),
+      GreaterThanOrEqual("testfloat", 1.0f),
+      LessThanOrEqual("testint", 43))
     val rdd = relation.asInstanceOf[PrunedFilteredScan]
-      .buildScan(Array("testByte", "testBool"), filters)
+      .buildScan(Array("testbyte", "testbool"), filters)
 
     // Technically this assertion should check that the RDD only returns a single row, but
     // since we've mocked out Redshift our WHERE clause won't have had any effect.
@@ -236,11 +236,11 @@ class RedshiftSourceSuite
     val params = defaultParams ++ Map(
       "postactions" -> "GRANT SELECT ON %s TO jeremy",
       "diststyle" -> "KEY",
-      "distkey" -> "testInt")
+      "distkey" -> "testint")
 
     val expectedCommands = Seq(
       "DROP TABLE IF EXISTS test_table_staging_.*".r,
-      "CREATE TABLE IF NOT EXISTS test_table_staging.* DISTSTYLE KEY DISTKEY \\(testInt\\).*".r,
+      "CREATE TABLE IF NOT EXISTS test_table_staging.* DISTSTYLE KEY DISTKEY \\(testint\\).*".r,
       "COPY test_table_staging_.*".r,
       "GRANT SELECT ON test_table_staging.+ TO jeremy".r,
       "ALTER TABLE test_table RENAME TO test_table_backup_.*".r,
