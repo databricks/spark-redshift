@@ -32,7 +32,7 @@ env:
     - secure: "LvndQIW6dHs6nyaMHtblGI/oL+s460lOezFs2BoD0Isenb/O/IM+nY5K9HepTXjJIcq8qvUYnojZX1FCrxxOXX2/+/Iihiq7GzJYdmdMC6hLg9bJYeAFk0dWYT88/AwadrJCBOa3ockRLhiO3dkai7Ki5+M1erfaFiAHHMpJxYQ="
 
 script:
-  - sbt -Dhadoop.version=$HADOOP_VERSION coverage test
+  - sbt -Dhadoop.version=$HADOOP_VERSION -Dspark.version=$SPARK_VERSION coverage test
   - if [ -d "$TRAVIS_SECURE_ENV_VARS" ]; then sbt -Dhadoop.version=$HADOOP_VERSION -Dspark.version=$SPARK_VERSION coverage it:test; fi
   - sbt scalastyle
   - sbt "test:scalastyle"
