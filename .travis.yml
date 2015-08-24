@@ -43,7 +43,7 @@ env:
 
 script:
   - sbt -Dhadoop.version=$HADOOP_VERSION -Dspark.version=$SPARK_VERSION coverage test
-  - if [ -d "$TRAVIS_SECURE_ENV_VARS" ]; then sbt -Dhadoop.version=$HADOOP_VERSION -Dspark.version=$SPARK_VERSION coverage it:test; fi
+  - if [ -z "$TRAVIS_SECURE_ENV_VARS" ]; then sbt -Dhadoop.version=$HADOOP_VERSION -Dspark.version=$SPARK_VERSION coverage it:test; fi
   - sbt scalastyle
   - sbt "test:scalastyle"
   - sbt "it:scalastyle"
