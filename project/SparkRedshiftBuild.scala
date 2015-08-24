@@ -45,6 +45,8 @@ object SparkRedshiftBuild extends Build {
       credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"),
       resolvers +=
         "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
+      resolvers +=
+        "Spark 1.5.0 RC1 Snapshot" at "https://repository.apache.org/content/repositories/orgapachespark-1137",
       libraryDependencies ++= Seq(
         "com.amazonaws" % "aws-java-sdk-core" % "1.9.40" % "provided",
         // We require spark-avro, but avro-mapred must be provided to match Hadoop version:
@@ -55,7 +57,7 @@ object SparkRedshiftBuild extends Build {
         // http://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-connection.html
         "com.amazon.redshift" % "jdbc4" % "1.1.7.1007" % "test" from "https://s3.amazonaws.com/redshift-downloads/drivers/RedshiftJDBC4-1.1.7.1007.jar",
         "com.google.guava" % "guava" % "14.0.1" % "test",
-        "org.scalatest" %% "scalatest" % "2.1.5" % "test",
+        "org.scalatest" %% "scalatest" % "2.2.1" % "test",
         "org.scalamock" %% "scalamock-scalatest-support" % "3.2" % "test"
       ),
       ScoverageSbtPlugin.ScoverageKeys.coverageHighlighting := {

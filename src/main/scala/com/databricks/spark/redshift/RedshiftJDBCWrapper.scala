@@ -22,6 +22,7 @@ import java.util.Properties
 
 import scala.util.Try
 
+import org.apache.spark.SPARK_VERSION
 import org.apache.spark.Logging
 import org.apache.spark.sql.types._
 
@@ -39,13 +40,22 @@ private[redshift] class JDBCWrapper extends Logging {
     // SPARK_VERSION.
     val classLoader =
       Option(Thread.currentThread().getContextClassLoader).getOrElse(this.getClass.getClassLoader)
-    val className = "org.apache.spark.sql.jdbc.package$DriverRegistry$"
-    // scalastyle:off
-    val driverRegistryClass = Class.forName(className, true, classLoader)
-    // scalastyle:on
-    val registerMethod = driverRegistryClass.getDeclaredMethod("register", classOf[String])
-    val companionObject = driverRegistryClass.getDeclaredField("MODULE$").get(null)
-    registerMethod.invoke(companionObject, driverClass)
+    if (SPARK_VERSION.startsWith("1.4")) {
+      val className = "org.apache.spark.sql.jdbc.package$DriverRegistry$"
+      // scalastyle:off
+      val driverRegistryClass = Class.forName(className, true, classLoader)
+      // scalastyle:on
+      val registerMethod = driverRegistryClass.getDeclaredMethod("register", classOf[String])
+      val companionObject = driverRegistryClass.getDeclaredField("MODULE$").get(null)
+      registerMethod.invoke(companionObject, driverClass)
+    } else { // Spark 1.5.0+
+      val className = "org.apache.spark.sql.execution.datasources.jdbc.DriverRegistry"
+      // scalastyle:off
+      val driverRegistryClass = Class.forName(className, true, classLoader)
+      // scalastyle:on
+      val registerMethod = driverRegistryClass.getDeclaredMethod("register", classOf[String])
+      registerMethod.invoke(null, driverClass)
+    }
   }
 
   /**
