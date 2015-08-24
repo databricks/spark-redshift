@@ -22,18 +22,18 @@ import java.util.Properties
 
 import scala.util.Random
 
-import org.scalatest.{BeforeAndAfterEach, BeforeAndAfterAll, FunSuite, Matchers}
+import org.scalatest.{BeforeAndAfterEach, BeforeAndAfterAll, Matchers}
 import org.apache.hadoop.fs.{FileSystem, Path}
 
 import org.apache.spark.SparkContext
-import org.apache.spark.sql.hive.test.TestHiveContext
 import org.apache.spark.sql.{AnalysisException, Row, SQLContext, SaveMode}
+import org.apache.spark.sql.hive.test.TestHiveContext
 
 /**
  * End-to-end tests which run against a real Redshift cluster.
  */
 class RedshiftIntegrationSuite
-  extends FunSuite
+  extends QueryTest
   with Matchers
   with BeforeAndAfterAll
   with BeforeAndAfterEach {
@@ -230,14 +230,14 @@ class RedshiftIntegrationSuite
   }
 
   test("DefaultSource can load Redshift UNLOAD output to a DataFrame") {
-    QueryTest.checkAnswer(
-      sqlContext.sql("select * from test_table order by testbyte, testbool"),
+    checkAnswer(
+      sqlContext.sql("select * from test_table"),
       TestUtils.expectedData)
   }
 
   test("DefaultSource supports simple column filtering") {
-    QueryTest.checkAnswer(
-      sqlContext.sql("select testbyte, testbool from test_table order by testbyte, testbool"),
+    checkAnswer(
+      sqlContext.sql("select testbyte, testbool from test_table"),
       Seq(
         Row(null, null),
         Row(0.toByte, null),
@@ -246,9 +246,9 @@ class RedshiftIntegrationSuite
         Row(1.toByte, true)))
   }
 
-  test("DefaultSource supports user schema, pruned and filtered scans") {
+  test("query with pruned and filtered scans") {
     // scalastyle:off
-    QueryTest.checkAnswer(
+    checkAnswer(
       sqlContext.sql(
         """
           |select testbyte, testbool
@@ -263,21 +263,30 @@ class RedshiftIntegrationSuite
     // scalastyle:on
   }
 
-  test("DefaultSource using 'query' supports user schema, pruned and filtered scans") {
-    // scalastyle:off
-    QueryTest.checkAnswer(
-      sqlContext.sql(
-        """
-          |select testbyte, testbool
-          |from test_table
-          |where testbool = true
-          | and teststring = "Unicode's樂趣"
-          | and testdouble = 1234152.12312498
-          | and testfloat = 1.0
-          | and testint = 42
-        """.stripMargin),
-      Seq(Row(1, true)))
-    // scalastyle:on
+  test("roundtrip save and load") {
+    val tableName = s"roundtrip_save_and_load_$randomSuffix"
+    try {
+      sqlContext.createDataFrame(sc.parallelize(TestUtils.expectedData), TestUtils.testSchema)
+        .write
+        .format("com.databricks.spark.redshift")
+        .option("url", jdbcUrl)
+        .option("dbtable", tableName)
+        .option("tempdir", tempDir)
+        .mode(SaveMode.ErrorIfExists)
+        .save()
+
+      assert(DefaultJDBCWrapper.tableExists(conn, tableName))
+      val loadedDf = sqlContext.read
+        .format("com.databricks.spark.redshift")
+        .option("url", jdbcUrl)
+        .option("dbtable", tableName)
+        .option("tempdir", tempDir)
+        .load()
+      checkAnswer(loadedDf, TestUtils.expectedData)
+    } finally {
+      conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
+      conn.commit()
+    }
   }
 
   // TODO: test overwrite; test overwite that fails.
@@ -295,8 +304,8 @@ class RedshiftIntegrationSuite
       .mode(SaveMode.Append)
       .saveAsTable(test_table3)
 
-    QueryTest.checkAnswer(
-      sqlContext.sql("select * from test_table3 order by testbyte, testbool"),
+    checkAnswer(
+      sqlContext.sql("select * from test_table3"),
       TestUtils.expectedData ++ extraData)
   }
 
@@ -318,7 +327,7 @@ class RedshiftIntegrationSuite
   }
 
   test("Do nothing when table exists if SaveMode = Ignore") {
-    val rdd = sc.parallelize(TestUtils.expectedData)
+    val rdd = sc.parallelize(TestUtils.expectedData.drop(1))
     val df = sqlContext.createDataFrame(rdd, TestUtils.testSchema)
     df.write
       .format("com.databricks.spark.redshift")
@@ -329,8 +338,8 @@ class RedshiftIntegrationSuite
       .saveAsTable(test_table)
 
     // Check that SaveMode.Ignore does nothing
-    QueryTest.checkAnswer(
-      sqlContext.sql("select * from test_table order by testbyte, testbool"),
+    checkAnswer(
+      sqlContext.sql("select * from test_table"),
       TestUtils.expectedData)
   }
 }

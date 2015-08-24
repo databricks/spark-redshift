@@ -25,7 +25,7 @@ import com.google.common.io.Files
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.mapreduce.InputFormat
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{BeforeAndAfterEach, BeforeAndAfterAll, FunSuite, Matchers}
+import org.scalatest.{BeforeAndAfterEach, BeforeAndAfterAll, Matchers}
 
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
@@ -53,7 +53,7 @@ private class TestContext extends SparkContext("local", "RedshiftSourceSuite") {
  * Tests main DataFrame loading and writing functionality
  */
 class RedshiftSourceSuite
-  extends FunSuite
+  extends QueryTest
   with Matchers
   with MockFactory
   with BeforeAndAfterAll
@@ -155,9 +155,9 @@ class RedshiftSourceSuite
 
   test("DefaultSource can load Redshift UNLOAD output to a DataFrame") {
     val expectedQuery = (
-      "UNLOAD \\('SELECT \"testByte\", \"testBool\", \"testDate\", \"testDouble\"," +
-      " \"testFloat\", \"testInt\", \"testLong\", \"testShort\", \"testString\", " +
-      "\"testTimestamp\" " +
+      "UNLOAD \\('SELECT \"testbyte\", \"testbool\", \"testdate\", \"testdouble\"," +
+      " \"testfloat\", \"testint\", \"testlong\", \"testshort\", \"teststring\", " +
+      "\"testtimestamp\" " +
       "FROM test_table '\\) " +
       "TO '.*' " +
       "WITH CREDENTIALS 'aws_access_key_id=test1;aws_secret_access_key=test2' " +
@@ -168,12 +168,12 @@ class RedshiftSourceSuite
     val source = new DefaultSource(jdbcWrapper)
     val relation = source.createRelation(testSqlContext, defaultParams)
     val df = testSqlContext.baseRelationToDataFrame(relation)
-    QueryTest.checkAnswer(df, TestUtils.expectedData)
+    checkAnswer(df, TestUtils.expectedData)
   }
 
   test("DefaultSource supports simple column filtering") {
     val expectedQuery = (
-      "UNLOAD \\('SELECT \"testByte\", \"testBool\" FROM test_table '\\) " +
+      "UNLOAD \\('SELECT \"testbyte\", \"testbool\" FROM test_table '\\) " +
       "TO '.*' " +
       "WITH CREDENTIALS 'aws_access_key_id=test1;aws_secret_access_key=test2' " +
       "ESCAPE ALLOWOVERWRITE").r
@@ -183,7 +183,7 @@ class RedshiftSourceSuite
     val relation = source.createRelation(testSqlContext, defaultParams, TestUtils.testSchema)
 
     val rdd = relation.asInstanceOf[PrunedFilteredScan]
-      .buildScan(Array("testByte", "testBool"), Array.empty[Filter])
+      .buildScan(Array("testbyte", "testbool"), Array.empty[Filter])
     val prunedExpectedValues = Array(
       Row(1.toByte, true),
       Row(1.toByte, false),
@@ -196,14 +196,14 @@ class RedshiftSourceSuite
   test("DefaultSource supports user schema, pruned and filtered scans") {
     // scalastyle:off
     val expectedQuery = (
-      "UNLOAD \\('SELECT \"testByte\", \"testBool\" " +
+      "UNLOAD \\('SELECT \"testbyte\", \"testbool\" " +
         "FROM test_table " +
-        "WHERE \"testBool\" = true " +
-        "AND \"testString\" = \\\\'Unicode是樂趣\\\\' " +
-        "AND \"testDouble\" > 1000.0 " +
-        "AND \"testDouble\" < 1.7976931348623157E308 " +
-        "AND \"testFloat\" >= 1.0 " +
-        "AND \"testInt\" <= 43'\\) " +
+        "WHERE \"testbool\" = true " +
+        "AND \"teststring\" = \\\\'Unicode\\\\'\\\\'s樂趣\\\\' " +
+        "AND \"testdouble\" > 1000.0 " +
+        "AND \"testdouble\" < 1.7976931348623157E308 " +
+        "AND \"testfloat\" >= 1.0 " +
+        "AND \"testint\" <= 43'\\) " +
       "TO '.*' " +
       "WITH CREDENTIALS 'aws_access_key_id=test1;aws_secret_access_key=test2' " +
       "ESCAPE ALLOWOVERWRITE").r
@@ -216,46 +216,16 @@ class RedshiftSourceSuite
 
     // Define a simple filter to only include a subset of rows
     val filters: Array[Filter] = Array(
-      EqualTo("testBool", true),
+      EqualTo("testbool", true),
       // scalastyle:off
-      EqualTo("testString", "Unicode是樂趣"),
+      EqualTo("teststring", "Unicode's樂趣"),
       // scalastyle:on
-      GreaterThan("testDouble", 1000.0),
-      LessThan("testDouble", Double.MaxValue),
-      GreaterThanOrEqual("testFloat", 1.0f),
-      LessThanOrEqual("testInt", 43))
+      GreaterThan("testdouble", 1000.0),
+      LessThan("testdouble", Double.MaxValue),
+      GreaterThanOrEqual("testfloat", 1.0f),
+      LessThanOrEqual("testint", 43))
     val rdd = relation.asInstanceOf[PrunedFilteredScan]
-      .buildScan(Array("testByte", "testBool"), filters)
-
-    // Technically this assertion should check that the RDD only returns a single row, but
-    // since we've mocked out Redshift our WHERE clause won't have had any effect.
-    assert(rdd.collect().contains(Row(1, true)))
-  }
-
-  test("DefaultSource filter pushdown ignores unexpected Filter subclasses") {
-    val expectedQuery = (
-      "UNLOAD \\('SELECT \"testByte\", \"testBool\" " +
-        "FROM test_table " +
-        "WHERE \"testBool\" = true'\\) " +
-        "TO '.*' " +
-        "WITH CREDENTIALS 'aws_access_key_id=test1;aws_secret_access_key=test2' " +
-        "ESCAPE ALLOWOVERWRITE").r
-    val jdbcWrapper = prepareUnloadTest(defaultParams, Seq(expectedQuery))
-
-    // Construct the source with a custom schema
-    val source = new DefaultSource(jdbcWrapper)
-    val relation = source.createRelation(testSqlContext, defaultParams, TestUtils.testSchema)
-
-    // This is a new filter subclasss which our DefaultSource does not know how to handle
-    case object NewFilter extends Filter
-
-    val filters: Array[Filter] = Array(
-      EqualTo("testBool", true),
-      NewFilter
-    )
-
-    val rdd = relation.asInstanceOf[PrunedFilteredScan]
-      .buildScan(Array("testByte", "testBool"), filters)
+      .buildScan(Array("testbyte", "testbool"), filters)
 
     // Technically this assertion should check that the RDD only returns a single row, but
     // since we've mocked out Redshift our WHERE clause won't have had any effect.
@@ -266,11 +236,11 @@ class RedshiftSourceSuite
     val params = defaultParams ++ Map(
       "postactions" -> "GRANT SELECT ON %s TO jeremy",
       "diststyle" -> "KEY",
-      "distkey" -> "testInt")
+      "distkey" -> "testint")
 
     val expectedCommands = Seq(
       "DROP TABLE IF EXISTS test_table_staging_.*".r,
-      "CREATE TABLE IF NOT EXISTS test_table_staging.* DISTSTYLE KEY DISTKEY \\(testInt\\).*".r,
+      "CREATE TABLE IF NOT EXISTS test_table_staging.* DISTSTYLE KEY DISTKEY \\(testint\\).*".r,
       "COPY test_table_staging_.*".r,
       "GRANT SELECT ON test_table_staging.+ TO jeremy".r,
       "ALTER TABLE test_table RENAME TO test_table_backup_.*".r,
@@ -293,9 +263,13 @@ class RedshiftSourceSuite
       RedshiftRelation(jdbcWrapper, Parameters.mergeParameters(params), None)(testSqlContext)
     relation.asInstanceOf[InsertableRelation].insert(expectedDataDF, true)
 
-    // Make sure we wrote the data out ready for Redshift load, in the expected formats
-    val written = testSqlContext.read.format("com.databricks.spark.avro").load(params("tempdir"))
-    QueryTest.checkAnswer(written, TestUtils.expectedData)
+    // Make sure we wrote the data out ready for Redshift load, in the expected formats.
+    // The data should have been written to a random subdirectory of `tempdir`. Since we clear
+    // `tempdir` between every unit test, there should only be one directory here.
+    assert(tempDir.list().length === 1)
+    val dirWithAvroFiles = tempDir.listFiles().head.toURI.toString
+    val written = testSqlContext.read.format("com.databricks.spark.avro").load(dirWithAvroFiles)
+    checkAnswer(written, TestUtils.expectedDataWithConvertedTimesAndDates)
   }
 
   test("Failed copies are handled gracefully when using a staging table") {
@@ -392,10 +366,13 @@ class RedshiftSourceSuite
       source.createRelation(testSqlContext, SaveMode.Append, defaultParams, expectedDataDF)
 
     // This test is "appending" to an empty table, so we expect all our test data to be
-    // the only content in the returned data frame
-    val written =
-      testSqlContext.read.format("com.databricks.spark.avro").load(defaultParams("tempdir"))
-    QueryTest.checkAnswer(written, TestUtils.expectedData)
+    // the only content in the returned data frame.
+    // The data should have been written to a random subdirectory of `tempdir`. Since we clear
+    // `tempdir` between every unit test, there should only be one directory here.
+    assert(tempDir.list().length === 1)
+    val dirWithAvroFiles = tempDir.listFiles().head.toURI.toString
+    val written = testSqlContext.read.format("com.databricks.spark.avro").load(dirWithAvroFiles)
+    checkAnswer(written, TestUtils.expectedDataWithConvertedTimesAndDates)
   }
 
   test("Respect SaveMode.ErrorIfExists when table exists") {

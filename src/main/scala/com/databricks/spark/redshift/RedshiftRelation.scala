@@ -50,8 +50,9 @@ private[redshift] case class RedshiftRelation(
   }
 
   override def buildScan(requiredColumns: Array[String], filters: Array[Filter]): RDD[Row] = {
-    val columns = columnList(requiredColumns)
-    val whereClause = buildWhereClause(filters)
+    // Always quote column names:
+    val columns = requiredColumns.map(col => s""""$col"""").mkString(", ")
+    val whereClause = FilterPushdown.buildWhereClause(schema, filters)
     unloadToTemp(columns, whereClause)
     makeRdd(pruneSchema(schema, requiredColumns))
   }
@@ -62,7 +63,7 @@ private[redshift] case class RedshiftRelation(
     new RedshiftWriter(jdbcWrapper).saveToRedshift(sqlContext, data, updatedParams)
   }
 
-  protected def unloadToTemp(columnList: String = "*", whereClause: String = ""): Unit = {
+  private def unloadToTemp(columnList: String = "*", whereClause: String = ""): Unit = {
     val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, new Properties()).apply()
     val unloadSql = unloadStmnt(columnList, whereClause)
     val statement = conn.prepareStatement(unloadSql)
@@ -71,7 +72,7 @@ private[redshift] case class RedshiftRelation(
     conn.close()
   }
 
-  protected def unloadStmnt(columnList: String, whereClause: String) : String = {
+  private def unloadStmnt(columnList: String, whereClause: String) : String = {
     val credsString = params.credentialsString(sqlContext.sparkContext.hadoopConfiguration)
     val query = s"SELECT $columnList FROM ${params.table} $whereClause"
     val fixedUrl = Utils.fixS3Url(params.tempPath)
@@ -79,41 +80,15 @@ private[redshift] case class RedshiftRelation(
     s"UNLOAD ('$query') TO '$fixedUrl' WITH CREDENTIALS '$credsString' ESCAPE ALLOWOVERWRITE"
   }
 
-  protected def makeRdd(schema: StructType): RDD[Row] = {
+  private def makeRdd(schema: StructType): RDD[Row] = {
     val sc = sqlContext.sparkContext
     val rdd = sc.newAPIHadoopFile(params.tempPath, classOf[RedshiftInputFormat],
       classOf[java.lang.Long], classOf[Array[String]], sc.hadoopConfiguration)
     rdd.values.map(Conversions.rowConverter(schema))
   }
 
-  protected def pruneSchema(schema: StructType, columns: Array[String]): StructType = {
+  private def pruneSchema(schema: StructType, columns: Array[String]): StructType = {
     val fieldMap = Map(schema.fields.map(x => x.name -> x): _*)
     new StructType(columns.map(name => fieldMap(name)))
-  }
-
-  protected def sqlQuote(identifier: String) = s""""$identifier""""
-
-  protected def columnList(columns: Seq[String]): String = {
-    columns.map(sqlQuote).mkString(", ")
-  }
-
-  protected def compileValue(value: Any): Any = value match {
-    case stringValue: String => s"\\'${escapeSql(stringValue.toString)}\\'"
-    case _ => value
-  }
-
-  protected def escapeSql(value: String): String =
-    if (value == null) null else value.replace("'", "''")
-
-  protected def buildWhereClause(filters: Array[Filter]): String = {
-    val filterClauses = filters.collect {
-      case EqualTo(attr, value) => s"${sqlQuote(attr)} = ${compileValue(value)}"
-      case LessThan(attr, value) => s"${sqlQuote(attr)} < ${compileValue(value)}"
-      case GreaterThan(attr, value) => s"${sqlQuote(attr)} > ${compileValue(value)}"
-      case LessThanOrEqual(attr, value) => s"${sqlQuote(attr)} <= ${compileValue(value)}"
-      case GreaterThanOrEqual(attr, value) => s"${sqlQuote(attr)} >= ${compileValue(value)}"
-    }.mkString(" AND ")
-
-    if (filterClauses.isEmpty) "" else "WHERE " + filterClauses
   }
 }
