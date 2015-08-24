@@ -1,22 +1,28 @@
 language: scala
 scala:
   - 2.10.4
-jdk:
-  - openjdk6
 sudo: false
 cache:
   directories:
     - $HOME/.ivy2
+# There's no nicer way to specify this matrix; see
+# https://github.com/travis-ci/travis-ci/issues/1519.
+# Spark 1.5.0 only supports Java 7+.
+matrix:
+  include:
+    - jdk: openjdk6
+      env: HADOOP_VERSION="1.0.4" SPARK_VERSION="1.4.1"
+    - jdk: openjdk6
+      env: HADOOP_VERSION="1.2.1" SPARK_VERSION="1.4.1"
+    - jdk: openjdk6
+      env: HADOOP_VERSION="2.2.0" SPARK_VERSION="1.4.1"
+    - jdk: openjdk7
+      env: HADOOP_VERSION="1.0.4" SPARK_VERSION="1.5.0-rc1"
+    - jdk: openjdk7
+      env: HADOOP_VERSION="1.2.1" SPARK_VERSION="1.5.0-rc1"
+    - jdk: openjdk7
+      env: HADOOP_VERSION="2.2.0" SPARK_VERSION="1.5.0-rc1"
 env:
-  matrix:
-    # There's no nicer way to specify this matrix; see
-    # https://github.com/travis-ci/travis-ci/issues/1519
-    - HADOOP_VERSION="1.0.4" SPARK_VERSION="1.4.1"
-    - HADOOP_VERSION="1.2.1" SPARK_VERSION="1.4.1"
-    - HADOOP_VERSION="2.2.0" SPARK_VERSION="1.4.1"
-    - HADOOP_VERSION="1.0.4" SPARK_VERSION="1.5.0-rc1"
-    - HADOOP_VERSION="1.2.1" SPARK_VERSION="1.5.0-rc1"
-    - HADOOP_VERSION="2.2.0" SPARK_VERSION="1.5.0-rc1"
   global:
     # AWS_REDSHIFT_JDBC_URL
     - secure: "RNkxdKcaKEYuJqxli8naazp42qO5/pgueIzs+J5rHwl39jcBvJMgW3DX8kT7duzdoBb/qrolj/ttbQ3l/30P45+djn0BEwcJMX7G/FGpZYD23yd03qeq7sOKPQl2Ni/OBttYHJMah5rI6aPmAysBZMQO7Wijdenb/RUiU2YcZp0="
