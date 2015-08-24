@@ -57,7 +57,7 @@ object SparkRedshiftBuild extends Build {
         // http://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-connection.html
         "com.amazon.redshift" % "jdbc4" % "1.1.7.1007" % "test" from "https://s3.amazonaws.com/redshift-downloads/drivers/RedshiftJDBC4-1.1.7.1007.jar",
         "com.google.guava" % "guava" % "14.0.1" % "test",
-        "org.scalatest" %% "scalatest" % "2.1.5" % "test",
+        "org.scalatest" %% "scalatest" % "2.2.1" % "test",
         "org.scalamock" %% "scalamock-scalatest-support" % "3.2" % "test"
       ),
       ScoverageSbtPlugin.ScoverageKeys.coverageHighlighting := {
