@@ -50,7 +50,7 @@ val sqlContext = new SQLContext(sc)
 // Get some data from a Redshift table
 val df: DataFrame = sqlContext.read
     .format("com.databricks.spark.redshift")
-    .option("url", "jdbc:postgresql://redshifthost:5439/database?user=username&password=pass")
+    .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass")
     .option("dbtable", "my_table")
     .option("tempdir", "s3://path/for/temp/data")
     .load()
@@ -60,7 +60,7 @@ val df: DataFrame = sqlContext.read
 
 df.write
     .format("com.databricks.spark.redshift")
-    .option("url", "jdbc:postgresql://redshifthost:5439/database?user=username&password=pass")
+    .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass")
     .option("dbtable", "my_table_copy")
     .option("tempdir", "s3://path/for/temp/data")
     .option("avrocompression", "snappy")
@@ -79,7 +79,7 @@ sql_context = SQLContext(sc)
 # Read data from a table
 df = sql_context.read \
     .format("com.databricks.spark.redshift") \
-    .option("url", "jdbc:postgresql://redshifthost:5439/database?user=username&password=pass") \
+    .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass") \
     .option("dbtable", "my_table") \
     .option("tempdir", "s3://path/for/temp/data") \
     .load()
@@ -87,7 +87,7 @@ df = sql_context.read \
 # Write back to a table
 df.write \
     .format("com.databricks.spark.redshift")
-    .option("url", "jdbc:postgresql://redshifthost:5439/database?user=username&password=pass") \
+    .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass") \
     .option("dbtable", "my_table_copy") \
     .option("tempdir", "s3://path/for/temp/data") \
     .option("avrocompression", "snappy")
@@ -103,7 +103,7 @@ USING com.databricks.spark.redshift
 OPTIONS (dbtable 'my_table',
          tempdir 's3://my_bucket/tmp',
          avrocompression 'snappy',
-         url 'jdbc:postgresql://host:port/db?user=username&password=pass');
+         url 'jdbc:redshift://host:port/db?user=username&password=pass');
 ```
 
 ### Scala helper functions
