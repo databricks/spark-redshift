@@ -31,7 +31,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql._
-import org.apache.spark.sql.types.{ByteType, StructType, StructField, IntegerType}
+import org.apache.spark.sql.types._
 
 private class TestContext extends SparkContext("local", "RedshiftSourceSuite") {
 
