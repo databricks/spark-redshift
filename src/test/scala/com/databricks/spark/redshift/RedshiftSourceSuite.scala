@@ -274,17 +274,11 @@ class RedshiftSourceSuite
 
   test("DefaultSource serializes data as Avro when avrocompression is enabled") {
 
-    //val testSqlContext = new SQLContext(sc)
-
-    //val jdbcUrl = "jdbc:postgresql://foo/bar"
     val params = defaultParams ++ Map(
       "postactions" -> "GRANT SELECT ON %s TO jeremy",
       "diststyle" -> "KEY",
       "distkey" -> "testInt",
       "avrocompression" -> "snappy")
-
-    //val rdd = sc.parallelize(TestUtils.expectedData.toSeq)
-    //val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
 
     val expectedCommands =
       Seq("DROP TABLE IF EXISTS test_table_staging_.*".r,
