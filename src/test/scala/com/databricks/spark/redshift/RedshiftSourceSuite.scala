@@ -401,15 +401,29 @@ class RedshiftSourceSuite
     ignoreSource.createRelation(testSqlContext, SaveMode.Ignore, defaultParams, expectedDataDF)
   }
 
+  test("Cannot save when 'query' parameter is specified instead of 'dbtable'") {
+    val invalidParams = Map(
+      "url" -> "jdbc:redshift://foo/bar",
+      "tempdir" -> tempDir.toURI.toString,
+      "query" -> "select * from test_table",
+      "aws_access_key_id" -> "test1",
+      "aws_secret_access_key" -> "test2")
+
+    val e1 = intercept[IllegalArgumentException] {
+      expectedDataDF.saveAsRedshiftTable(invalidParams)
+    }
+    assert(e1.getMessage.contains("dbtable"))
+  }
+
   test("Public Scala API rejects invalid parameter maps") {
     val invalidParams = Map("dbtable" -> "foo") // missing tempdir and url
 
-    val e1 = intercept[Exception] {
+    val e1 = intercept[IllegalArgumentException] {
       expectedDataDF.saveAsRedshiftTable(invalidParams)
     }
     assert(e1.getMessage.contains("tempdir"))
 
-    val e2 = intercept[Exception] {
+    val e2 = intercept[IllegalArgumentException] {
       testSqlContext.redshiftTable(invalidParams)
     }
     assert(e2.getMessage.contains("tempdir"))

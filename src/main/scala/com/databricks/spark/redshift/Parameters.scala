@@ -47,13 +47,19 @@ private[redshift] object Parameters extends Logging {
    */
   def mergeParameters(userParameters: Map[String, String]): MergedParameters = {
     if (!userParameters.contains("tempdir")) {
-      sys.error("'tempdir' is required for all Redshift loads and saves")
-    }
-    if (!userParameters.contains("dbtable")) {
-      sys.error("You must specify a Redshift table name with 'dbtable' parameter")
+      throw new IllegalArgumentException("'tempdir' is required for all Redshift loads and saves")
     }
     if (!userParameters.contains("url")) {
-      sys.error("A JDBC URL must be provided with 'url' parameter")
+      throw new IllegalArgumentException("A JDBC URL must be provided with 'url' parameter")
+    }
+    if (!userParameters.contains("dbtable") && !userParameters.contains("query")) {
+      throw new IllegalArgumentException(
+        "You must specify a Redshift table name with the 'dbtable' parameter or a query with the " +
+        "'query' parameter.")
+    }
+    if (userParameters.contains("dbtable") && userParameters.contains("query")) {
+      throw new IllegalArgumentException(
+        "You cannot specify both the 'dbtable' and 'query' parameters at the same time.")
     }
 
     MergedParameters(DEFAULT_PARAMETERS ++ userParameters)
@@ -79,7 +85,12 @@ private[redshift] object Parameters extends Logging {
     /**
      * The Redshift table to be used as the target when loading or writing data.
      */
-    def table: String = parameters("dbtable")
+    def table: Option[String] = parameters.get("dbtable")
+
+    /**
+     * The Redshift query to be used as the target when loading data.
+     */
+    def query: Option[String] = parameters.get("query")
 
     /**
      * A JDBC URL, of the format:

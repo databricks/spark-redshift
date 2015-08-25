@@ -257,6 +257,28 @@ class RedshiftIntegrationSuite
     checkAnswer(loadedDf, Seq(Row(1, true)))
   }
 
+  test("Can load output when 'query' is specified instead of 'dbtable'") {
+    // scalastyle:off
+    val query =
+      s"""
+        |select testbyte, testbool
+        |from $test_table
+        |where testbool = true
+        | and teststring = 'Unicode''s樂趣'
+        | and testdouble = 1234152.12312498
+        | and testfloat = 1.0
+        | and testint = 42
+      """.stripMargin
+    // scalastyle:on
+    val loadedDf = sqlContext.read
+      .format("com.databricks.spark.redshift")
+      .option("url", jdbcUrl)
+      .option("query", query)
+      .option("tempdir", tempDir)
+      .load()
+    checkAnswer(loadedDf, Seq(Row(1, true)))
+  }
+
   test("DefaultSource supports simple column filtering") {
     checkAnswer(
       sqlContext.sql("select testbyte, testbool from test_table"),

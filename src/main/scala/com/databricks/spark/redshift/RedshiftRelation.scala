@@ -44,7 +44,8 @@ private[redshift] case class RedshiftRelation(
       case Some(schema) => schema
       case None => {
         jdbcWrapper.registerDriver(params.jdbcDriver)
-        jdbcWrapper.resolveTable(params.jdbcUrl, params.table, new Properties())
+        val tableNameOrSubquery = params.query.map(q => s"($q)").orElse(params.table).get
+        jdbcWrapper.resolveTable(params.jdbcUrl, tableNameOrSubquery, new Properties())
       }
     }
   }
@@ -75,16 +76,13 @@ private[redshift] case class RedshiftRelation(
   private def unloadStmnt(columnList: String, whereClause: String) : String = {
     val credsString = params.credentialsString(sqlContext.sparkContext.hadoopConfiguration)
     val tableNameOrSubquery: String = {
-      def sqlEscape(s: String): String = s.replace("'", "\\'")
-      if (!params.table.isEmpty) {
-        sqlEscape(params.table)
-      } else {
-        sys.error("Must specify either 'table' or 'query' param.")
-      }
+      val unescaped = params.query.map(q => s"($q)").orElse(params.table).get
+      unescaped.replace("'", "\\'")
     }
     val query = s"SELECT $columnList FROM $tableNameOrSubquery $whereClause"
     val fixedUrl = Utils.fixS3Url(params.tempPath)
 
+    println(s"UNLOAD ('$query') TO '$fixedUrl' WITH CREDENTIALS '$credsString' ESCAPE ALLOWOVERWRITE")
     s"UNLOAD ('$query') TO '$fixedUrl' WITH CREDENTIALS '$credsString' ESCAPE ALLOWOVERWRITE"
   }
 
