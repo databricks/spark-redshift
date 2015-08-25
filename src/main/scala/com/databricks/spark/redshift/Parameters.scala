@@ -217,6 +217,6 @@ private[redshift] object Parameters extends Logging {
      *
      * Defaults to disabled (i.e. whatever is set in Hadoop config).
      */
-    def avrocompression = parameters("avrocompression")
+    def avrocompression: String = parameters("avrocompression")
   }
 }
