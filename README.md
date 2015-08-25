@@ -55,6 +55,14 @@ val df: DataFrame = sqlContext.read
     .option("tempdir" -> "s3://path/for/temp/data")
     .load()
 
+// Can also load data from a Redshift query
+val df: DataFrame = sqlContext.read
+    .format("com.databricks.spark.redshift")
+    .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass")
+    .option("query" -> "select x, count(*) my_table group by x")
+    .option("tempdir" -> "s3://path/for/temp/data")
+    .load()
+
 // Apply some transformations to the data as per normal, then you can use the
 // Data Source API to write the data back to another table
 
@@ -80,6 +88,14 @@ df = sql_context.read \
     .format("com.databricks.spark.redshift") \
     .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass") \
     .option("dbtable" -> "my_table") \
+    .option("tempdir" -> "s3://path/for/temp/data") \
+    .load()
+
+# Read data from a query
+df = sql_context.read \
+    .format("com.databricks.spark.redshift") \
+    .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass") \
+    .option("query" -> "select x, count(*) my_table group by x") \
     .option("tempdir" -> "s3://path/for/temp/data") \
     .load()
 
@@ -158,10 +174,16 @@ The parameter map or <tt>OPTIONS</tt> provided in Spark SQL supports the followi
 
  <tr>
     <td><tt>dbtable</tt></td>
-    <td>Yes</td>
+    <td>Yes, unless <tt>query</tt> is specified</td>
     <td>No default</td>
-    <td>The table to create or read from in Redshift</td>
- </tr
+    <td>The table to create or read from in Redshift. This parameter is required when saving data back to Redshift.</td>
+ </tr>
+ <tr>
+    <td><tt>query</tt></td>
+    <td>Yes, unless <tt>dbtable</tt> is specified</td>
+    <td>No default</td>
+    <td>The query to read from in Redshift</td>
+ </tr>
  <tr>
     <td><tt>url</tt></td>
     <td>Yes</td>
@@ -195,7 +217,7 @@ need to be configured to allow access from your driver application.
  <tr>
     <td><tt>aws_security_token</tt></td>
     <td>No, unless using temporary IAM credentials</td>
-    <td>None</td>
+    <td>No default</td>
     <td>AWS security token corresponding to provided access key.</td>
  </tr>
  <tr>

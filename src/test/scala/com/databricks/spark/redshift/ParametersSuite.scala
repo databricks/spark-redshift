@@ -33,7 +33,7 @@ class ParametersSuite extends FunSuite with Matchers {
 
     mergedParams.tempPath should startWith (params("tempdir"))
     mergedParams.jdbcUrl shouldBe params("url")
-    mergedParams.table shouldBe params("dbtable")
+    mergedParams.table shouldBe Some(params("dbtable"))
 
     // Check that the defaults have been added
     Parameters.DEFAULT_PARAMETERS foreach {
@@ -54,9 +54,8 @@ class ParametersSuite extends FunSuite with Matchers {
   }
 
   test("Errors are thrown when mandatory parameters are not provided") {
-
     def checkMerge(params: Map[String, String]): Unit = {
-      intercept[Exception] {
+      intercept[IllegalArgumentException] {
         Parameters.mergeParameters(params)
       }
     }
@@ -64,5 +63,26 @@ class ParametersSuite extends FunSuite with Matchers {
     checkMerge(Map("dbtable" -> "test_table", "url" -> "jdbc:redshift://foo/bar"))
     checkMerge(Map("tempdir" -> "s3://foo/bar", "url" -> "jdbc:redshift://foo/bar"))
     checkMerge(Map("dbtable" -> "test_table", "tempdir" -> "s3://foo/bar"))
+  }
+
+  test("Must specify either 'dbtable' or 'query' parameter, but not both") {
+    intercept[IllegalArgumentException] {
+      Parameters.mergeParameters(Map(
+        "tempdir" -> "s3://foo/bar",
+        "url" -> "jdbc:redshift://foo/bar"))
+    }.getMessage should (include ("dbtable") and include ("query"))
+
+    intercept[IllegalArgumentException] {
+      Parameters.mergeParameters(Map(
+        "tempdir" -> "s3://foo/bar",
+        "dbtable" -> "test_table",
+        "query" -> "select * from test_table",
+        "url" -> "jdbc:redshift://foo/bar"))
+    }.getMessage should (include ("dbtable") and include ("query") and include("both"))
+
+    Parameters.mergeParameters(Map(
+      "tempdir" -> "s3://foo/bar",
+      "query" -> "select * from test_table",
+      "url" -> "jdbc:redshift://foo/bar"))
   }
 }

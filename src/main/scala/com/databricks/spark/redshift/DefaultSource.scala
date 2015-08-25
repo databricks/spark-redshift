@@ -68,11 +68,15 @@ class DefaultSource(jdbcWrapper: JDBCWrapper)
       parameters: Map[String, String],
       data: DataFrame): BaseRelation = {
     val params = Parameters.mergeParameters(parameters)
+    val table = params.table.getOrElse {
+      throw new IllegalArgumentException(
+        "For save operations you must specify a Redshift table name with the 'dbtable' parameter")
+    }
 
     def tableExists: Boolean = {
       val conn =
         jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, new Properties()).apply()
-      val exists = jdbcWrapper.tableExists(conn, params.table)
+      val exists = jdbcWrapper.tableExists(conn, table)
       conn.close()
       exists
     }
@@ -82,13 +86,13 @@ class DefaultSource(jdbcWrapper: JDBCWrapper)
       case SaveMode.Overwrite => (true, true)
       case SaveMode.ErrorIfExists =>
         if (tableExists) {
-          sys.error(s"Table ${params.table} already exists! (SaveMode is set to ErrorIfExists)")
+          sys.error(s"Table $table already exists! (SaveMode is set to ErrorIfExists)")
         } else {
           (true, false)
         }
       case SaveMode.Ignore =>
         if (tableExists) {
-          log.info(s"Table ${params.table} already exists -- ignoring save request.")
+          log.info(s"Table $table already exists -- ignoring save request.")
           (false, false)
         } else {
           (true, false)

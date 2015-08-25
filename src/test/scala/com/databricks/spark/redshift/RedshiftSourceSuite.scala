@@ -31,7 +31,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql._
-import org.apache.spark.sql.types.{StructType, StructField, IntegerType}
+import org.apache.spark.sql.types._
 
 private class TestContext extends SparkContext("local", "RedshiftSourceSuite") {
 
@@ -170,6 +170,54 @@ class RedshiftSourceSuite
     val relation = source.createRelation(testSqlContext, defaultParams)
     val df = testSqlContext.baseRelationToDataFrame(relation)
     checkAnswer(df, TestUtils.expectedData)
+  }
+
+  test("Can load output of Redshift queries") {
+    // scalastyle:off
+    val expectedJDBCQuery =
+      """
+        |UNLOAD \('SELECT "testbyte", "testbool" FROM
+        |  \(select testbyte, testbool
+        |    from test_table
+        |    where teststring = \\'Unicode\\'\\'s樂趣\\'\) '\)
+      """.stripMargin.lines.map(_.trim).mkString(" ").trim.r
+    val query =
+      """select testbyte, testbool from test_table where teststring = 'Unicode''s樂趣'"""
+    // scalastyle:on
+    val querySchema =
+      StructType(Seq(StructField("testbyte", ByteType), StructField("testbool", BooleanType)))
+
+    // Test with dbtable parameter that wraps the query in parens:
+    {
+      val params = defaultParams + ("dbtable" -> s"($query)")
+      val jdbcWrapper = mockJdbcWrapper(params("url"), Seq(expectedJDBCQuery))
+      (jdbcWrapper.registerDriver _)
+        .expects(*)
+        .anyNumberOfTimes()
+      (jdbcWrapper.resolveTable _)
+        .expects(params("url"), *, *)
+        .returning(querySchema)
+        .anyNumberOfTimes()
+      // Note: Assertions covered by mocks
+      val relation = new DefaultSource(jdbcWrapper).createRelation(testSqlContext, params)
+      testSqlContext.baseRelationToDataFrame(relation).collect()
+    }
+
+    // Test with query parameter
+    {
+      val params = defaultParams - "dbtable" + ("query" -> query)
+      val jdbcWrapper = mockJdbcWrapper(params("url"), Seq(expectedJDBCQuery))
+      (jdbcWrapper.registerDriver _)
+        .expects(*)
+        .anyNumberOfTimes()
+      (jdbcWrapper.resolveTable _)
+        .expects(params("url"), *, *)
+        .returning(querySchema)
+        .anyNumberOfTimes()
+      // Note: Assertions covered by mocks
+      val relation = new DefaultSource(jdbcWrapper).createRelation(testSqlContext, params)
+      testSqlContext.baseRelationToDataFrame(relation).collect()
+    }
   }
 
   test("DefaultSource supports simple column filtering") {
@@ -419,15 +467,29 @@ class RedshiftSourceSuite
     ignoreSource.createRelation(testSqlContext, SaveMode.Ignore, defaultParams, expectedDataDF)
   }
 
+  test("Cannot save when 'query' parameter is specified instead of 'dbtable'") {
+    val invalidParams = Map(
+      "url" -> "jdbc:redshift://foo/bar",
+      "tempdir" -> tempDir.toURI.toString,
+      "query" -> "select * from test_table",
+      "aws_access_key_id" -> "test1",
+      "aws_secret_access_key" -> "test2")
+
+    val e1 = intercept[IllegalArgumentException] {
+      expectedDataDF.saveAsRedshiftTable(invalidParams)
+    }
+    assert(e1.getMessage.contains("dbtable"))
+  }
+
   test("Public Scala API rejects invalid parameter maps") {
     val invalidParams = Map("dbtable" -> "foo") // missing tempdir and url
 
-    val e1 = intercept[Exception] {
+    val e1 = intercept[IllegalArgumentException] {
       expectedDataDF.saveAsRedshiftTable(invalidParams)
     }
     assert(e1.getMessage.contains("tempdir"))
 
-    val e2 = intercept[Exception] {
+    val e2 = intercept[IllegalArgumentException] {
       testSqlContext.redshiftTable(invalidParams)
     }
     assert(e2.getMessage.contains("tempdir"))

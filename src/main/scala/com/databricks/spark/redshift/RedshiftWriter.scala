@@ -36,7 +36,7 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
   /**
    * Generate CREATE TABLE statement for Redshift
    */
-  def createTableSql(data: DataFrame, params: MergedParameters): String = {
+  private def createTableSql(data: DataFrame, params: MergedParameters): String = {
     val schemaSql = jdbcWrapper.schemaString(data.schema)
     val distStyleDef = params.distStyle match {
       case Some(style) => s"DISTSTYLE $style"
@@ -47,17 +47,18 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
       case None => ""
     }
     val sortKeyDef = params.sortKeySpec.getOrElse("")
+    val table = params.table.get
 
-    s"CREATE TABLE IF NOT EXISTS ${params.table} ($schemaSql) $distStyleDef $distKeyDef $sortKeyDef"
+    s"CREATE TABLE IF NOT EXISTS $table ($schemaSql) $distStyleDef $distKeyDef $sortKeyDef"
   }
 
   /**
    * Generate the COPY SQL command
    */
-  def copySql(sqlContext: SQLContext, params: MergedParameters): String = {
+  private def copySql(sqlContext: SQLContext, params: MergedParameters): String = {
     val creds = params.credentialsString(sqlContext.sparkContext.hadoopConfiguration)
     val fixedUrl = Utils.fixS3Url(params.tempPath)
-    s"COPY ${params.table} FROM '$fixedUrl' CREDENTIALS '$creds' FORMAT AS " +
+    s"COPY ${params.table.get} FROM '$fixedUrl' CREDENTIALS '$creds' FORMAT AS " +
       "AVRO 'auto' DATEFORMAT 'YYYY-MM-DD HH:MI:SS'"
   }
 
@@ -65,27 +66,30 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
    * Sets up a staging table then runs the given action, passing the temporary table name
    * as a parameter.
    */
-  def withStagingTable(conn: Connection, params: MergedParameters, action: (String) => Unit) {
+  private def withStagingTable(
+      conn: Connection,
+      table: String,
+      action: (String) => Unit) {
     val randomSuffix = Math.abs(Random.nextInt()).toString
-    val tempTable = s"${params.table}_staging_$randomSuffix"
-    val backupTable = s"${params.table}_backup_$randomSuffix"
+    val tempTable = s"${table}_staging_$randomSuffix"
+    val backupTable = s"${table}_backup_$randomSuffix"
 
     try {
       log.info("Loading new Redshift data to: " + tempTable)
       log.info("Existing data will be backed up in: " + backupTable)
 
       action(tempTable)
-      if (jdbcWrapper.tableExists(conn, params.table)) {
-        conn.prepareStatement(s"ALTER TABLE ${params.table} RENAME TO $backupTable").execute()
+      if (jdbcWrapper.tableExists(conn, table)) {
+        conn.prepareStatement(s"ALTER TABLE $table RENAME TO $backupTable").execute()
       }
-      conn.prepareStatement(s"ALTER TABLE $tempTable RENAME TO ${params.table}").execute()
+      conn.prepareStatement(s"ALTER TABLE $tempTable RENAME TO $table").execute()
     } catch {
       case e: SQLException =>
         if (jdbcWrapper.tableExists(conn, tempTable)) {
           conn.prepareStatement(s"DROP TABLE $tempTable").execute()
         }
         if (jdbcWrapper.tableExists(conn, backupTable)) {
-          conn.prepareStatement(s"ALTER TABLE $backupTable RENAME TO ${params.table}").execute()
+          conn.prepareStatement(s"ALTER TABLE $backupTable RENAME TO $table").execute()
         }
         throw new Exception("Error loading data to Redshift, changes reverted.", e)
     }
@@ -97,11 +101,11 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
    * Perform the Redshift load, including deletion of existing data in the case of an overwrite,
    * and creating the table if it doesn't already exist.
    */
-  def doRedshiftLoad(conn: Connection, data: DataFrame, params: MergedParameters): Unit = {
+  private def doRedshiftLoad(conn: Connection, data: DataFrame, params: MergedParameters): Unit = {
 
     // Overwrites must drop the table, in case there has been a schema update
     if (params.overwrite) {
-      val deleteExisting = conn.prepareStatement(s"DROP TABLE IF EXISTS ${params.table}")
+      val deleteExisting = conn.prepareStatement(s"DROP TABLE IF EXISTS ${params.table.get}")
       deleteExisting.execute()
     }
 
@@ -118,7 +122,7 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
 
     // Execute postActions
     params.postActions.foreach { action =>
-      val actionSql = if (action.contains("%s")) action.format(params.table) else action
+      val actionSql = if (action.contains("%s")) action.format(params.table.get) else action
       log.info("Executing postAction: " + actionSql)
       conn.prepareStatement(actionSql).execute()
     }
@@ -191,12 +195,17 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
    * Write a DataFrame to a Redshift table, using S3 and Avro serialization
    */
   def saveToRedshift(sqlContext: SQLContext, data: DataFrame, params: MergedParameters) : Unit = {
+    if (params.table.isEmpty) {
+      throw new IllegalArgumentException(
+        "For save operations you must specify a Redshift table name with the 'dbtable' parameter")
+    }
+
     val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, new Properties()).apply()
 
     try {
       if (params.overwrite && params.useStagingTable) {
-        withStagingTable(conn, params, table => {
-          val updatedParams = MergedParameters(params.parameters.updated("dbtable", table))
+        withStagingTable(conn, params.table.get, stagingTable => {
+          val updatedParams = MergedParameters(params.parameters.updated("dbtable", stagingTable))
           unloadData(sqlContext, data, updatedParams.tempPath)
           doRedshiftLoad(conn, data, updatedParams)
         })
