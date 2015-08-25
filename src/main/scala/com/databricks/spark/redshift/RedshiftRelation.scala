@@ -74,7 +74,15 @@ private[redshift] case class RedshiftRelation(
 
   private def unloadStmnt(columnList: String, whereClause: String) : String = {
     val credsString = params.credentialsString(sqlContext.sparkContext.hadoopConfiguration)
-    val query = s"SELECT $columnList FROM ${params.table} $whereClause"
+    val tableNameOrSubquery: String = {
+      def sqlEscape(s: String): String = s.replace("'", "\\'")
+      if (!params.table.isEmpty) {
+        sqlEscape(params.table)
+      } else {
+        sys.error("Must specify either 'table' or 'query' param.")
+      }
+    }
+    val query = s"SELECT $columnList FROM $tableNameOrSubquery $whereClause"
     val fixedUrl = Utils.fixS3Url(params.tempPath)
 
     s"UNLOAD ('$query') TO '$fixedUrl' WITH CREDENTIALS '$credsString' ESCAPE ALLOWOVERWRITE"
