@@ -274,22 +274,17 @@ class RedshiftSourceSuite
 
   test("DefaultSource serializes data as Avro when avrocompression is enabled") {
 
-    val testSqlContext = new SQLContext(sc)
+    //val testSqlContext = new SQLContext(sc)
 
-    val jdbcUrl = "jdbc:postgresql://foo/bar"
-    val params =
-      Map("url" -> jdbcUrl,
-          "tempdir" -> tempDir,
-          "dbtable" -> "test_table",
-          "aws_access_key_id" -> "test1",
-          "aws_secret_access_key" -> "test2",
-          "postactions" -> "GRANT SELECT ON %s TO jeremy",
-          "diststyle" -> "KEY",
-          "distkey" -> "testInt",
-          "avrocompression" -> "snappy")
+    //val jdbcUrl = "jdbc:postgresql://foo/bar"
+    val params = defaultParams ++ Map(
+      "postactions" -> "GRANT SELECT ON %s TO jeremy",
+      "diststyle" -> "KEY",
+      "distkey" -> "testInt",
+      "avrocompression" -> "snappy")
 
-    val rdd = sc.parallelize(expectedData.toSeq)
-    val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
+    //val rdd = sc.parallelize(TestUtils.expectedData.toSeq)
+    //val df = testSqlContext.createDataFrame(rdd, TestUtils.testSchema)
 
     val expectedCommands =
       Seq("DROP TABLE IF EXISTS test_table_staging_.*".r,
@@ -298,9 +293,9 @@ class RedshiftSourceSuite
           "GRANT SELECT ON test_table_staging.+ TO jeremy".r,
           "ALTER TABLE test_table RENAME TO test_table_backup_.*".r,
           "ALTER TABLE test_table_staging_.* RENAME TO test_table".r,
-          "DROP TABLE test_table_backup.*".r)
+          "DROP TABLE IF EXISTS test_table_backup.*".r)
 
-    val jdbcWrapper = mockJdbcWrapper(jdbcUrl, expectedCommands)
+    val jdbcWrapper = mockJdbcWrapper(params("url"), expectedCommands)
 
     (jdbcWrapper.tableExists _)
       .expects(*, "test_table")
@@ -308,19 +303,22 @@ class RedshiftSourceSuite
       .anyNumberOfTimes()
 
     (jdbcWrapper.schemaString _)
-      .expects(*, jdbcUrl)
+      .expects(*)
       .returning("schema")
       .anyNumberOfTimes()
 
-    val relation = RedshiftRelation(jdbcWrapper, Parameters.mergeParameters(params), None)(testSqlContext)
-    relation.asInstanceOf[InsertableRelation].insert(df, true)
+    val relation =
+      RedshiftRelation(jdbcWrapper, Parameters.mergeParameters(params), None)(testSqlContext)
+    relation.asInstanceOf[InsertableRelation].insert(expectedDataDF, true)
 
     // Make sure we wrote the data out ready for Redshift load, in the expected formats
-    val written = testSqlContext.read.format("com.databricks.spark.avro").load(tempDir)
-    written.collect() zip expectedData foreach {
-      case (loaded, expected) =>
-        loaded shouldBe expected
-    }
+    // The data should have been written to a random subdirectory of `tempdir`. Since we clear
+    // `tempdir` between every unit test, there should only be one directory here.
+    // Note: this does not actually test that the written files are properly compressed.
+    assert(tempDir.list().length === 1)
+    val dirWithAvroFiles = tempDir.listFiles().head.toURI.toString
+    val written = testSqlContext.read.format("com.databricks.spark.avro").load(dirWithAvroFiles)
+    checkAnswer(written, TestUtils.expectedDataWithConvertedTimesAndDates)
   }
 
   test("Failed copies are handled gracefully when using a staging table") {
