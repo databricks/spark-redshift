@@ -279,6 +279,16 @@ class RedshiftIntegrationSuite
     checkAnswer(loadedDf, Seq(Row(1, true)))
   }
 
+  test("Can load output of Redshift aggregation queries") {
+    val loadedDf = sqlContext.read
+      .format("com.databricks.spark.redshift")
+      .option("url", jdbcUrl)
+      .option("query", s"select testbool, count(*) from $test_table group by testbool")
+      .option("tempdir", tempDir)
+      .load()
+    checkAnswer(loadedDf, Seq(Row(true, 1), Row(false, 2), Row(null, 2)))
+  }
+
   test("DefaultSource supports simple column filtering") {
     checkAnswer(
       sqlContext.sql("select testbyte, testbool from test_table"),
