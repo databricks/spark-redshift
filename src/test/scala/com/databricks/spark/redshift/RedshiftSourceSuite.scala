@@ -30,6 +30,7 @@ import org.scalatest.{BeforeAndAfterEach, BeforeAndAfterAll, Matchers}
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.sources._
+import org.apache.spark.sql.types.{BooleanType, StructType, StructField, ByteType}
 import org.apache.spark.sql.{DataFrame, Row, SQLContext, SaveMode}
 
 private class TestContext extends SparkContext("local", "RedshiftSourceSuite") {
@@ -169,6 +170,54 @@ class RedshiftSourceSuite
     val relation = source.createRelation(testSqlContext, defaultParams)
     val df = testSqlContext.baseRelationToDataFrame(relation)
     checkAnswer(df, TestUtils.expectedData)
+  }
+
+  test("Can load output of Redshift queries") {
+    // scalastyle:off
+    val expectedJDBCQuery =
+      """
+        |UNLOAD \('SELECT "testbyte", "testbool" FROM
+        |  \(select testbyte, testbool
+        |    from test_table
+        |    where teststring = \\'Unicode\\'\\'s樂趣\\'\) '\)
+      """.stripMargin.lines.map(_.trim).mkString(" ").trim.r
+    val query =
+      """select testbyte, testbool from test_table where teststring = 'Unicode''s樂趣'"""
+    // scalastyle:on
+    val querySchema =
+      StructType(Seq(StructField("testbyte", ByteType), StructField("testbool", BooleanType)))
+
+    // Test with dbtable parameter that wraps the query in parens:
+    {
+      val params = defaultParams + ("dbtable" -> s"($query)")
+      val jdbcWrapper = mockJdbcWrapper(params("url"), Seq(expectedJDBCQuery))
+      (jdbcWrapper.registerDriver _)
+        .expects(*)
+        .anyNumberOfTimes()
+      (jdbcWrapper.resolveTable _)
+        .expects(params("url"), *, *)
+        .returning(querySchema)
+        .anyNumberOfTimes()
+      // Note: Assertions covered by mocks
+      val relation = new DefaultSource(jdbcWrapper).createRelation(testSqlContext, params)
+      testSqlContext.baseRelationToDataFrame(relation).collect()
+    }
+
+    // Test with query parameter
+    {
+      val params = defaultParams - "dbtable" + ("query" -> query)
+      val jdbcWrapper = mockJdbcWrapper(params("url"), Seq(expectedJDBCQuery))
+      (jdbcWrapper.registerDriver _)
+        .expects(*)
+        .anyNumberOfTimes()
+      (jdbcWrapper.resolveTable _)
+        .expects(params("url"), *, *)
+        .returning(querySchema)
+        .anyNumberOfTimes()
+      // Note: Assertions covered by mocks
+      val relation = new DefaultSource(jdbcWrapper).createRelation(testSqlContext, params)
+      testSqlContext.baseRelationToDataFrame(relation).collect()
+    }
   }
 
   test("DefaultSource supports simple column filtering") {
