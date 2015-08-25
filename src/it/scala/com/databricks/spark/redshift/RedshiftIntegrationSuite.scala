@@ -28,6 +28,7 @@ import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.{AnalysisException, Row, SQLContext, SaveMode}
 import org.apache.spark.sql.hive.test.TestHiveContext
+import org.apache.spark.sql.types._
 
 /**
  * End-to-end tests which run against a real Redshift cluster.
@@ -337,6 +338,35 @@ class RedshiftIntegrationSuite
         .option("tempdir", tempDir)
         .load()
       checkAnswer(loadedDf, TestUtils.expectedData)
+    } finally {
+      conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
+      conn.commit()
+    }
+  }
+
+  test("roundtrip save and load with uppercase column names") {
+    val tableName = s"roundtrip_write_and_read_with_uppercase_column_names_$randomSuffix"
+    val df = sqlContext.createDataFrame(sc.parallelize(Seq(Row(1))),
+      StructType(StructField("A", IntegerType) :: Nil))
+    try {
+      df.write
+        .format("com.databricks.spark.redshift")
+        .option("url", jdbcUrl)
+        .option("dbtable", tableName)
+        .option("tempdir", tempDir)
+        .mode(SaveMode.ErrorIfExists)
+        .save()
+
+      assert(DefaultJDBCWrapper.tableExists(conn, tableName))
+      val loadedDf = sqlContext.read
+        .format("com.databricks.spark.redshift")
+        .option("url", jdbcUrl)
+        .option("dbtable", tableName)
+        .option("tempdir", tempDir)
+        .load()
+      assert(loadedDf.schema.length === 1)
+      assert(loadedDf.columns === Seq("a"))
+      checkAnswer(loadedDf, Seq(Row(1)))
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
       conn.commit()

@@ -30,8 +30,8 @@ import org.scalatest.{BeforeAndAfterEach, BeforeAndAfterAll, Matchers}
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.sources._
-import org.apache.spark.sql.types.{BooleanType, StructType, StructField, ByteType}
-import org.apache.spark.sql.{DataFrame, Row, SQLContext, SaveMode}
+import org.apache.spark.sql._
+import org.apache.spark.sql.types.{StructType, StructField, IntegerType}
 
 private class TestContext extends SparkContext("local", "RedshiftSourceSuite") {
 
@@ -319,6 +319,23 @@ class RedshiftSourceSuite
     val dirWithAvroFiles = tempDir.listFiles().head.toURI.toString
     val written = testSqlContext.read.format("com.databricks.spark.avro").load(dirWithAvroFiles)
     checkAnswer(written, TestUtils.expectedDataWithConvertedTimesAndDates)
+  }
+
+  test("Cannot write table with column names that become ambiguous under case insensitivity") {
+    val jdbcWrapper = mock[JDBCWrapper]
+    val mockedConnection = mock[Connection]
+    (jdbcWrapper.getConnector _)
+      .expects(*, defaultParams("url"), *)
+      .returning(() => mockedConnection)
+    (mockedConnection.close _).expects()
+
+    val schema = StructType(Seq(StructField("a", IntegerType), StructField("A", IntegerType)))
+    val df = testSqlContext.createDataFrame(sc.emptyRDD[Row], schema)
+    val writer = new RedshiftWriter(jdbcWrapper)
+
+    intercept[IllegalArgumentException] {
+      writer.saveToRedshift(testSqlContext, df, Parameters.mergeParameters(defaultParams))
+    }
   }
 
   test("Failed copies are handled gracefully when using a staging table") {
