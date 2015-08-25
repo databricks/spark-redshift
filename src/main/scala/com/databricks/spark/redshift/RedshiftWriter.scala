@@ -156,18 +156,27 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
       Row.fromSeq(convertedValues)
     }
 
+    // Convert all column names to lowercase, which is necessary for Redshift to be able to load
+    // those columns (see #51).
+    val schemaWithLowercaseColumnNames: StructType =
+      StructType(data.schema.map(f => f.copy(name = f.name.toLowerCase)))
+
+    if (schemaWithLowercaseColumnNames.map(_.name).toSet.size != data.schema.size) {
+      throw new IllegalArgumentException(
+        "Cannot save table to Redshift because two or more column names would be identical" +
+        " after conversion to lowercase: " + data.schema.map(_.name))
+    }
+
     // Update the schema so that Avro writes date and timestamp columns as formatted timestamp
     // strings. This is necessary for Redshift to be able to load these columns (see #39).
-    // In addition, convert all column names to lowercase, which is necessary for Redshift to be
-    // able to load those columns (see #51).
     val convertedSchema: StructType = StructType(
-      data.schema.map {
+      schemaWithLowercaseColumnNames.map {
         case StructField(name, DateType, nullable, meta) =>
           StructField(name, StringType, nullable, meta)
         case StructField(name, TimestampType, nullable, meta) =>
           StructField(name, StringType, nullable, meta)
         case other => other
-      }.map(f => f.copy(name = f.name.toLowerCase))
+      }
     )
 
     sqlContext.createDataFrame(convertedRows, convertedSchema)
