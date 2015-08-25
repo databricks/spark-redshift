@@ -82,7 +82,6 @@ private[redshift] case class RedshiftRelation(
     val query = s"SELECT $columnList FROM $tableNameOrSubquery $whereClause"
     val fixedUrl = Utils.fixS3Url(params.tempPath)
 
-    println(s"UNLOAD ('$query') TO '$fixedUrl' WITH CREDENTIALS '$credsString' ESCAPE ALLOWOVERWRITE")
     s"UNLOAD ('$query') TO '$fixedUrl' WITH CREDENTIALS '$credsString' ESCAPE ALLOWOVERWRITE"
   }
 
