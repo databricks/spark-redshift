@@ -166,7 +166,7 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
     if (schemaWithLowercaseColumnNames.map(_.name).toSet.size != data.schema.size) {
       throw new IllegalArgumentException(
         "Cannot save table to Redshift because two or more column names would be identical" +
-        " after conversion to lowercase: " + data.schema.map(_.name))
+        " after conversion to lowercase: " + data.schema.map(_.name).mkString(", "))
     }
 
     // Update the schema so that Avro writes date and timestamp columns as formatted timestamp
