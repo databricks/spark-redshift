@@ -23,6 +23,7 @@ import java.util.Properties
 import scala.util.Random
 
 import org.scalatest.{BeforeAndAfterEach, BeforeAndAfterAll, Matchers}
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 
 import org.apache.spark.SparkContext
@@ -86,10 +87,6 @@ class RedshiftIntegrationSuite
   override def beforeAll(): Unit = {
     super.beforeAll()
     sc = new SparkContext("local", "RedshiftSourceSuite")
-    sc.hadoopConfiguration.set("fs.s3.awsAccessKeyId", AWS_ACCESS_KEY_ID)
-    sc.hadoopConfiguration.set("fs.s3.awsSecretAccessKey", AWS_SECRET_ACCESS_KEY)
-    sc.hadoopConfiguration.set("fs.s3n.awsAccessKeyId", AWS_ACCESS_KEY_ID)
-    sc.hadoopConfiguration.set("fs.s3n.awsSecretAccessKey", AWS_SECRET_ACCESS_KEY)
 
     conn = DefaultJDBCWrapper.getConnector(
       "com.amazon.redshift.jdbc4.Driver", jdbcUrl, new Properties())()
@@ -138,7 +135,10 @@ class RedshiftIntegrationSuite
 
   override def afterAll(): Unit = {
     try {
-      val fs = FileSystem.get(URI.create(tempDir), sc.hadoopConfiguration)
+      val conf = new Configuration()
+      conf.set("fs.s3n.awsAccessKeyId", AWS_ACCESS_KEY_ID)
+      conf.set("fs.s3n.awsSecretAccessKey", AWS_SECRET_ACCESS_KEY)
+      val fs = FileSystem.get(URI.create(tempDir), conf)
       fs.delete(new Path(tempDir), true)
       fs.close()
     } finally {
@@ -178,6 +178,8 @@ class RedshiftIntegrationSuite
          | options(
          |   url \"$jdbcUrl\",
          |   tempdir \"$tempDir\",
+         |   aws_access_key_id \"$AWS_ACCESS_KEY_ID\",
+         |   aws_secret_access_key \"$AWS_SECRET_ACCESS_KEY\",
          |   dbtable \"$test_table\"
          | )
        """.stripMargin
@@ -201,6 +203,8 @@ class RedshiftIntegrationSuite
          | options(
          |   url \"$jdbcUrl\",
          |   tempdir \"$tempDir\",
+         |   aws_access_key_id \"$AWS_ACCESS_KEY_ID\",
+         |   aws_secret_access_key \"$AWS_SECRET_ACCESS_KEY\",
          |   dbtable \"$test_table2\"
          | )
        """.stripMargin
@@ -224,6 +228,8 @@ class RedshiftIntegrationSuite
          | options(
          |   url \"$jdbcUrl\",
          |   tempdir \"$tempDir\",
+         |   aws_access_key_id \"$AWS_ACCESS_KEY_ID\",
+         |   aws_secret_access_key \"$AWS_SECRET_ACCESS_KEY\",
          |   dbtable \"$test_table3\"
          | )
        """.stripMargin
@@ -254,6 +260,8 @@ class RedshiftIntegrationSuite
       .option("url", jdbcUrl)
       .option("dbtable", query)
       .option("tempdir", tempDir)
+      .option("aws_access_key_id", AWS_ACCESS_KEY_ID)
+      .option("aws_secret_access_key", AWS_SECRET_ACCESS_KEY)
       .load()
     checkAnswer(loadedDf, Seq(Row(1, true)))
   }
@@ -276,6 +284,8 @@ class RedshiftIntegrationSuite
       .option("url", jdbcUrl)
       .option("query", query)
       .option("tempdir", tempDir)
+      .option("aws_access_key_id", AWS_ACCESS_KEY_ID)
+      .option("aws_secret_access_key", AWS_SECRET_ACCESS_KEY)
       .load()
     checkAnswer(loadedDf, Seq(Row(1, true)))
   }
@@ -286,6 +296,8 @@ class RedshiftIntegrationSuite
       .option("url", jdbcUrl)
       .option("query", s"select testbool, count(*) from $test_table group by testbool")
       .option("tempdir", tempDir)
+      .option("aws_access_key_id", AWS_ACCESS_KEY_ID)
+      .option("aws_secret_access_key", AWS_SECRET_ACCESS_KEY)
       .load()
     checkAnswer(loadedDf, Seq(Row(true, 1), Row(false, 2), Row(null, 2)))
   }
@@ -327,6 +339,8 @@ class RedshiftIntegrationSuite
         .option("url", jdbcUrl)
         .option("dbtable", tableName)
         .option("tempdir", tempDir)
+        .option("aws_access_key_id", AWS_ACCESS_KEY_ID)
+        .option("aws_secret_access_key", AWS_SECRET_ACCESS_KEY)
         .mode(SaveMode.ErrorIfExists)
         .save()
 
@@ -336,6 +350,8 @@ class RedshiftIntegrationSuite
         .option("url", jdbcUrl)
         .option("dbtable", tableName)
         .option("tempdir", tempDir)
+        .option("aws_access_key_id", AWS_ACCESS_KEY_ID)
+        .option("aws_secret_access_key", AWS_SECRET_ACCESS_KEY)
         .load()
       checkAnswer(loadedDf, TestUtils.expectedData)
     } finally {
@@ -354,6 +370,8 @@ class RedshiftIntegrationSuite
         .option("url", jdbcUrl)
         .option("dbtable", tableName)
         .option("tempdir", tempDir)
+        .option("aws_access_key_id", AWS_ACCESS_KEY_ID)
+        .option("aws_secret_access_key", AWS_SECRET_ACCESS_KEY)
         .mode(SaveMode.ErrorIfExists)
         .save()
 
@@ -363,6 +381,8 @@ class RedshiftIntegrationSuite
         .option("url", jdbcUrl)
         .option("dbtable", tableName)
         .option("tempdir", tempDir)
+        .option("aws_access_key_id", AWS_ACCESS_KEY_ID)
+        .option("aws_secret_access_key", AWS_SECRET_ACCESS_KEY)
         .load()
       assert(loadedDf.schema.length === 1)
       assert(loadedDf.columns === Seq("a"))
@@ -421,6 +441,8 @@ class RedshiftIntegrationSuite
           .option("url", jdbcUrl)
           .option("dbtable", tableName)
           .option("tempdir", tempDir)
+          .option("aws_access_key_id", AWS_ACCESS_KEY_ID)
+          .option("aws_secret_access_key", AWS_SECRET_ACCESS_KEY)
           .mode(SaveMode.ErrorIfExists)
           .save()
       }
@@ -441,6 +463,8 @@ class RedshiftIntegrationSuite
         .option("url", jdbcUrl)
         .option("dbtable", tableName)
         .option("tempdir", tempDir)
+        .option("aws_access_key_id", AWS_ACCESS_KEY_ID)
+        .option("aws_secret_access_key", AWS_SECRET_ACCESS_KEY)
         .mode(SaveMode.Overwrite)
         .save()
 
@@ -450,6 +474,8 @@ class RedshiftIntegrationSuite
         .option("url", jdbcUrl)
         .option("dbtable", tableName)
         .option("tempdir", tempDir)
+        .option("aws_access_key_id", AWS_ACCESS_KEY_ID)
+        .option("aws_secret_access_key", AWS_SECRET_ACCESS_KEY)
         .load()
       checkAnswer(loadedDf, TestUtils.expectedData)
     } finally {
@@ -470,6 +496,8 @@ class RedshiftIntegrationSuite
       .option("url", jdbcUrl)
       .option("dbtable", test_table3)
       .option("tempdir", tempDir)
+      .option("aws_access_key_id", AWS_ACCESS_KEY_ID)
+      .option("aws_secret_access_key", AWS_SECRET_ACCESS_KEY)
       .mode(SaveMode.Append)
       .saveAsTable(test_table3)
 
@@ -490,6 +518,8 @@ class RedshiftIntegrationSuite
         .option("url", jdbcUrl)
         .option("dbtable", test_table)
         .option("tempdir", tempDir)
+        .option("aws_access_key_id", AWS_ACCESS_KEY_ID)
+        .option("aws_secret_access_key", AWS_SECRET_ACCESS_KEY)
         .mode(SaveMode.ErrorIfExists)
         .saveAsTable(test_table)
     }
@@ -503,6 +533,8 @@ class RedshiftIntegrationSuite
       .option("url", jdbcUrl)
       .option("dbtable", test_table)
       .option("tempdir", tempDir)
+      .option("aws_access_key_id", AWS_ACCESS_KEY_ID)
+      .option("aws_secret_access_key", AWS_SECRET_ACCESS_KEY)
       .mode(SaveMode.Ignore)
       .saveAsTable(test_table)
 
