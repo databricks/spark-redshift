@@ -159,11 +159,7 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
             logError("Error occurred while querying STL_LOAD_ERRORS", e2)
             None
         }
-        if (detailedException.isDefined) {
-          throw detailedException.get
-        } else {
-          throw e
-        }
+      throw detailedException.getOrElse(e)
     }
 
     // Execute postActions
