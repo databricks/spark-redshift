@@ -145,8 +145,8 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
             val exceptionMessage =
               s"""
                  |Error (code $errCode) while loading data into Redshift: "$errReason".
-                 |Column name: ${results.getString("colname")}
-                 |Column type: ${results.getString("type")}$columnLength
+                 |Column name: ${results.getString("colname").trim}
+                 |Column type: ${results.getString("type").trim}$columnLength
                  |Raw line: ${results.getString("raw_line")}
                  |Raw field value: ${results.getString("raw_field_value")}
                 """.stripMargin
