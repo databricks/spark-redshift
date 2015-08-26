@@ -388,7 +388,6 @@ class RedshiftIntegrationSuite
           .save()
       }
       assert(e.getMessage.contains("while loading data into Redshift"))
-
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
       conn.commit()
