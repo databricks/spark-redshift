@@ -154,7 +154,7 @@ private[redshift] class JDBCWrapper extends Logging {
         case _ => throw new IllegalArgumentException(s"Don't know how to save $field to JDBC")
       }
       val nullable = if (field.nullable) "" else "NOT NULL"
-      sb.append(s", $name $typ $nullable")
+      sb.append(s", $name $typ $nullable".trim)
     }}
     if (sb.length < 2) "" else sb.substring(2)
   }

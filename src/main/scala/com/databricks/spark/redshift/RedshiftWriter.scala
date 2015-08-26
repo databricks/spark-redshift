@@ -32,12 +32,13 @@ import org.apache.spark.sql.types._
 /**
  * Functions to write data to Redshift with intermediate Avro serialisation into S3.
  */
-class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
+private[redshift] class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
 
   /**
    * Generate CREATE TABLE statement for Redshift
    */
-  private def createTableSql(data: DataFrame, params: MergedParameters): String = {
+  // Visible for testing.
+  private[redshift] def createTableSql(data: DataFrame, params: MergedParameters): String = {
     val schemaSql = jdbcWrapper.schemaString(data.schema)
     val distStyleDef = params.distStyle match {
       case Some(style) => s"DISTSTYLE $style"

@@ -33,6 +33,8 @@ import org.apache.spark.sql.sources._
 import org.apache.spark.sql._
 import org.apache.spark.sql.types._
 
+import com.databricks.spark.redshift.Parameters.MergedParameters
+
 private class TestContext extends SparkContext("local", "RedshiftSourceSuite") {
 
   /**
@@ -439,6 +441,23 @@ class RedshiftSourceSuite
     val dirWithAvroFiles = tempDir.listFiles().head.toURI.toString
     val written = testSqlContext.read.format("com.databricks.spark.avro").load(dirWithAvroFiles)
     checkAnswer(written, TestUtils.expectedDataWithConvertedTimesAndDates)
+  }
+
+  test("configuring maxlength on string columns") {
+    val longStrMetadata = new MetadataBuilder().putLong("maxlength", 512).build()
+    val shortStrMetadata = new MetadataBuilder().putLong("maxlength", 10).build()
+    val schema = StructType(
+      StructField("long_str", StringType, metadata = longStrMetadata) ::
+      StructField("short_str", StringType, metadata = shortStrMetadata) ::
+      StructField("default_str", StringType) ::
+      Nil)
+    val df = testSqlContext.createDataFrame(sc.emptyRDD[Row], schema)
+    val createTableCommand =
+      DefaultRedshiftWriter.createTableSql(df, MergedParameters.apply(defaultParams)).trim
+    val expectedCreateTableCommand =
+      "CREATE TABLE IF NOT EXISTS test_table (long_str VARCHAR(512), short_str VARCHAR(10), " +
+        "default_str TEXT)"
+    assert(createTableCommand === expectedCreateTableCommand)
   }
 
   test("Respect SaveMode.ErrorIfExists when table exists") {
