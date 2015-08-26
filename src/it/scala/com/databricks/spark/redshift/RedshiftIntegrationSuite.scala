@@ -404,6 +404,8 @@ class RedshiftIntegrationSuite
         .option("url", jdbcUrl)
         .option("dbtable", tableName)
         .option("tempdir", tempDir)
+        .option("aws_access_key_id", AWS_ACCESS_KEY_ID)
+        .option("aws_secret_access_key", AWS_SECRET_ACCESS_KEY)
         .mode(SaveMode.ErrorIfExists)
         .save()
       assert(DefaultJDBCWrapper.tableExists(conn, tableName))
@@ -412,6 +414,8 @@ class RedshiftIntegrationSuite
         .option("url", jdbcUrl)
         .option("dbtable", tableName)
         .option("tempdir", tempDir)
+        .option("aws_access_key_id", AWS_ACCESS_KEY_ID)
+        .option("aws_secret_access_key", AWS_SECRET_ACCESS_KEY)
         .load()
       checkAnswer(loadedDf, Seq(Row("a" * 512)))
       // This append should fail due to the string being longer than the maxlength
@@ -421,6 +425,8 @@ class RedshiftIntegrationSuite
           .option("url", jdbcUrl)
           .option("dbtable", tableName)
           .option("tempdir", tempDir)
+          .option("aws_access_key_id", AWS_ACCESS_KEY_ID)
+          .option("aws_secret_access_key", AWS_SECRET_ACCESS_KEY)
           .mode(SaveMode.Append)
           .save()
       }
