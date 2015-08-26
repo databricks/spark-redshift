@@ -18,13 +18,14 @@ package com.databricks.spark.redshift
 
 import java.util.Properties
 
-import com.databricks.spark.redshift.Parameters.MergedParameters
-
+import org.apache.hadoop.conf.Configuration
 import org.apache.spark.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
+
+import com.databricks.spark.redshift.Parameters.MergedParameters
 
 /**
  * Data Source API implementation for Amazon Redshift database tables
@@ -87,8 +88,10 @@ private[redshift] case class RedshiftRelation(
 
   private def makeRdd(schema: StructType): RDD[Row] = {
     val sc = sqlContext.sparkContext
+    val hadoopConf = new Configuration(sc.hadoopConfiguration)
+    params.setCredentials(hadoopConf)
     val rdd = sc.newAPIHadoopFile(params.tempPath, classOf[RedshiftInputFormat],
-      classOf[java.lang.Long], classOf[Array[String]], sc.hadoopConfiguration)
+      classOf[java.lang.Long], classOf[Array[String]], hadoopConf)
     rdd.values.map(Conversions.rowConverter(schema))
   }
 
