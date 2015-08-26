@@ -20,6 +20,7 @@ import java.sql.{Connection, Date, SQLException, Timestamp}
 import java.util.Properties
 
 import scala.util.Random
+import scala.util.control.NonFatal
 
 import com.databricks.spark.redshift.Parameters.MergedParameters
 
@@ -118,7 +119,49 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
     // Load the temporary data into the new file
     val copyStatement = copySql(data.sqlContext, params)
     val copyData = conn.prepareStatement(copyStatement)
-    copyData.execute()
+    try {
+      copyData.execute()
+    } catch {
+      case e: SQLException =>
+        // Try to query Redshift's STL_LOAD_ERRORS table to figure out why the load failed.
+        // See http://docs.aws.amazon.com/redshift/latest/dg/r_STL_LOAD_ERRORS.html for details.
+        val errorLookupQuery =
+          """
+            | SELECT *
+            | FROM stl_load_errors
+            | WHERE query = pg_last_query_id()
+          """.stripMargin
+        val detailedException: Option[SQLException] = try {
+          val results = conn.prepareStatement(errorLookupQuery).executeQuery()
+          if (results.next()) {
+            val errCode = results.getInt("err_code")
+            val errReason = results.getString("err_reason").trim
+            val columnLength: String =
+              Option(results.getString("col_length"))
+                .map(_.trim)
+                .filter(_.nonEmpty)
+                .map(n => s"($n)")
+                .getOrElse("")
+            val exceptionMessage =
+              s"""
+                 |Error (code $errCode) while loading data into Redshift: "$errReason"
+                 |Table name: ${params.table.get}
+                 |Column name: ${results.getString("colname").trim}
+                 |Column type: ${results.getString("type").trim}$columnLength
+                 |Raw line: ${results.getString("raw_line")}
+                 |Raw field value: ${results.getString("raw_field_value")}
+                """.stripMargin
+            Some(new SQLException(exceptionMessage, e))
+          } else {
+            None
+          }
+        } catch {
+          case NonFatal(e2) =>
+            logError("Error occurred while querying STL_LOAD_ERRORS", e2)
+            None
+        }
+      throw detailedException.getOrElse(e)
+    }
 
     // Execute postActions
     params.postActions.foreach { action =>
