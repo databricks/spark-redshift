@@ -64,6 +64,7 @@ object SparkRedshiftBuild extends Build {
         if (scalaBinaryVersion.value == "2.10") false
         else false
       },
+      logBuffered := false,
       // Display full-length stacktraces from ScalaTest:
       testOptions in Test += Tests.Argument("-oF")
     )
