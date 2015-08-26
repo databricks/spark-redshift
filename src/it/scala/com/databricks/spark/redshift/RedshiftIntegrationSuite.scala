@@ -28,6 +28,7 @@ import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.{AnalysisException, Row, SQLContext, SaveMode}
 import org.apache.spark.sql.hive.test.TestHiveContext
+import org.apache.spark.sql.types._
 
 /**
  * End-to-end tests which run against a real Redshift cluster.
@@ -235,6 +236,60 @@ class RedshiftIntegrationSuite
       TestUtils.expectedData)
   }
 
+  test("Can load output when 'dbtable' is a subquery wrapped in parentheses") {
+    // scalastyle:off
+    val query =
+      s"""
+        |(select testbyte, testbool
+        |from $test_table
+        |where testbool = true
+        | and teststring = 'Unicode''s樂趣'
+        | and testdouble = 1234152.12312498
+        | and testfloat = 1.0
+        | and testint = 42)
+      """.stripMargin
+    // scalastyle:on
+    val loadedDf = sqlContext.read
+      .format("com.databricks.spark.redshift")
+      .option("url", jdbcUrl)
+      .option("dbtable", query)
+      .option("tempdir", tempDir)
+      .load()
+    checkAnswer(loadedDf, Seq(Row(1, true)))
+  }
+
+  test("Can load output when 'query' is specified instead of 'dbtable'") {
+    // scalastyle:off
+    val query =
+      s"""
+        |select testbyte, testbool
+        |from $test_table
+        |where testbool = true
+        | and teststring = 'Unicode''s樂趣'
+        | and testdouble = 1234152.12312498
+        | and testfloat = 1.0
+        | and testint = 42
+      """.stripMargin
+    // scalastyle:on
+    val loadedDf = sqlContext.read
+      .format("com.databricks.spark.redshift")
+      .option("url", jdbcUrl)
+      .option("query", query)
+      .option("tempdir", tempDir)
+      .load()
+    checkAnswer(loadedDf, Seq(Row(1, true)))
+  }
+
+  test("Can load output of Redshift aggregation queries") {
+    val loadedDf = sqlContext.read
+      .format("com.databricks.spark.redshift")
+      .option("url", jdbcUrl)
+      .option("query", s"select testbool, count(*) from $test_table group by testbool")
+      .option("tempdir", tempDir)
+      .load()
+    checkAnswer(loadedDf, Seq(Row(true, 1), Row(false, 2), Row(null, 2)))
+  }
+
   test("DefaultSource supports simple column filtering") {
     checkAnswer(
       sqlContext.sql("select testbyte, testbool from test_table"),
@@ -283,6 +338,35 @@ class RedshiftIntegrationSuite
         .option("tempdir", tempDir)
         .load()
       checkAnswer(loadedDf, TestUtils.expectedData)
+    } finally {
+      conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
+      conn.commit()
+    }
+  }
+
+  test("roundtrip save and load with uppercase column names") {
+    val tableName = s"roundtrip_write_and_read_with_uppercase_column_names_$randomSuffix"
+    val df = sqlContext.createDataFrame(sc.parallelize(Seq(Row(1))),
+      StructType(StructField("A", IntegerType) :: Nil))
+    try {
+      df.write
+        .format("com.databricks.spark.redshift")
+        .option("url", jdbcUrl)
+        .option("dbtable", tableName)
+        .option("tempdir", tempDir)
+        .mode(SaveMode.ErrorIfExists)
+        .save()
+
+      assert(DefaultJDBCWrapper.tableExists(conn, tableName))
+      val loadedDf = sqlContext.read
+        .format("com.databricks.spark.redshift")
+        .option("url", jdbcUrl)
+        .option("dbtable", tableName)
+        .option("tempdir", tempDir)
+        .load()
+      assert(loadedDf.schema.length === 1)
+      assert(loadedDf.columns === Seq("a"))
+      checkAnswer(loadedDf, Seq(Row(1)))
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
       conn.commit()
