@@ -17,7 +17,7 @@
 package com.databricks.spark.redshift
 
 import java.net.URI
-import java.sql.Connection
+import java.sql.{SQLException, Connection}
 import java.util.Properties
 
 import scala.util.Random
@@ -367,6 +367,43 @@ class RedshiftIntegrationSuite
       assert(loadedDf.schema.length === 1)
       assert(loadedDf.columns === Seq("a"))
       checkAnswer(loadedDf, Seq(Row(1)))
+    } finally {
+      conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
+      conn.commit()
+    }
+  }
+
+  test("configuring maxlength on string columns") {
+    val tableName = s"configuring_maxlength_on_string_column_$randomSuffix"
+    try {
+      val metadata = new MetadataBuilder().putLong("maxlength", 512).build()
+      val schema = StructType(
+        StructField("x", StringType, metadata = metadata) :: Nil)
+      sqlContext.createDataFrame(sc.parallelize(Seq(Row("a" * 512))), schema).write
+        .format("com.databricks.spark.redshift")
+        .option("url", jdbcUrl)
+        .option("dbtable", tableName)
+        .option("tempdir", tempDir)
+        .mode(SaveMode.ErrorIfExists)
+        .save()
+      assert(DefaultJDBCWrapper.tableExists(conn, tableName))
+      val loadedDf = sqlContext.read
+        .format("com.databricks.spark.redshift")
+        .option("url", jdbcUrl)
+        .option("dbtable", tableName)
+        .option("tempdir", tempDir)
+        .load()
+      checkAnswer(loadedDf, Seq(Row("a" * 512)))
+      // This append should fail due to the string being longer than the maxlength
+      intercept[SQLException] {
+        sqlContext.createDataFrame(sc.parallelize(Seq(Row("a" * 513))), schema).write
+          .format("com.databricks.spark.redshift")
+          .option("url", jdbcUrl)
+          .option("dbtable", tableName)
+          .option("tempdir", tempDir)
+          .mode(SaveMode.Append)
+          .save()
+      }
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
       conn.commit()
