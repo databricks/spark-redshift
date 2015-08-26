@@ -142,12 +142,11 @@ private[redshift] class JDBCWrapper extends Logging {
         case ByteType => "SMALLINT" // Redshift does not support the BYTE type.
         case BooleanType => "BOOLEAN"
         case StringType =>
-          val maxlength = if (field.metadata.contains("maxlength")) {
-            field.metadata.getLong("maxlength")
+          if (field.metadata.contains("maxlength")) {
+            s"VARCHAR(${field.metadata.getLong("maxlength")})"
           } else {
-            255 // TODO: make this default configurable?
+            "TEXT"
           }
-          s"VARCHAR($maxlength)"
         case BinaryType => "BLOB"
         case TimestampType => "TIMESTAMP"
         case DateType => "DATE"
