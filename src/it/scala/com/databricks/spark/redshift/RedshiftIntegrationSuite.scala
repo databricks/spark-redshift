@@ -404,6 +404,8 @@ class RedshiftIntegrationSuite
           .option("url", jdbcUrl)
           .option("dbtable", tableName)
           .option("tempdir", tempDir)
+          .option("aws_access_key_id", AWS_ACCESS_KEY_ID)
+          .option("aws_secret_access_key", AWS_SECRET_ACCESS_KEY)
           .mode(SaveMode.ErrorIfExists)
           .save()
       }
