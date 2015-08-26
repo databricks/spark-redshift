@@ -373,6 +373,24 @@ class RedshiftIntegrationSuite
     }
   }
 
+  test("error message when saving a table with string that is longer than max length") {
+    val tableName = s"error_message_when_string_too_long_$randomSuffix"
+    try {
+      val df = sqlContext.createDataFrame(sc.parallelize(Seq(Row("a" * 512))),
+        StructType(StructField("A", StringType) :: Nil))
+      df.write
+        .format("com.databricks.spark.redshift")
+        .option("url", jdbcUrl)
+        .option("dbtable", tableName)
+        .option("tempdir", tempDir)
+        .mode(SaveMode.ErrorIfExists)
+        .save()
+    } finally {
+      conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
+      conn.commit()
+    }
+  }
+
   test("SaveMode.Overwrite with non-existent table") {
     val tableName = s"overwrite_non_existent_table$randomSuffix"
     try {
