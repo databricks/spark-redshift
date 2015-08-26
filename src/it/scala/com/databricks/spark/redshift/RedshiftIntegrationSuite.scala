@@ -17,7 +17,7 @@
 package com.databricks.spark.redshift
 
 import java.net.URI
-import java.sql.Connection
+import java.sql.{SQLException, Connection}
 import java.util.Properties
 
 import scala.util.Random
@@ -387,6 +387,27 @@ class RedshiftIntegrationSuite
       assert(loadedDf.schema.length === 1)
       assert(loadedDf.columns === Seq("a"))
       checkAnswer(loadedDf, Seq(Row(1)))
+    } finally {
+      conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
+      conn.commit()
+    }
+  }
+
+  test("informative error message when saving a table with string that is longer than max length") {
+    val tableName = s"error_message_when_string_too_long_$randomSuffix"
+    try {
+      val df = sqlContext.createDataFrame(sc.parallelize(Seq(Row("a" * 512))),
+        StructType(StructField("A", StringType) :: Nil))
+      val e = intercept[SQLException] {
+        df.write
+          .format("com.databricks.spark.redshift")
+          .option("url", jdbcUrl)
+          .option("dbtable", tableName)
+          .option("tempdir", tempDir)
+          .mode(SaveMode.ErrorIfExists)
+          .save()
+      }
+      assert(e.getMessage.contains("while loading data into Redshift"))
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
       conn.commit()
