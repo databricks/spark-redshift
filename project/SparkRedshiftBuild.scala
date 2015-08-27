@@ -48,7 +48,7 @@ object SparkRedshiftBuild extends Build {
       resolvers +=
         "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
       resolvers +=
-        "Spark 1.5.0 RC1 Snapshot" at "https://repository.apache.org/content/repositories/orgapachespark-1137",
+        "Spark 1.5.0 RC2 Staging" at "https://repository.apache.org/content/repositories/orgapachespark-1141",
       libraryDependencies ++= Seq(
         "com.amazonaws" % "aws-java-sdk-core" % "1.9.40" % "provided",
         // We require spark-avro, but avro-mapred must be provided to match Hadoop version:
