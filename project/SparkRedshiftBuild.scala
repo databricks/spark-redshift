@@ -21,7 +21,8 @@ import sbtsparkpackage.SparkPackagePlugin.autoImport._
 import scoverage.ScoverageSbtPlugin
 
 object SparkRedshiftBuild extends Build {
-  val hadoopVersion = settingKey[String]("Hadoop version")
+  val testSparkVersion = settingKey[String]("Spark version to test against")
+  val testHadoopVersion = settingKey[String]("Hadoop version to test against")
 
   // Define a custom test configuration so that unit test helper classes can be re-used under
   // the integration tests configuration; see http://stackoverflow.com/a/20635808.
@@ -37,16 +38,18 @@ object SparkRedshiftBuild extends Build {
       organization := "com.databricks",
       version := "0.4.1-SNAPSHOT",
       scalaVersion := "2.10.4",
-      sparkVersion := sys.props.get("spark.version").getOrElse("1.4.1"),
-      hadoopVersion := sys.props.get("hadoop.version").getOrElse("2.2.0"),
+      sparkVersion := "1.4.1",
+      testSparkVersion := sys.props.get("spark.testVersion").getOrElse(sparkVersion.value),
+      testHadoopVersion := sys.props.get("hadoop.testVersion").getOrElse("2.2.0"),
       spName := "databricks/spark-redshift",
       sparkComponents ++= Seq("sql", "hive"),
+      spIgnoreProvided := true,
       licenses += "Apache-2.0" -> url("http://opensource.org/licenses/Apache-2.0"),
       credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"),
       resolvers +=
         "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
       resolvers +=
-        "Spark 1.5.0 RC1 Snapshot" at "https://repository.apache.org/content/repositories/orgapachespark-1137",
+        "Spark 1.5.0 RC2 Staging" at "https://repository.apache.org/content/repositories/orgapachespark-1141",
       libraryDependencies ++= Seq(
         "com.amazonaws" % "aws-java-sdk-core" % "1.9.40" % "provided",
         // We require spark-avro, but avro-mapred must be provided to match Hadoop version:
@@ -59,6 +62,12 @@ object SparkRedshiftBuild extends Build {
         "com.google.guava" % "guava" % "14.0.1" % "test",
         "org.scalatest" %% "scalatest" % "2.2.1" % "test",
         "org.scalamock" %% "scalamock-scalatest-support" % "3.2" % "test"
+      ),
+      libraryDependencies ++= Seq(
+        "org.apache.hadoop" % "hadoop-client" % testHadoopVersion.value % "test",
+        "org.apache.spark" %% "spark-core" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client"),
+        "org.apache.spark" %% "spark-sql" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client"),
+        "org.apache.spark" %% "spark-hive" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client")
       ),
       ScoverageSbtPlugin.ScoverageKeys.coverageHighlighting := {
         if (scalaBinaryVersion.value == "2.10") false
