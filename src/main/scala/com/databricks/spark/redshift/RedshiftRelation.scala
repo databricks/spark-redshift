@@ -49,48 +49,76 @@ private[redshift] case class RedshiftRelation(
     }
   }
 
-  override def buildScan(requiredColumns: Array[String], filters: Array[Filter]): RDD[Row] = {
-    // Always quote column names:
-    val columns = requiredColumns.map(col => s""""$col"""").mkString(", ")
-    val whereClause = FilterPushdown.buildWhereClause(schema, filters)
-    unloadToTemp(columns, whereClause)
-    makeRdd(pruneSchema(schema, requiredColumns))
-  }
-
   override def insert(data: DataFrame, overwrite: Boolean): Unit = {
     val updatedParams =
       Parameters.mergeParameters(params.parameters updated ("overwrite", overwrite.toString))
     new RedshiftWriter(jdbcWrapper).saveToRedshift(sqlContext, data, updatedParams)
   }
 
-  private def unloadToTemp(columnList: String = "*", whereClause: String = ""): Unit = {
-    val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
-    val unloadSql = unloadStmnt(columnList, whereClause)
-    val statement = conn.prepareStatement(unloadSql)
-
-    statement.execute()
-    conn.close()
+  override def buildScan(requiredColumns: Array[String], filters: Array[Filter]): RDD[Row] = {
+    if (requiredColumns.isEmpty) {
+      // In the special case where no columns were requested, issue a `count(*)` against Redshift
+      // rather than unloading data.
+      val whereClause = FilterPushdown.buildWhereClause(schema, filters)
+      val tableNameOrSubquery = params.query.map(q => s"($q)").orElse(params.table).get
+      val countQuery = s"SELECT count(*) FROM $tableNameOrSubquery $whereClause"
+      logInfo(countQuery)
+      val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
+      try {
+        val results = conn.prepareStatement(countQuery).executeQuery()
+        if (results.next()) {
+          val numRows = results.getLong(1)
+          val parallelism = sqlContext.getConf("spark.sql.shuffle.partitions", "200").toInt
+          val emptyRow = Row.empty
+          sqlContext.sparkContext.parallelize(1L to numRows, parallelism).map(_ => emptyRow)
+        } else {
+          throw new IllegalStateException("Could not read count from Redshift")
+        }
+      } finally {
+        conn.close()
+      }
+    } else {
+      // Unload data from Redshift into a temporary directory in S3:
+      val unloadSql = buildUnloadStmt(requiredColumns, filters)
+      logInfo(unloadSql)
+      val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
+      try {
+        conn.prepareStatement(unloadSql).execute()
+      } finally {
+        conn.close()
+      }
+      // Create a DataFrame to read the unloaded data:
+      val sc = sqlContext.sparkContext
+      val hadoopConf = new Configuration(sc.hadoopConfiguration)
+      params.setCredentials(hadoopConf)
+      val rdd = sc.newAPIHadoopFile(params.tempPath, classOf[RedshiftInputFormat],
+        classOf[java.lang.Long], classOf[Array[String]], hadoopConf)
+      val prunedSchema = pruneSchema(schema, requiredColumns)
+      rdd.values.mapPartitions { iter =>
+        val converter: Array[String] => Row = Conversions.createRowConverter(prunedSchema)
+        iter.map(converter)
+      }
+    }
   }
 
-  private def unloadStmnt(columnList: String, whereClause: String) : String = {
+  private def buildUnloadStmt(requiredColumns: Array[String], filters: Array[Filter]): String = {
+    assert(!requiredColumns.isEmpty)
+    // Always quote column names:
+    val columnList = requiredColumns.map(col => s""""$col"""").mkString(", ")
+    val whereClause = FilterPushdown.buildWhereClause(schema, filters)
     val credsString = params.credentialsString(sqlContext.sparkContext.hadoopConfiguration)
-    val tableNameOrSubquery: String = {
-      val unescaped = params.query.map(q => s"($q)").orElse(params.table).get
-      unescaped.replace("'", "\\'")
+    val query = {
+      // Since the query passed to UNLOAD will be enclosed in single quotes, we need to escape
+      // any single quotes that appear in the query itself
+      val tableNameOrSubquery: String = {
+        val unescaped = params.query.map(q => s"($q)").orElse(params.table).get
+        unescaped.replace("'", "\\'")
+      }
+      s"SELECT $columnList FROM $tableNameOrSubquery $whereClause"
     }
-    val query = s"SELECT $columnList FROM $tableNameOrSubquery $whereClause"
     val fixedUrl = Utils.fixS3Url(params.tempPath)
 
     s"UNLOAD ('$query') TO '$fixedUrl' WITH CREDENTIALS '$credsString' ESCAPE ALLOWOVERWRITE"
-  }
-
-  private def makeRdd(schema: StructType): RDD[Row] = {
-    val sc = sqlContext.sparkContext
-    val hadoopConf = new Configuration(sc.hadoopConfiguration)
-    params.setCredentials(hadoopConf)
-    val rdd = sc.newAPIHadoopFile(params.tempPath, classOf[RedshiftInputFormat],
-      classOf[java.lang.Long], classOf[Array[String]], hadoopConf)
-    rdd.values.map(Conversions.rowConverter(schema))
   }
 
   private def pruneSchema(schema: StructType, columns: Array[String]): StructType = {
