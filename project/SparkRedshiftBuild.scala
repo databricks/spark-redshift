@@ -43,6 +43,7 @@ object SparkRedshiftBuild extends Build {
       testHadoopVersion := sys.props.get("hadoop.testVersion").getOrElse("2.2.0"),
       spName := "databricks/spark-redshift",
       sparkComponents ++= Seq("sql", "hive"),
+      spIgnoreProvided := true,
       licenses += "Apache-2.0" -> url("http://opensource.org/licenses/Apache-2.0"),
       credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"),
       resolvers +=
