@@ -55,16 +55,12 @@ private[redshift] case class RedshiftRelation(
     new RedshiftWriter(jdbcWrapper).saveToRedshift(sqlContext, data, updatedParams)
   }
 
-  private val tableNameOrSubquery: String = {
-    val unescaped = params.query.map(q => s"($q)").orElse(params.table).get
-    unescaped.replace("'", "\\'")
-  }
-
   override def buildScan(requiredColumns: Array[String], filters: Array[Filter]): RDD[Row] = {
     if (requiredColumns.isEmpty) {
       // In the special case where no columns were requested, issue a `count(*)` against Redshift
       // rather than unloading data.
       val whereClause = FilterPushdown.buildWhereClause(schema, filters)
+      val tableNameOrSubquery = params.query.map(q => s"($q)").orElse(params.table).get
       val countQuery = s"SELECT count(*) FROM $tableNameOrSubquery $whereClause"
       logInfo(countQuery)
       val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
@@ -111,7 +107,15 @@ private[redshift] case class RedshiftRelation(
     val columnList = requiredColumns.map(col => s""""$col"""").mkString(", ")
     val whereClause = FilterPushdown.buildWhereClause(schema, filters)
     val credsString = params.credentialsString(sqlContext.sparkContext.hadoopConfiguration)
-    val query = s"SELECT $columnList FROM $tableNameOrSubquery $whereClause"
+    val query = {
+      // Since the query passed to UNLOAD will be enclosed in single quotes, we need to escape
+      // any single quotes that appear in the query itself
+      val tableNameOrSubquery: String = {
+        val unescaped = params.query.map(q => s"($q)").orElse(params.table).get
+        unescaped.replace("'", "\\'")
+      }
+      s"SELECT $columnList FROM $tableNameOrSubquery $whereClause"
+    }
     val fixedUrl = Utils.fixS3Url(params.tempPath)
 
     s"UNLOAD ('$query') TO '$fixedUrl' WITH CREDENTIALS '$credsString' ESCAPE ALLOWOVERWRITE"
