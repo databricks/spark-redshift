@@ -99,7 +99,7 @@ private[redshift] case class RedshiftRelation(
         classOf[java.lang.Long], classOf[Array[String]], hadoopConf)
       val prunedSchema = pruneSchema(schema, requiredColumns)
       rdd.values.mapPartitions { iter =>
-        val converter: Array[String] => Row = Conversions.rowConverter(prunedSchema)
+        val converter: Array[String] => Row = Conversions.createRowConverter(prunedSchema)
         iter.map(converter)
       }
     }

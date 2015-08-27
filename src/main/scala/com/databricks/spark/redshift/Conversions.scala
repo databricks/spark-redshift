@@ -121,7 +121,7 @@ private[redshift] object Conversions {
    * Return a function that will convert arrays of strings conforming to
    * the given schema to Row instances
    */
-  def rowConverter(schema: StructType): (Array[String]) => Row = {
+  def createRowConverter(schema: StructType): (Array[String]) => Row = {
     convertRow(schema, _: Array[String])
   }
 }
