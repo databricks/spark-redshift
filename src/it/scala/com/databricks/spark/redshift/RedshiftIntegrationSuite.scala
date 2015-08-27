@@ -241,7 +241,25 @@ class RedshiftIntegrationSuite
   }
 
   test("count() on DataFrame created from a Redshift table") {
-    assert(sqlContext.sql("select * from test_table").count() === TestUtils.expectedData.length)
+    checkAnswer(
+      sqlContext.sql("select count(*) from test_table"),
+      Seq(Row(TestUtils.expectedData.length))
+    )
+  }
+
+  test("count() on DataFrame created from a Redshift query") {
+    val loadedDf = sqlContext.read
+      .format("com.databricks.spark.redshift")
+      .option("url", jdbcUrl)
+      // scalastyle:off
+      .option("query", s"select * from $test_table where teststring = 'Unicode''s樂趣'")
+      // scalastyle:on
+      .option("tempdir", tempDir)
+      .load()
+    checkAnswer(
+      loadedDf.selectExpr("count(*)"),
+      Seq(Row(1))
+    )
   }
 
   test("Can load output when 'dbtable' is a subquery wrapped in parentheses") {
