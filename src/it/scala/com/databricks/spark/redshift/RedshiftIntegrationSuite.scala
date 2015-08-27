@@ -240,6 +240,10 @@ class RedshiftIntegrationSuite
       TestUtils.expectedData)
   }
 
+  test("count() on DataFrame created from a Redshift table") {
+    assert(sqlContext.sql("select * from test_table").count() === TestUtils.expectedData.length)
+  }
+
   test("Can load output when 'dbtable' is a subquery wrapped in parentheses") {
     // scalastyle:off
     val query =
