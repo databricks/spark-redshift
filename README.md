@@ -216,7 +216,7 @@ need to be configured to allow access from your driver application.
  </tr>
  <tr>
     <td><tt>aws_security_token</tt></td>
-    <td>No, unless using temporary IAM credentials</td>
+    <td>No, unless using AWS Security Token Service</td>
     <td>No default</td>
     <td>AWS security token corresponding to provided access key.</td>
  </tr>
