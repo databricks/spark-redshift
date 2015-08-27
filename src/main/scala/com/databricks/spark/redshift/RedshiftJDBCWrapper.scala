@@ -70,8 +70,8 @@ private[redshift] class JDBCWrapper extends Logging {
    * @throws SQLException if the table specification is garbage.
    * @throws SQLException if the table contains an unsupported type.
    */
-  def resolveTable(url: String, table: String, properties: Properties): StructType = {
-    val conn: Connection = DriverManager.getConnection(url, properties)
+  def resolveTable(url: String, table: String): StructType = {
+    val conn: Connection = DriverManager.getConnection(url, new Properties())
     try {
       val rs = conn.prepareStatement(s"SELECT * FROM $table WHERE 1=0").executeQuery()
       try {
@@ -104,26 +104,19 @@ private[redshift] class JDBCWrapper extends Logging {
   }
 
   /**
-   * Given a driver string and an url, return a function that loads the
-   * specified driver string then returns a connection to the JDBC url.
-   * getConnector is run on the driver code, while the function it returns
-   * is run on the executor.
+   * Given a driver string and a JDBC url, load the specified driver and return a DB connection.
    *
-   * @param driver - The class name of the JDBC driver for the given url.
-   * @param url - The JDBC url to connect to.
-   *
-   * @return A function that loads the driver and connects to the url.
+   * @param driver the class name of the JDBC driver for the given url.
+   * @param url the JDBC url to connect to.
    */
-  def getConnector(driver: String, url: String, properties: Properties): () => Connection = {
-    () => {
-      try {
-        if (driver != null) registerDriver(driver)
-      } catch {
-        case e: ClassNotFoundException =>
-          logWarning(s"Couldn't find class $driver", e)
-      }
-      DriverManager.getConnection(url, properties)
+  def getConnector(driver: String, url: String): Connection = {
+    try {
+      if (driver != null) registerDriver(driver)
+    } catch {
+      case e: ClassNotFoundException =>
+        logWarning(s"Couldn't find class $driver", e)
     }
+    DriverManager.getConnection(url, new Properties())
   }
 
   /**

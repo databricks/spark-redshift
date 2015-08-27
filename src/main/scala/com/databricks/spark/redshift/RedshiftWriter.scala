@@ -17,7 +17,6 @@
 package com.databricks.spark.redshift
 
 import java.sql.{Connection, Date, SQLException, Timestamp}
-import java.util.Properties
 
 import scala.util.Random
 import scala.util.control.NonFatal
@@ -244,7 +243,7 @@ private[redshift] class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging
         "For save operations you must specify a Redshift table name with the 'dbtable' parameter")
     }
 
-    val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, new Properties()).apply()
+    val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
 
     try {
       if (params.overwrite && params.useStagingTable) {

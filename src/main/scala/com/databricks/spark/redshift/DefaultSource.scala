@@ -16,8 +16,6 @@
 
 package com.databricks.spark.redshift
 
-import java.util.Properties
-
 import org.apache.spark.Logging
 import org.apache.spark.sql.sources.{BaseRelation, CreatableRelationProvider, RelationProvider, SchemaRelationProvider}
 import org.apache.spark.sql.types.StructType
@@ -74,8 +72,7 @@ class DefaultSource(jdbcWrapper: JDBCWrapper)
     }
 
     def tableExists: Boolean = {
-      val conn =
-        jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, new Properties()).apply()
+      val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
       val exists = jdbcWrapper.tableExists(conn, table)
       conn.close()
       exists

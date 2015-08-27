@@ -16,8 +16,6 @@
 
 package com.databricks.spark.redshift
 
-import java.util.Properties
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.Logging
 import org.apache.spark.rdd.RDD
@@ -46,7 +44,7 @@ private[redshift] case class RedshiftRelation(
       case None => {
         jdbcWrapper.registerDriver(params.jdbcDriver)
         val tableNameOrSubquery = params.query.map(q => s"($q)").orElse(params.table).get
-        jdbcWrapper.resolveTable(params.jdbcUrl, tableNameOrSubquery, new Properties())
+        jdbcWrapper.resolveTable(params.jdbcUrl, tableNameOrSubquery)
       }
     }
   }
@@ -66,7 +64,7 @@ private[redshift] case class RedshiftRelation(
   }
 
   private def unloadToTemp(columnList: String = "*", whereClause: String = ""): Unit = {
-    val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, new Properties()).apply()
+    val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
     val unloadSql = unloadStmnt(columnList, whereClause)
     val statement = conn.prepareStatement(unloadSql)
 

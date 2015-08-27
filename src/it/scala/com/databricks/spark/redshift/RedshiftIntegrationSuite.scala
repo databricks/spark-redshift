@@ -18,7 +18,6 @@ package com.databricks.spark.redshift
 
 import java.net.URI
 import java.sql.{SQLException, Connection}
-import java.util.Properties
 
 import scala.util.Random
 
@@ -88,8 +87,7 @@ class RedshiftIntegrationSuite
     super.beforeAll()
     sc = new SparkContext("local", "RedshiftSourceSuite")
 
-    conn = DefaultJDBCWrapper.getConnector(
-      "com.amazon.redshift.jdbc4.Driver", jdbcUrl, new Properties())()
+    conn = DefaultJDBCWrapper.getConnector("com.amazon.redshift.jdbc4.Driver", jdbcUrl)
 
     conn.prepareStatement("drop table if exists test_table").executeUpdate()
     conn.prepareStatement("drop table if exists test_table2").executeUpdate()

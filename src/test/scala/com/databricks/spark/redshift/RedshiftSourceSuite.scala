@@ -117,7 +117,7 @@ class RedshiftSourceSuite
     val jdbcWrapper = mock[JDBCWrapper]
     val mockedConnection = mock[Connection]
 
-    (jdbcWrapper.getConnector _).expects(*, expectedUrl, *).returning(() => mockedConnection)
+    (jdbcWrapper.getConnector _).expects(*, expectedUrl).returning(mockedConnection)
 
     inSequence {
       expectedQueries foreach { r =>
@@ -149,7 +149,7 @@ class RedshiftSourceSuite
       .expects(*)
       .anyNumberOfTimes()
     (jdbcWrapper.resolveTable _)
-      .expects(jdbcUrl, "test_table", *)
+      .expects(jdbcUrl, "test_table")
       .returning(TestUtils.testSchema)
       .anyNumberOfTimes()
 
@@ -197,7 +197,7 @@ class RedshiftSourceSuite
         .expects(*)
         .anyNumberOfTimes()
       (jdbcWrapper.resolveTable _)
-        .expects(params("url"), *, *)
+        .expects(params("url"), *)
         .returning(querySchema)
         .anyNumberOfTimes()
       // Note: Assertions covered by mocks
@@ -213,7 +213,7 @@ class RedshiftSourceSuite
         .expects(*)
         .anyNumberOfTimes()
       (jdbcWrapper.resolveTable _)
-        .expects(params("url"), *, *)
+        .expects(params("url"), *)
         .returning(querySchema)
         .anyNumberOfTimes()
       // Note: Assertions covered by mocks
@@ -327,8 +327,8 @@ class RedshiftSourceSuite
     val jdbcWrapper = mock[JDBCWrapper]
     val mockedConnection = mock[Connection]
     (jdbcWrapper.getConnector _)
-      .expects(*, defaultParams("url"), *)
-      .returning(() => mockedConnection)
+      .expects(*, defaultParams("url"))
+      .returning(mockedConnection)
     (mockedConnection.close _).expects()
 
     val schema = StructType(Seq(StructField("a", IntegerType), StructField("A", IntegerType)))
@@ -347,8 +347,8 @@ class RedshiftSourceSuite
     val mockedConnection = mock[Connection]
 
     (jdbcWrapper.getConnector _)
-      .expects(*, params("url"), *)
-      .returning(() => mockedConnection)
+      .expects(*, params("url"))
+      .returning(mockedConnection)
 
     def successfulStatement(pattern: Regex): PreparedStatement = {
       val mockedStatement = mock[PreparedStatement]
