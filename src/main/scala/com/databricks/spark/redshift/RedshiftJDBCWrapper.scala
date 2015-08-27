@@ -141,7 +141,12 @@ private[redshift] class JDBCWrapper extends Logging {
         case ShortType => "INTEGER"
         case ByteType => "SMALLINT" // Redshift does not support the BYTE type.
         case BooleanType => "BOOLEAN"
-        case StringType => "TEXT"
+        case StringType =>
+          if (field.metadata.contains("maxlength")) {
+            s"VARCHAR(${field.metadata.getLong("maxlength")})"
+          } else {
+            "TEXT"
+          }
         case BinaryType => "BLOB"
         case TimestampType => "TIMESTAMP"
         case DateType => "DATE"
@@ -149,7 +154,7 @@ private[redshift] class JDBCWrapper extends Logging {
         case _ => throw new IllegalArgumentException(s"Don't know how to save $field to JDBC")
       }
       val nullable = if (field.nullable) "" else "NOT NULL"
-      sb.append(s", $name $typ $nullable")
+      sb.append(s", $name $typ $nullable".trim)
     }}
     if (sb.length < 2) "" else sb.substring(2)
   }

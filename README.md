@@ -303,6 +303,24 @@ table, the changes will be reverted and the backup table restored if post action
  </tr>
 </table>
 
+## Additional configuration options
+
+### Configuring the maximum size of string columns
+
+When creating Redshift tables, `spark-redshift`'s default behavior is to create `TEXT` columns for string columns. Redshift stores `TEXT` columns as `VARCHAR(256)`, so these columns have a maximum size of 256 characters ([source](http://docs.aws.amazon.com/redshift/latest/dg/r_Character_types.html)).
+
+To support larger columns, you can use the `maxlength` column metadata field to specify the maximum length of individual string columns. This can also be done as a space-savings performance optimization in order to declare columns with a smaller maximum length than the default.
+
+Here is an example of updating a column's metadata field in Scala:
+
+```
+import org.apache.spark.sql.types.MetadataBuilder
+val metadata = new MetadataBuilder().putLong("maxlength", 10).build()
+df.withColumn("colName", col("colName").as("colName", metadata)
+```
+
+Column metadata modification is unsupported in the Python, SQL, and R language APIs.
+
 ## AWS Credentials
 
 Note that you can provide AWS credentials in the parameters above, with Hadoop `fs.*` configuration settings, 
