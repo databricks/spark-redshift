@@ -21,7 +21,8 @@ import sbtsparkpackage.SparkPackagePlugin.autoImport._
 import scoverage.ScoverageSbtPlugin
 
 object SparkRedshiftBuild extends Build {
-  val hadoopVersion = settingKey[String]("Hadoop version")
+  val testSparkVersion = settingKey[String]("Spark version to test against")
+  val testHadoopVersion = settingKey[String]("Hadoop version to test against")
 
   // Define a custom test configuration so that unit test helper classes can be re-used under
   // the integration tests configuration; see http://stackoverflow.com/a/20635808.
@@ -37,8 +38,9 @@ object SparkRedshiftBuild extends Build {
       organization := "com.databricks",
       version := "0.4.1-SNAPSHOT",
       scalaVersion := "2.10.4",
-      sparkVersion := sys.props.get("spark.version").getOrElse("1.4.1"),
-      hadoopVersion := sys.props.get("hadoop.version").getOrElse("2.2.0"),
+      sparkVersion := "1.4.1",
+      testSparkVersion := sys.props.get("spark.testVersion").getOrElse(sparkVersion.value),
+      testHadoopVersion := sys.props.get("hadoop.testVersion").getOrElse("1.2.1"),
       spName := "databricks/spark-redshift",
       sparkComponents ++= Seq("sql", "hive"),
       licenses += "Apache-2.0" -> url("http://opensource.org/licenses/Apache-2.0"),
@@ -59,6 +61,12 @@ object SparkRedshiftBuild extends Build {
         "com.google.guava" % "guava" % "14.0.1" % "test",
         "org.scalatest" %% "scalatest" % "2.2.1" % "test",
         "org.scalamock" %% "scalamock-scalatest-support" % "3.2" % "test"
+      ),
+      libraryDependencies ++= Seq(
+        "org.apache.hadoop" % "hadoop-client" % testHadoopVersion.value % "test",
+        "org.apache.spark" %% "spark-core" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client"),
+        "org.apache.spark" %% "spark-sql" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client"),
+        "org.apache.spark" %% "spark-hive" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client")
       ),
       ScoverageSbtPlugin.ScoverageKeys.coverageHighlighting := {
         if (scalaBinaryVersion.value == "2.10") false
