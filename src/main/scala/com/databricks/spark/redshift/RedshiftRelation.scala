@@ -74,7 +74,7 @@ private[redshift] case class RedshiftRelation(
           val numRows = results.getLong(1)
           val parallelism = sqlContext.getConf("spark.sql.shuffle.partitions", "200").toInt
           val emptyRow = Row.empty
-          sqlContext.sparkContext.parallelize(1L to numRows).map(_ => emptyRow)
+          sqlContext.sparkContext.parallelize(1L to numRows, parallelism).map(_ => emptyRow)
         } else {
           throw new IllegalStateException("Could not read count from Redshift")
         }
