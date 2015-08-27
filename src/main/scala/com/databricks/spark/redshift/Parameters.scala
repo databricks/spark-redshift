@@ -189,7 +189,14 @@ private[redshift] object Parameters extends Logging {
      */
     def credentialsString(configuration: Configuration): String = {
       val ((_, accessKeyId), (_, secretAccessKey)) = credentialsTuple(configuration)
-      s"aws_access_key_id=$accessKeyId;aws_secret_access_key=$secretAccessKey"
+      val credentials = s"aws_access_key_id=$accessKeyId;aws_secret_access_key=$secretAccessKey"
+
+      if (parameters.contains("aws_security_token")) {
+        val securityToken = parameters("aws_security_token")
+        credentials + s";token=$securityToken"
+      } else {
+        credentials
+      }
     }
 
     /**
