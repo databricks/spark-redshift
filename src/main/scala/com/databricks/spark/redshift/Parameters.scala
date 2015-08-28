@@ -91,7 +91,7 @@ private[redshift] object Parameters extends Logging {
       val ((_, key), (_, secretKey)) = credentialsTuple(configuration)
       val baseUri = new URI(tempPath)
       val withCredentials =
-        new URI(baseUri.getScheme, s"$key:$secretKey", baseUri.getHost, -1, baseUri.getPath, null, null)
+        new URI(baseUri.getScheme, s"$key:$secretKey", baseUri.getHost, -1, baseUri.getRawPath, null, null)
 
       withCredentials.toString
     }
