@@ -244,16 +244,17 @@ private[redshift] class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging
     }
 
     val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
+    val config = sqlContext.sparkContext.hadoopConfiguration
 
     try {
       if (params.overwrite && params.useStagingTable) {
         withStagingTable(conn, params.table.get, stagingTable => {
           val updatedParams = MergedParameters(params.parameters.updated("dbtable", stagingTable))
-          unloadData(sqlContext, data, updatedParams.tempPath)
+          unloadData(sqlContext, data, updatedParams.tempPathWithCredentials(config))
           doRedshiftLoad(conn, data, updatedParams)
         })
       } else {
-        unloadData(sqlContext, data, params.tempPath)
+        unloadData(sqlContext, data, params.tempPathWithCredentials(config))
         doRedshiftLoad(conn, data, params)
       }
     } finally {

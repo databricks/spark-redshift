@@ -83,6 +83,20 @@ private[redshift] object Parameters extends Logging {
     val tempPath: String = Utils.makeTempPath(tempDir)
 
     /**
+     * Returns the `tempPath` with the credentials encoded in the URI.  Note that due to limitations in the S3 support
+     * built into hadoop, this will only work for credentials with no slashes (`/`) in them, even though they are
+     * properly escaped in the returned URI.
+     */
+    def tempPathWithCredentials(configuration: Configuration): String = {
+      val ((_, key), (_, secretKey)) = credentialsTuple(configuration)
+      val baseUri = new URI(tempPath)
+      val withCredentials =
+        new URI(baseUri.getScheme, s"$key:$secretKey", baseUri.getHost, -1, baseUri.getPath, null, null)
+
+      withCredentials.toString
+    }
+
+    /**
      * The Redshift table to be used as the target when loading or writing data.
      */
     def table: Option[String] = parameters.get("dbtable")
