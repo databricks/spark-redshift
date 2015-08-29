@@ -17,7 +17,7 @@
 package com.databricks.spark.redshift
 
 import java.sql.Timestamp
-import java.text.{DateFormat, FieldPosition, ParsePosition, SimpleDateFormat}
+import java.text.{DecimalFormat, DateFormat, FieldPosition, ParsePosition, SimpleDateFormat}
 import java.util.Date
 
 import org.apache.spark.sql.types._
@@ -91,6 +91,15 @@ private[redshift] object Conversions {
     else throw new IllegalArgumentException(s"Expected 't' or 'f' but got '$s'")
   }
 
+  private[this] val redshiftDecimalFormat: DecimalFormat = new DecimalFormat()
+  redshiftDecimalFormat.setParseBigDecimal(true)
+
+  /**
+   * Parse a boolean using Redshift's UNLOAD decimal syntax
+   */
+  private def parseDecimal(s: String): java.math.BigDecimal = {
+    redshiftDecimalFormat.parse(s).asInstanceOf[java.math.BigDecimal]
+  }
   /**
    * Construct a Row from the given array of strings, retrieved from Redshift UNLOAD.
    * The schema will be used for type mappings.
@@ -105,6 +114,7 @@ private[redshift] object Conversions {
           case DateType => parseDate(data)
           case DoubleType => data.toDouble
           case FloatType => data.toFloat
+          case dt: DecimalType => parseDecimal(data)
           case IntegerType => data.toInt
           case LongType => data.toLong
           case ShortType => data.toShort
