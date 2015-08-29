@@ -413,6 +413,38 @@ class RedshiftIntegrationSuite
     }
   }
 
+  test("reading decimals") {
+    val tableName = s"reading_decimals_$randomSuffix"
+    try {
+      conn.createStatement().executeUpdate(
+        s"""
+           |create table $tableName (
+           |  x decimal(38, 18)
+           |)
+          """.stripMargin)
+      conn.createStatement().executeUpdate(
+        s"""
+           |insert into $tableName values
+           |(12345.6789)
+         """.stripMargin)
+      conn.commit()
+      assert(DefaultJDBCWrapper.tableExists(conn, tableName))
+      val loadedDf = sqlContext.read
+        .format("com.databricks.spark.redshift")
+        .option("url", jdbcUrl)
+        .option("dbtable", tableName)
+        .option("tempdir", tempDir)
+        .option("aws_access_key_id", AWS_ACCESS_KEY_ID)
+        .option("aws_secret_access_key", AWS_SECRET_ACCESS_KEY)
+        .load()
+      checkAnswer(loadedDf.selectExpr("sum(x)"), Seq(Row(java.math.BigDecimal.valueOf(12345.6789))))
+      checkAnswer(loadedDf, Seq(Row(java.math.BigDecimal.valueOf(12345.6789))))
+    } finally {
+      conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
+      conn.commit()
+    }
+  }
+
   test("configuring maxlength on string columns") {
     val tableName = s"configuring_maxlength_on_string_column_$randomSuffix"
     try {
