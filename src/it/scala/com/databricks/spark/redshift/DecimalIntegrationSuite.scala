@@ -24,104 +24,59 @@ import org.apache.spark.sql.Row
  */
 class DecimalIntegrationSuite extends IntegrationSuiteBase {
 
-  test("reading DECIMAL(19, 0)") {
-    val tableName = s"reading_decimal_19_0_$randomSuffix"
-    val decimals = Seq(
-      // Max and min values of DECIMAL(19, 0) column according to Redshift docs:
-      "9223372036854775807", // 2^63 - 1
-      "-9223372036854775807",
-      "0",
-      "12345678910",
-      null
-    )
-    val expectedRows = decimals.map(d => Row(if (d == null) null else Conversions.parseDecimal(d)))
-    try {
-      conn.createStatement().executeUpdate(s"CREATE TABLE $tableName (x DECIMAL(19, 0))")
-      for (x <- decimals) {
-        conn.createStatement().executeUpdate(s"INSERT INTO $tableName VALUES ($x)")
+  private def testReadingDecimals(precision: Int, scale: Int, decimalStrings: Seq[String]): Unit = {
+    test(s"reading DECIMAL($precision, $scale") {
+      val tableName = s"reading_decimal_${precision}_${scale}_$randomSuffix"
+      val expectedRows =
+        decimalStrings.map(d => Row(if (d == null) null else Conversions.parseDecimal(d)))
+      try {
+        conn.createStatement().executeUpdate(
+          s"CREATE TABLE $tableName (x DECIMAL($precision, $scale))")
+        for (x <- decimalStrings) {
+          conn.createStatement().executeUpdate(s"INSERT INTO $tableName VALUES ($x)")
+        }
+        conn.commit()
+        assert(DefaultJDBCWrapper.tableExists(conn, tableName))
+        val loadedDf = sqlContext.read
+          .format("com.databricks.spark.redshift")
+          .option("url", jdbcUrl)
+          .option("dbtable", tableName)
+          .option("tempdir", tempDir)
+          .option("aws_access_key_id", AWS_ACCESS_KEY_ID)
+          .option("aws_secret_access_key", AWS_SECRET_ACCESS_KEY)
+          .load()
+        checkAnswer(loadedDf, expectedRows)
+        checkAnswer(loadedDf.selectExpr("x + 0"), expectedRows)
+      } finally {
+        conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
+        conn.commit()
       }
-      conn.commit()
-      assert(DefaultJDBCWrapper.tableExists(conn, tableName))
-      val loadedDf = sqlContext.read
-        .format("com.databricks.spark.redshift")
-        .option("url", jdbcUrl)
-        .option("dbtable", tableName)
-        .option("tempdir", tempDir)
-        .option("aws_access_key_id", AWS_ACCESS_KEY_ID)
-        .option("aws_secret_access_key", AWS_SECRET_ACCESS_KEY)
-        .load()
-      checkAnswer(loadedDf, expectedRows)
-      checkAnswer(loadedDf.selectExpr("x + 0"), expectedRows)
-    } finally {
-      conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
-      conn.commit()
     }
   }
 
-  test("reading DECIMAL(19, 4)") {
-    val tableName = s"reading_decimal_19_4_$randomSuffix"
-    val decimals = Seq(
-      "922337203685477.5807",
-      "-922337203685477.5807",
-      "0",
-      "1234567.8910",
-      null
-    )
-    val expectedRows = decimals.map(d => Row(if (d == null) null else Conversions.parseDecimal(d)))
-    try {
-      conn.createStatement().executeUpdate(s"CREATE TABLE $tableName (x DECIMAL(19, 4))")
-      for (x <- decimals) {
-        conn.createStatement().executeUpdate(s"INSERT INTO $tableName VALUES ($x)")
-      }
-      conn.commit()
-      assert(DefaultJDBCWrapper.tableExists(conn, tableName))
-      val loadedDf = sqlContext.read
-        .format("com.databricks.spark.redshift")
-        .option("url", jdbcUrl)
-        .option("dbtable", tableName)
-        .option("tempdir", tempDir)
-        .option("aws_access_key_id", AWS_ACCESS_KEY_ID)
-        .option("aws_secret_access_key", AWS_SECRET_ACCESS_KEY)
-        .load()
-      checkAnswer(loadedDf, expectedRows)
-      checkAnswer(loadedDf.selectExpr("x + 0"), expectedRows)
-    } finally {
-      conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
-      conn.commit()
-    }
-  }
+  testReadingDecimals(19, 0, Seq(
+    // Max and min values of DECIMAL(19, 0) column according to Redshift docs:
+    "9223372036854775807", // 2^63 - 1
+    "-9223372036854775807",
+    "0",
+    "12345678910",
+    null
+  ))
 
-  test("reading DECIMAL(38, 4)") {
-    val tableName = s"reading_decimal_38_4_$randomSuffix"
-    val decimals = Seq(
-      "922337203685477.5808",
-      "9999999999999999999999999999999999.0000",
-      "-9999999999999999999999999999999999.0000",
-      "0",
-      "1234567.8910",
-      null
-    )
-    val expectedRows = decimals.map(d => Row(if (d == null) null else Conversions.parseDecimal(d)))
-    try {
-      conn.createStatement().executeUpdate(s"CREATE TABLE $tableName (x DECIMAL(38, 4))")
-      for (x <- decimals) {
-        conn.createStatement().executeUpdate(s"INSERT INTO $tableName VALUES ($x)")
-      }
-      conn.commit()
-      assert(DefaultJDBCWrapper.tableExists(conn, tableName))
-      val loadedDf = sqlContext.read
-        .format("com.databricks.spark.redshift")
-        .option("url", jdbcUrl)
-        .option("dbtable", tableName)
-        .option("tempdir", tempDir)
-        .option("aws_access_key_id", AWS_ACCESS_KEY_ID)
-        .option("aws_secret_access_key", AWS_SECRET_ACCESS_KEY)
-        .load()
-      checkAnswer(loadedDf, expectedRows)
-      checkAnswer(loadedDf.selectExpr("x + 0"), expectedRows)
-    } finally {
-      conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
-      conn.commit()
-    }
-  }
+  testReadingDecimals(19, 4, Seq(
+    "922337203685477.5807",
+    "-922337203685477.5807",
+    "0",
+    "1234567.8910",
+    null
+  ))
+
+  testReadingDecimals(38, 4, Seq(
+    "922337203685477.5808",
+    "9999999999999999999999999999999999.0000",
+    "-9999999999999999999999999999999999.0000",
+    "0",
+    "1234567.8910",
+    null
+  ))
 }
