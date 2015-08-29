@@ -95,9 +95,9 @@ private[redshift] object Conversions {
   redshiftDecimalFormat.setParseBigDecimal(true)
 
   /**
-   * Parse a boolean using Redshift's UNLOAD decimal syntax
+   * Parse a decimal using Redshift's UNLOAD decimal syntax
    */
-  private def parseDecimal(s: String): java.math.BigDecimal = {
+  def parseDecimal(s: String): java.math.BigDecimal = {
     redshiftDecimalFormat.parse(s).asInstanceOf[java.math.BigDecimal]
   }
   /**
