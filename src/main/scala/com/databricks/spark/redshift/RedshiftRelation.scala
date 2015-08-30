@@ -88,11 +88,11 @@ private[redshift] case class RedshiftRelation(
         conn.close()
       }
       // Create a DataFrame to read the unloaded data:
-      val sc = sqlContext.sparkContext
-      val hadoopConf = new Configuration(sc.hadoopConfiguration)
-      params.setCredentials(hadoopConf)
-      val rdd = sc.newAPIHadoopFile(params.tempPath, classOf[RedshiftInputFormat],
-        classOf[java.lang.Long], classOf[Array[String]], hadoopConf)
+      val rdd = sqlContext.sparkContext.newAPIHadoopFile(
+        params.tempPathWithCredentials(sqlContext.sparkContext.hadoopConfiguration),
+        classOf[RedshiftInputFormat],
+        classOf[java.lang.Long],
+        classOf[Array[String]])
       val prunedSchema = pruneSchema(schema, requiredColumns)
       rdd.values.mapPartitions { iter =>
         val converter: Array[String] => Row = Conversions.createRowConverter(prunedSchema)
