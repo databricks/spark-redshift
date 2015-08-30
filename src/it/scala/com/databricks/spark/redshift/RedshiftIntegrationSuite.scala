@@ -136,6 +136,9 @@ class RedshiftIntegrationSuite
       val conf = new Configuration()
       conf.set("fs.s3n.awsAccessKeyId", AWS_ACCESS_KEY_ID)
       conf.set("fs.s3n.awsSecretAccessKey", AWS_SECRET_ACCESS_KEY)
+      // Bypass Hadoop's FileSystem caching mechanism so that we don't cache the credentials:
+      conf.setBoolean("fs.s3.impl.disable.cache", true)
+      conf.setBoolean("fs.s3n.impl.disable.cache", true)
       val fs = FileSystem.get(URI.create(tempDir), conf)
       fs.delete(new Path(tempDir), true)
       fs.close()

@@ -90,6 +90,9 @@ private[redshift] case class RedshiftRelation(
       // Create a DataFrame to read the unloaded data:
       val sc = sqlContext.sparkContext
       val hadoopConf = new Configuration(sc.hadoopConfiguration)
+      // Bypass Hadoop's FileSystem caching mechanism so that we don't cache the credentials:
+      hadoopConf.setBoolean("fs.s3.impl.disable.cache", true)
+      hadoopConf.setBoolean("fs.s3n.impl.disable.cache", true)
       params.setCredentials(hadoopConf)
       val rdd = sc.newAPIHadoopFile(params.tempPath, classOf[RedshiftInputFormat],
         classOf[java.lang.Long], classOf[Array[String]], hadoopConf)
