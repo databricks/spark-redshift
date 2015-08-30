@@ -83,22 +83,41 @@ private[redshift] object Parameters extends Logging {
     val tempPath: String = Utils.makeTempPath(tempDir)
 
     /**
-     * Returns the `tempPath` with the credentials encoded in the URI.  Note that due to limitations
-     * in the S3 support built into Hadoop, this will only work for credentials with no slashes
-     * (`/`) in them, even though they are properly escaped in the returned URI.
+     * Returns the `tempPath` with the credentials encoded in the URI, unless the source of those
+     * credentials was `SparkContext.hadoopConf`.
+     *
+     * Note that due to limitations in the S3 support built into Hadoop, this will only work for
+     * credentials with no slashes (`/`) in them, even though they are properly escaped in the
+     * returned URI.
      */
     def tempPathWithCredentials(configuration: Configuration): String = {
-      val ((_, key), (_, secretKey)) = credentialsTuple(configuration)
-      val baseUri = new URI(tempPath)
-      val withCredentials = new URI(
-        baseUri.getScheme,
-        s"$key:$secretKey",
-        baseUri.getHost,
-        baseUri.getPort,
-        baseUri.getPath,
-        baseUri.getQuery,
-        baseUri.getFragment)
-      withCredentials.toString
+      val ((_, key), (_, secretKey), credentialsSource) = credentialsTuple(configuration)
+      if (credentialsSource == "hadoopConf") {
+        // The credentials have already been set in the Hadoop conf, which happens to be the
+        // SparkContext's `hadoopConfiguration`, so there is no need to encode them in the URI.
+        // We want to avoid the encoding because it does not support secret keys which contain
+        // backslashes.
+        tempPath
+      } else {
+        // The credentials were not obtained from the Hadoop configuration, so we'll have to encode
+        // them in the URI.
+        if (secretKey.contains("/")) {
+          throw new IllegalArgumentException(
+            "Due to a Hadoop limitation, AWS secret keys which contain slashes ('/') are not " +
+              "supported; please re-try with credentials that do not include slashes " +
+              "(or specify your keys using the global SparkContext.hadoopConfiguration instead).")
+        }
+        val baseUri = new URI(tempPath)
+        val withCredentials = new URI(
+          baseUri.getScheme,
+          s"$key:$secretKey",
+          baseUri.getHost,
+          baseUri.getPort,
+          baseUri.getPath,
+          baseUri.getQuery,
+          baseUri.getFragment)
+        withCredentials.toString
+      }
     }
 
     /**
@@ -207,7 +226,7 @@ private[redshift] object Parameters extends Logging {
      * available.
      */
     def credentialsString(configuration: Configuration): String = {
-      val ((_, accessKeyId), (_, secretAccessKey)) = credentialsTuple(configuration)
+      val ((_, accessKeyId), (_, secretAccessKey), _) = credentialsTuple(configuration)
       val credentials = s"aws_access_key_id=$accessKeyId;aws_secret_access_key=$secretAccessKey"
 
       if (parameters.contains("aws_security_token")) {
@@ -222,20 +241,20 @@ private[redshift] object Parameters extends Logging {
       val scheme = new URI(tempDir).getScheme
       val hadoopConfPrefix = s"fs.$scheme"
 
-      val (accessKeyId, secretAccessKey) = {
+      val (accessKeyId, secretAccessKey, credentialsSource) = {
         if (parameters.contains("aws_access_key_id")) {
           log.info("Using credentials provided in parameter map.")
-          (parameters("aws_access_key_id"), parameters("aws_secret_access_key"))
+          (parameters("aws_access_key_id"), parameters("aws_secret_access_key"), "params")
         } else if (configuration.get(s"$hadoopConfPrefix.awsAccessKeyId") != null) {
           log.info(s"Using hadoopConfiguration credentials for scheme $scheme}")
           (configuration.get(s"$hadoopConfPrefix.awsAccessKeyId"),
-            configuration.get(s"$hadoopConfPrefix.awsSecretAccessKey"))
+            configuration.get(s"$hadoopConfPrefix.awsSecretAccessKey"), "hadoopConf")
         } else {
           try {
             log.info(
               "Using default provider chain for AWS credentials, as none provided explicitly.")
             val awsCredentials = (new DefaultAWSCredentialsProviderChain).getCredentials
-            (awsCredentials.getAWSAccessKeyId, awsCredentials.getAWSSecretKey)
+            (awsCredentials.getAWSAccessKeyId, awsCredentials.getAWSSecretKey, "providerChain")
           } catch {
             case e: Exception =>
               throw new Exception("No credentials provided and unable to detect automatically.", e)
@@ -243,14 +262,8 @@ private[redshift] object Parameters extends Logging {
         }
       }
 
-     if (accessKeyId.contains("/") || secretAccessKey.contains("/")) {
-       throw new IllegalArgumentException(
-         "Due to a Hadoop limitation, AWS access keys which contain slashes ('/') are not" +
-           "supported; please re-try with credentials that do not include slashes.")
-     }
-
       ((s"$hadoopConfPrefix.awsAccessKeyId", accessKeyId),
-        (s"$hadoopConfPrefix.awsSecretAccessKey", secretAccessKey))
+        (s"$hadoopConfPrefix.awsSecretAccessKey", secretAccessKey), credentialsSource)
     }
   }
 }
