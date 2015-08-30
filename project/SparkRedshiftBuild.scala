@@ -56,6 +56,7 @@ object SparkRedshiftBuild extends Build {
         "Spark 1.5.0 RC2 Staging" at "https://repository.apache.org/content/repositories/orgapachespark-1141",
       libraryDependencies ++= Seq(
         "com.amazonaws" % "aws-java-sdk-core" % "1.9.40" % "provided",
+        "com.amazonaws" % "aws-java-sdk-sts" % "1.9.40" % "test",
         // We require spark-avro, but avro-mapred must be provided to match Hadoop version:
         "com.databricks" %% "spark-avro" % "1.0.0",
         "org.apache.avro" % "avro-mapred" % "1.7.6" % "provided" exclude("org.mortbay.jetty", "servlet-api"),
