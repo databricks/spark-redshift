@@ -110,14 +110,14 @@ object SparkRedshiftBuild extends Build {
             <url>https://github.com/mengxr</url>
           </developer>
           <developer>
-            <id>marmbrus</id>
-            <name>Michael Armbrust</name>
-            <url>https://github.com/marmbrus</url>
-          </developer>
-          <developer>
             <id>joshrosen</id>
             <name>Josh Rosen</name>
             <url>https://github.com/joshrosen</url>
+          </developer>
+          <developer>
+            <id>marmbrus</id>
+            <name>Michael Armbrust</name>
+            <url>https://github.com/marmbrus</url>
           </developer>
         </developers>,
 
