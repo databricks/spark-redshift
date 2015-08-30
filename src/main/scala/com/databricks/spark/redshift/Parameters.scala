@@ -89,11 +89,6 @@ private[redshift] object Parameters extends Logging {
      */
     def tempPathWithCredentials(configuration: Configuration): String = {
       val ((_, key), (_, secretKey)) = credentialsTuple(configuration)
-      if (key.contains("/") || secretKey.contains("/")) {
-        throw new IllegalArgumentException(
-          "Due to a Hadoop limitation, AWS access keys which contain slashes ('/') are not" +
-            "supported; please re-try with credentials that do not include slashes.")
-      }
       val baseUri = new URI(tempPath)
       val withCredentials = new URI(
         baseUri.getScheme,
@@ -247,6 +242,12 @@ private[redshift] object Parameters extends Logging {
           }
         }
       }
+
+     if (accessKeyId.contains("/") || secretAccessKey.contains("/")) {
+       throw new IllegalArgumentException(
+         "Due to a Hadoop limitation, AWS access keys which contain slashes ('/') are not" +
+           "supported; please re-try with credentials that do not include slashes.")
+     }
 
       ((s"$hadoopConfPrefix.awsAccessKeyId", accessKeyId),
         (s"$hadoopConfPrefix.awsSecretAccessKey", secretAccessKey))
