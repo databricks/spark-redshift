@@ -4,12 +4,22 @@
 [![codecov.io](http://codecov.io/github/databricks/spark-redshift/coverage.svg?branch=master)](http://codecov.io/github/databricks/spark-redshift?branch=master)
 
 A library to load data into Spark SQL DataFrames from Amazon Redshift, and write them back to
-Redshift tables. Amazon S3 is used to transfer data efficiently into and out of Redshift, and
-JDBC is used to trigger the appropriate <tt>COPY</tt> and <tt>UNLOAD</tt> commands on Redshift automatically.
+Redshift tables. Amazon S3 is used to efficiently transfer data in and out of Redshift, and
+JDBC is used to automatically trigger the appropriate `COPY` and `UNLOAD` commands on Redshift.
 
-## Install
+- [Installation](#installation)
+- Usage:
+  - Data sources API: [Scala](#scala), [Python](#python), [SQL](#sql)
+  - [Hadoop InputFormat](#hadoop-inputformat)
+- [Configuration](#configuration)
+  - [AWS Credentials](#aws-credentials)
+  - [Parameters](#parameters)
+  - [Configuring the maximum size of string columns](#configuring-the-maximum-size-of-string-columns)
+- [Migration Guide](#migration-guide)
 
-**Note:** `spark-redshift` requires Apache Spark version 1.4+ and Amazon Redshift version 1.0.963+ for
+## Installation
+
+`spark-redshift` requires Apache Spark version 1.4+ and Amazon Redshift version 1.0.963+ for
 writing with Avro data.
 
 You may use this library in your applications with the following dependency information:
@@ -160,7 +170,17 @@ val records: DataFrame = sqlContext.redshiftFile(path, Seq("name", "age"))
 val records: DataFrame = sqlContext.redshiftFile(path, "name varchar(10) age integer")
 ```
 
-## Parameters
+## Configuration
+
+### AWS Credentials
+
+`spark-redshift` reads and writes data to S3 when transferring data to/from Redshift. As a result, it requires AWS credentials with read and write access to a S3 bucket (specified as `tempdir` in the configuration parameters described below).
+
+You can provide AWS credentials via the parameters listed below, with Hadoop `fs.*` configuration settings, or by making them available via the usual environment variables, system properties or IAM roles.
+
+**:warning: Note**: `spark-redshift` does not clean up the temporary files that it creates in S3. As a result, we recommend that you use an S3 bucket with an [object lifecycle configuration](http://docs.aws.amazon.com/AmazonS3/latest/dev/object-lifecycle-mgmt.html) to ensure that temporary files are automatically deleted after a specified expiration period. By default, `spark-redshift` will refuse to read / write data to S3 buckets that do not have object lifecycle configurations; if you plan to clean up the temporary files manually, then you can use the `disable_s3_lifecycle_check` configuration option to disable this safety check.
+
+### Parameters
 
 The parameter map or <tt>OPTIONS</tt> provided in Spark SQL supports the following settings.
 
@@ -229,6 +249,12 @@ Redshift when writing. If you're using `spark-redshift` as part of a regular ETL
 set a <a href="http://docs.aws.amazon.com/AmazonS3/latest/dev/object-lifecycle-mgmt.html">Lifecycle Policy</a> on a bucket
 and use that as a temp location for this data.
     </td>
+ </tr>
+ <tr>
+ 	<td><tt>disable_s3_lifecycle_check<tt></td>
+ 	<td>No</td>
+ 	<td>false</td>
+ 	<td>If true, disables an automatic check which ensures that the <tt>tempdir</tt> S3 bucket is configured with an object lifecycle policy.
  </tr>
  <tr>
     <td><tt>jdbcdriver</tt></td>
@@ -320,13 +346,6 @@ df.withColumn("colName", col("colName").as("colName", metadata)
 ```
 
 Column metadata modification is unsupported in the Python, SQL, and R language APIs.
-
-## AWS Credentials
-
-Note that you can provide AWS credentials in the parameters above, with Hadoop `fs.*` configuration settings, 
-or you can make them available by the usual environment variables, system properties or IAM roles, etc. The credentials 
-you provide will be used in Redshift <tt>COPY</tt> and <tt>UNLOAD</tt> commands, which means they need write access 
-to the S3 bucket you reference in your <tt>tempdir</tt> setting.
 
 ## Migration Guide
 
