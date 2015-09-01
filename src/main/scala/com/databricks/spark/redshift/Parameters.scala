@@ -123,6 +123,7 @@ private[redshift] object Parameters extends Logging {
      *
      * Defaults to false.
      */
+    @deprecated("Use SaveMode instead", "0.5.0")
     def overwrite: Boolean = parameters("overwrite").toBoolean
 
     /**
