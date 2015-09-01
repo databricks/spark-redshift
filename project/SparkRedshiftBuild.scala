@@ -64,10 +64,10 @@ object SparkRedshiftBuild extends Build {
         "org.scalamock" %% "scalamock-scalatest-support" % "3.2" % "test"
       ),
       libraryDependencies ++= Seq(
-        "org.apache.hadoop" % "hadoop-client" % testHadoopVersion.value % "test",
-        "org.apache.spark" %% "spark-core" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client"),
-        "org.apache.spark" %% "spark-sql" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client"),
-        "org.apache.spark" %% "spark-hive" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client")
+        "org.apache.hadoop" % "hadoop-client" % testHadoopVersion.value % "test" force(),
+        "org.apache.spark" %% "spark-core" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force(),
+        "org.apache.spark" %% "spark-sql" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force(),
+        "org.apache.spark" %% "spark-hive" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force()
       ),
       ScoverageSbtPlugin.ScoverageKeys.coverageHighlighting := {
         if (scalaBinaryVersion.value == "2.10") false
@@ -75,6 +75,8 @@ object SparkRedshiftBuild extends Build {
       },
       logBuffered := false,
       // Display full-length stacktraces from ScalaTest:
-      testOptions in Test += Tests.Argument("-oF")
+      testOptions in Test += Tests.Argument("-oF"),
+      fork in Test := true,
+      javaOptions in Test ++= Seq("-Xms512M", "-Xmx2048M", "-XX:MaxPermSize=2048M")
     )
 }
