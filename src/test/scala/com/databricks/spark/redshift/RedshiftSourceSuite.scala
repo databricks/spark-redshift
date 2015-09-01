@@ -81,8 +81,7 @@ class RedshiftSourceSuite
     "tempdir" -> tempDir.toURI.toString,
     "dbtable" -> "test_table",
     "aws_access_key_id" -> "test1",
-    "aws_secret_access_key" -> "test2",
-    "disable_s3_lifecycle_check" -> "true")
+    "aws_secret_access_key" -> "test2")
 
   override def beforeAll(): Unit = {
     super.beforeAll()

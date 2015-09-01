@@ -1,4 +1,4 @@
-# `spark-redshift`
+# # `spark-redshift`
 
 [![Build Status](https://travis-ci.org/databricks/spark-redshift.svg?branch=master)](https://travis-ci.org/databricks/spark-redshift)
 [![codecov.io](http://codecov.io/github/databricks/spark-redshift/coverage.svg?branch=master)](http://codecov.io/github/databricks/spark-redshift?branch=master)
@@ -143,7 +143,7 @@ val records = sc.newAPIHadoopFile(
 
 You can provide AWS credentials via the parameters listed below, with Hadoop `fs.*` configuration settings, or by making them available via the usual environment variables, system properties or IAM roles.
 
-**:warning: Note**: `spark-redshift` does not clean up the temporary files that it creates in S3. As a result, we recommend that you use an S3 bucket with an [object lifecycle configuration](http://docs.aws.amazon.com/AmazonS3/latest/dev/object-lifecycle-mgmt.html) to ensure that temporary files are automatically deleted after a specified expiration period. By default, `spark-redshift` will refuse to read / write data to S3 buckets that do not have object lifecycle configurations; if you plan to clean up the temporary files manually, then you can use the `disable_s3_lifecycle_check` configuration option to disable this safety check.
+**:warning: Note**: `spark-redshift` does not clean up the temporary files that it creates in S3. As a result, we recommend that you use a dedicated temporary S3 bucket with an [object lifecycle configuration](http://docs.aws.amazon.com/AmazonS3/latest/dev/object-lifecycle-mgmt.html) to ensure that temporary files are automatically deleted after a specified expiration period.
 
 ### Parameters
 
@@ -214,12 +214,6 @@ Redshift when writing. If you're using `spark-redshift` as part of a regular ETL
 set a <a href="http://docs.aws.amazon.com/AmazonS3/latest/dev/object-lifecycle-mgmt.html">Lifecycle Policy</a> on a bucket
 and use that as a temp location for this data.
     </td>
- </tr>
- <tr>
- 	<td><tt>disable_s3_lifecycle_check<tt></td>
- 	<td>No</td>
- 	<td>false</td>
- 	<td>If true, disables an automatic check which ensures that the <tt>tempdir</tt> S3 bucket is configured with an object lifecycle policy.
  </tr>
  <tr>
     <td><tt>jdbcdriver</tt></td>

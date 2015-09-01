@@ -21,6 +21,7 @@ import java.net.URI
 import com.amazonaws.services.s3.model.BucketLifecycleConfiguration
 
 import scala.collection.JavaConverters._
+import scala.util.control.NonFatal
 
 import com.amazonaws.auth.{BasicAWSCredentials, DefaultAWSCredentialsProviderChain}
 import com.amazonaws.services.s3.{AmazonS3URI, AmazonS3Client}
@@ -186,13 +187,6 @@ private[redshift] object Parameters extends Logging {
     def postActions: Array[String] = parameters("postactions").split(";")
 
     /**
-     * If true, disables automatic checks which ensure that the `tempdir` S3 bucket has an
-     * object lifecycle policy.
-     */
-    def disableS3LifecycleCheck: Boolean =
-      parameters.getOrElse("disable_s3_lifecycle_check", "false").toBoolean
-
-    /**
      * Looks up "aws_access_key_id" and "aws_secret_access_key" in the parameter map and generates a
      * credentials string for Redshift. If no credentials have been provided, this function will
      * instead try using the Hadoop Configuration `fs.* settings` for the provided tempDir scheme,
@@ -259,7 +253,7 @@ private[redshift] object Parameters extends Logging {
     }
 
     def validateS3Configuration(configuration: Configuration): Unit = {
-      if (!disableS3LifecycleCheck) {
+      try {
         val ((_, accessKeyId), (_, secretAccessKey)) = credentialsTuple(configuration)
         val s3Client = new AmazonS3Client(new BasicAWSCredentials(accessKeyId, secretAccessKey))
         val s3URI = new AmazonS3URI(Utils.fixS3Url(tempDir))
@@ -273,12 +267,16 @@ private[redshift] object Parameters extends Logging {
           rule.getStatus == BucketLifecycleConfiguration.ENABLED && key.startsWith(rule.getPrefix)
         }
         if (!someRuleMatchesTempDir) {
-          val msg = s"The S3 bucket $bucket does not have an object lifecycle configuration to " +
-            "ensure cleanup of temporary files. Please configure `tempdir` to use a bucket with" +
-            "an object lifecycle policy or set disable_s3_lifecycle_check=true in your " +
-            "configuration."
-          throw new IllegalArgumentException(msg)
+          logWarning(s"The S3 bucket $bucket does not have an object lifecycle configuration to " +
+            "ensure cleanup of temporary files. Consider configuring `tempdir` to point to a " +
+            "bucket with an object lifecycle policy that automatically deletes files after an " +
+            "expiration period. For more information, see " +
+            "https://docs.aws.amazon.com/AmazonS3/latest/dev/object-lifecycle-mgmt.html")
         }
+      } catch {
+        case NonFatal(e) =>
+          logWarning(
+            "An error occurred while trying to read the S3 bucket lifecycle configuration", e)
       }
     }
   }
