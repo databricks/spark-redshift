@@ -22,7 +22,11 @@ import org.apache.spark.sql.types._
 
 /**
  * A simple parser for Redshift table schemas.
+ *
+ * Note: the only method which uses this class has been deprecated, so this class should be
+ * removed in `spark-redshift` 0.6. We will not accept patches to extend this parser.
  */
+@deprecated("Do not use SchemaParser directly", "0.5.0")
 private[redshift] object SchemaParser extends JavaTokenParsers {
   // redshift data types: http://docs.aws.amazon.com/redshift/latest/dg/c_Supported_data_types.html
   private val SMALLINT: Parser[DataType] = ("smallint" | "int2") ^^^ ShortType

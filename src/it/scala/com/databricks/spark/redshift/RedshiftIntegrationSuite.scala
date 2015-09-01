@@ -16,68 +16,15 @@
 
 package com.databricks.spark.redshift
 
-import java.net.URI
-import java.sql.{SQLException, Connection}
+import java.sql.SQLException
 
-import scala.util.Random
-
-import org.scalatest.{BeforeAndAfterEach, BeforeAndAfterAll, Matchers}
-import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, Path}
-
-import org.apache.spark.SparkContext
 import org.apache.spark.sql.{AnalysisException, Row, SQLContext, SaveMode}
-import org.apache.spark.sql.hive.test.TestHiveContext
 import org.apache.spark.sql.types._
 
 /**
  * End-to-end tests which run against a real Redshift cluster.
  */
-class RedshiftIntegrationSuite
-  extends QueryTest
-  with Matchers
-  with BeforeAndAfterAll
-  with BeforeAndAfterEach {
-
-  private def loadConfigFromEnv(envVarName: String): String = {
-    Option(System.getenv(envVarName)).getOrElse {
-      fail(s"Must set $envVarName environment variable")
-    }
-  }
-
-  // The following configurations must be set in order to run these tests. In Travis, these
-  // environment variables are set using Travis's encrypted environment variables feature:
-  // http://docs.travis-ci.com/user/environment-variables/#Encrypted-Variables
-
-  // JDBC URL listed in the AWS console (should not contain username and password).
-  private val AWS_REDSHIFT_JDBC_URL: String = loadConfigFromEnv("AWS_REDSHIFT_JDBC_URL")
-  private val AWS_REDSHIFT_USER: String = loadConfigFromEnv("AWS_REDSHIFT_USER")
-  private val AWS_REDSHIFT_PASSWORD: String = loadConfigFromEnv("AWS_REDSHIFT_PASSWORD")
-  private val AWS_ACCESS_KEY_ID: String = loadConfigFromEnv("TEST_AWS_ACCESS_KEY_ID")
-  private val AWS_SECRET_ACCESS_KEY: String = loadConfigFromEnv("TEST_AWS_SECRET_ACCESS_KEY")
-  // Path to a directory in S3 (e.g. 's3n://bucket-name/path/to/scratch/space').
-  private val AWS_S3_SCRATCH_SPACE: String = loadConfigFromEnv("AWS_S3_SCRATCH_SPACE")
-  require(AWS_S3_SCRATCH_SPACE.contains("s3n"), "must use s3n:// URL")
-
-  private val jdbcUrl: String = {
-    s"$AWS_REDSHIFT_JDBC_URL?user=$AWS_REDSHIFT_USER&password=$AWS_REDSHIFT_PASSWORD"
-  }
-
-  /**
-   * Random suffix appended appended to table and directory names in order to avoid collisions
-   * between separate Travis builds.
-   */
-  private val randomSuffix: String = Math.abs(Random.nextLong()).toString
-
-  private val tempDir: String = AWS_S3_SCRATCH_SPACE + randomSuffix + "/"
-
-  /**
-   * Spark Context with Hadoop file overridden to point at our local test data file for this suite,
-   * no-matter what temp directory was generated and requested.
-   */
-  private var sc: SparkContext = _
-  private var sqlContext: SQLContext = _
-  private var conn: Connection = _
+class RedshiftIntegrationSuite extends IntegrationSuiteBase {
 
   private val test_table: String = s"test_table_$randomSuffix"
   private val test_table2: String = s"test_table2_$randomSuffix"
@@ -85,9 +32,6 @@ class RedshiftIntegrationSuite
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    sc = new SparkContext("local", "RedshiftSourceSuite")
-
-    conn = DefaultJDBCWrapper.getConnector("com.amazon.redshift.jdbc4.Driver", jdbcUrl)
 
     conn.prepareStatement("drop table if exists test_table").executeUpdate()
     conn.prepareStatement("drop table if exists test_table2").executeUpdate()
@@ -133,34 +77,17 @@ class RedshiftIntegrationSuite
 
   override def afterAll(): Unit = {
     try {
-      val conf = new Configuration()
-      conf.set("fs.s3n.awsAccessKeyId", AWS_ACCESS_KEY_ID)
-      conf.set("fs.s3n.awsSecretAccessKey", AWS_SECRET_ACCESS_KEY)
-      // Bypass Hadoop's FileSystem caching mechanism so that we don't cache the credentials:
-      conf.setBoolean("fs.s3.impl.disable.cache", true)
-      conf.setBoolean("fs.s3n.impl.disable.cache", true)
-      val fs = FileSystem.get(URI.create(tempDir), conf)
-      fs.delete(new Path(tempDir), true)
-      fs.close()
+      conn.prepareStatement(s"drop table if exists $test_table").executeUpdate()
+      conn.prepareStatement(s"drop table if exists $test_table2").executeUpdate()
+      conn.prepareStatement(s"drop table if exists $test_table3").executeUpdate()
+      conn.commit()
     } finally {
-      try {
-        conn.prepareStatement(s"drop table if exists $test_table").executeUpdate()
-        conn.prepareStatement(s"drop table if exists $test_table2").executeUpdate()
-        conn.prepareStatement(s"drop table if exists $test_table3").executeUpdate()
-        conn.commit()
-        conn.close()
-      } finally {
-        try {
-          sc.stop()
-        } finally {
-          super.afterAll()
-        }
-      }
+      super.afterAll()
     }
   }
 
   override def beforeEach(): Unit = {
-    sqlContext = new TestHiveContext(sc)
+    super.beforeEach()
     sqlContext.sql(
       s"""
          | create temporary table test_table(
