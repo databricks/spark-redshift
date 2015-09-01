@@ -38,7 +38,7 @@ trait IntegrationSuiteBase
   with BeforeAndAfterAll
   with BeforeAndAfterEach {
 
-  private def loadConfigFromEnv(envVarName: String): String = {
+  protected def loadConfigFromEnv(envVarName: String): String = {
     Option(System.getenv(envVarName)).getOrElse {
       fail(s"Must set $envVarName environment variable")
     }
