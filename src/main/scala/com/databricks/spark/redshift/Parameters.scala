@@ -267,6 +267,9 @@ private[redshift] object Parameters extends Logging {
         val bucketLifecycleConfiguration = s3Client.getBucketLifecycleConfiguration(bucket)
         val key = s3URI.getKey
         val someRuleMatchesTempDir = bucketLifecycleConfiguration.getRules.asScala.exists { rule =>
+          // Note: this only checks that there is an active rule which matches the temp directory;
+          // it does not actually check that the rule will delete the files. This check is still
+          // better than nothing, though, and we can always improve it later.
           rule.getStatus == BucketLifecycleConfiguration.ENABLED && key.startsWith(rule.getPrefix)
         }
         if (!someRuleMatchesTempDir) {
