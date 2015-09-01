@@ -18,7 +18,13 @@ package com.databricks.spark.redshift
 
 import java.net.URI
 
-import com.amazonaws.auth.DefaultAWSCredentialsProviderChain
+import com.amazonaws.services.s3.model.BucketLifecycleConfiguration
+
+import scala.collection.JavaConverters._
+import scala.util.control.NonFatal
+
+import com.amazonaws.auth.{BasicAWSCredentials, DefaultAWSCredentialsProviderChain}
+import com.amazonaws.services.s3.{AmazonS3URI, AmazonS3Client}
 import org.apache.hadoop.conf.Configuration
 
 import org.apache.spark.Logging
@@ -189,6 +195,7 @@ private[redshift] object Parameters extends Logging {
      * available.
      */
     def credentialsString(configuration: Configuration): String = {
+      validateS3Configuration(configuration)
       val ((_, accessKeyId), (_, secretAccessKey)) = credentialsTuple(configuration)
       val credentials = s"aws_access_key_id=$accessKeyId;aws_secret_access_key=$secretAccessKey"
 
@@ -209,13 +216,14 @@ private[redshift] object Parameters extends Logging {
      * available.
      */
     def setCredentials(configuration: Configuration): Unit = {
+      validateS3Configuration(configuration)
       val ((accessKeyIdProp, accessKeyId), (secretAccessKeyProp, secretAccessKey)) =
         credentialsTuple(configuration)
       configuration.setIfUnset(accessKeyIdProp, accessKeyId)
       configuration.setIfUnset(secretAccessKeyProp, secretAccessKey)
     }
 
-   private def credentialsTuple(configuration: Configuration) = {
+    private def credentialsTuple(configuration: Configuration) = {
       val scheme = new URI(tempDir).getScheme
       val hadoopConfPrefix = s"fs.$scheme"
 
@@ -242,6 +250,34 @@ private[redshift] object Parameters extends Logging {
 
       ((s"$hadoopConfPrefix.awsAccessKeyId", accessKeyId),
         (s"$hadoopConfPrefix.awsSecretAccessKey", secretAccessKey))
+    }
+
+    def validateS3Configuration(configuration: Configuration): Unit = {
+      try {
+        val ((_, accessKeyId), (_, secretAccessKey)) = credentialsTuple(configuration)
+        val s3Client = new AmazonS3Client(new BasicAWSCredentials(accessKeyId, secretAccessKey))
+        val s3URI = new AmazonS3URI(Utils.fixS3Url(tempDir))
+        val bucket = s3URI.getBucket
+        val bucketLifecycleConfiguration = s3Client.getBucketLifecycleConfiguration(bucket)
+        val key = s3URI.getKey
+        val someRuleMatchesTempDir = bucketLifecycleConfiguration.getRules.asScala.exists { rule =>
+          // Note: this only checks that there is an active rule which matches the temp directory;
+          // it does not actually check that the rule will delete the files. This check is still
+          // better than nothing, though, and we can always improve it later.
+          rule.getStatus == BucketLifecycleConfiguration.ENABLED && key.startsWith(rule.getPrefix)
+        }
+        if (!someRuleMatchesTempDir) {
+          logWarning(s"The S3 bucket $bucket does not have an object lifecycle configuration to " +
+            "ensure cleanup of temporary files. Consider configuring `tempdir` to point to a " +
+            "bucket with an object lifecycle policy that automatically deletes files after an " +
+            "expiration period. For more information, see " +
+            "https://docs.aws.amazon.com/AmazonS3/latest/dev/object-lifecycle-mgmt.html")
+        }
+      } catch {
+        case NonFatal(e) =>
+          logWarning(
+            "An error occurred while trying to read the S3 bucket lifecycle configuration", e)
+      }
     }
   }
 }

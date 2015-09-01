@@ -4,33 +4,34 @@
 [![codecov.io](http://codecov.io/github/databricks/spark-redshift/coverage.svg?branch=master)](http://codecov.io/github/databricks/spark-redshift?branch=master)
 
 A library to load data into Spark SQL DataFrames from Amazon Redshift, and write them back to
-Redshift tables. Amazon S3 is used to transfer data efficiently into and out of Redshift, and
-JDBC is used to trigger the appropriate <tt>COPY</tt> and <tt>UNLOAD</tt> commands on Redshift automatically.
+Redshift tables. Amazon S3 is used to efficiently transfer data in and out of Redshift, and
+JDBC is used to automatically trigger the appropriate `COPY` and `UNLOAD` commands on Redshift.
 
-## Install
+- [Installation](#installation)
+- Usage:
+  - Data sources API: [Scala](#scala), [Python](#python), [SQL](#sql)
+  - [Hadoop InputFormat](#hadoop-inputformat)
+- [Configuration](#configuration)
+  - [AWS Credentials](#aws-credentials)
+  - [Parameters](#parameters)
+  - [Configuring the maximum size of string columns](#configuring-the-maximum-size-of-string-columns)
+- [Migration Guide](#migration-guide)
 
-**Note:** `spark-redshift` requires Apache Spark version 1.4+ and Amazon Redshift version 1.0.963+ for
-writing with Avro data.
+## Installation
+
+`spark-redshift` requires Apache Spark 1.4+ and Amazon Redshift 1.0.963+.
 
 You may use this library in your applications with the following dependency information:
 
 ```
 groupId: com.databricks
 artifactId: spark-redshift
-version: 0.4.1
+version: 0.5.0-SNAPSHOT
 ```
 
-The project makes use of [`spark-avro`](https://github.com/databricks/spark-avro), which is pulled
-in as a dependency, however you'll need to provide the corresponding `avro-mapred` matching the Hadoop
-distribution that you plan to deploy to.
+You will also need to provide a JDBC driver that is compatible with Redshift. Amazon recommend that you use [their driver](http://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-connection.html), which is distributed as a JAR that is hosted on Amazon's website. This library has also been successfully tested using the Postgres JDBC driver.
 
-Further, as Redshift is an AWS product, some AWS libraries will be required. This library expects that
-your deployment environment will include `hadoop-aws`, or other things necessary to access S3, credentials,
-etc. Check the dependencies with "provided" scope in <tt>build.sbt</tt> if you're at all unclear.
-
-You're also going to need a JDBC driver that is compatible with Redshift. Amazon recommend that you
-use [their driver](http://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-connection.html),
-although this library has also been successfully tested using the Postgres JDBC driver.
+**Note on Hadoop versions**: This library depends on [`spark-avro`](https://github.com/databricks/spark-avro), which should automatically be downloaded because it is declared as a dependency. However, you may need to provide the corresponding `avro-mapred` dependency which matches your Hadoop distribution. In most deployments, however, this dependency will be automatically provided by your cluster's Spark assemblies and no additional action will be required.
 
 ## Usage
 
@@ -134,7 +135,17 @@ val records = sc.newAPIHadoopFile(
   classOf[Array[String]])
 ```
 
-## Parameters
+## Configuration
+
+### AWS Credentials
+
+`spark-redshift` reads and writes data to S3 when transferring data to/from Redshift. As a result, it requires AWS credentials with read and write access to a S3 bucket (specified as `tempdir` in the configuration parameters described below).
+
+You can provide AWS credentials via the parameters listed below, with Hadoop `fs.*` configuration settings, or by making them available via the usual environment variables, system properties or IAM roles.
+
+**:warning: Note**: `spark-redshift` does not clean up the temporary files that it creates in S3. As a result, we recommend that you use a dedicated temporary S3 bucket with an [object lifecycle configuration](http://docs.aws.amazon.com/AmazonS3/latest/dev/object-lifecycle-mgmt.html) to ensure that temporary files are automatically deleted after a specified expiration period.
+
+### Parameters
 
 The parameter map or <tt>OPTIONS</tt> provided in Spark SQL supports the following settings.
 
@@ -286,13 +297,6 @@ df.withColumn("colName", col("colName").as("colName", metadata)
 ```
 
 Column metadata modification is unsupported in the Python, SQL, and R language APIs.
-
-## AWS Credentials
-
-Note that you can provide AWS credentials in the parameters above, with Hadoop `fs.*` configuration settings, 
-or you can make them available by the usual environment variables, system properties or IAM roles, etc. The credentials 
-you provide will be used in Redshift <tt>COPY</tt> and <tt>UNLOAD</tt> commands, which means they need write access 
-to the S3 bucket you reference in your <tt>tempdir</tt> setting.
 
 ## Migration Guide
 
