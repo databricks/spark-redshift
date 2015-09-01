@@ -19,6 +19,10 @@ import sbt._
 import sbt.Keys._
 import sbtsparkpackage.SparkPackagePlugin.autoImport._
 import scoverage.ScoverageSbtPlugin
+import sbtrelease.ReleasePlugin.autoImport._
+import sbtrelease.ReleasePlugin.autoImport.ReleaseTransformations._
+import com.typesafe.sbt.pgp._
+import bintray.BintrayPlugin.autoImport._
 
 object SparkRedshiftBuild extends Build {
   val testSparkVersion = settingKey[String]("Spark version to test against")
@@ -36,8 +40,8 @@ object SparkRedshiftBuild extends Build {
     .settings(
       name := "spark-redshift",
       organization := "com.databricks",
-      version := "0.4.1-SNAPSHOT",
       scalaVersion := "2.10.4",
+      crossScalaVersions := Seq("2.10.5", "2.11.7"),
       sparkVersion := "1.4.1",
       testSparkVersion := sys.props.get("spark.testVersion").getOrElse(sparkVersion.value),
       testHadoopVersion := sys.props.get("hadoop.testVersion").getOrElse("2.2.0"),
@@ -65,10 +69,10 @@ object SparkRedshiftBuild extends Build {
         "org.scalamock" %% "scalamock-scalatest-support" % "3.2" % "test"
       ),
       libraryDependencies ++= Seq(
-        "org.apache.hadoop" % "hadoop-client" % testHadoopVersion.value % "test",
-        "org.apache.spark" %% "spark-core" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client"),
-        "org.apache.spark" %% "spark-sql" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client"),
-        "org.apache.spark" %% "spark-hive" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client")
+        "org.apache.hadoop" % "hadoop-client" % testHadoopVersion.value % "test" force(),
+        "org.apache.spark" %% "spark-core" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force(),
+        "org.apache.spark" %% "spark-sql" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force(),
+        "org.apache.spark" %% "spark-hive" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force()
       ),
       ScoverageSbtPlugin.ScoverageKeys.coverageHighlighting := {
         if (scalaBinaryVersion.value == "2.10") false
@@ -76,6 +80,65 @@ object SparkRedshiftBuild extends Build {
       },
       logBuffered := false,
       // Display full-length stacktraces from ScalaTest:
-      testOptions in Test += Tests.Argument("-oF")
+      testOptions in Test += Tests.Argument("-oF"),
+      fork in Test := true,
+      javaOptions in Test ++= Seq("-Xms512M", "-Xmx2048M", "-XX:MaxPermSize=2048M"),
+
+      /********************
+       * Release settings *
+       ********************/
+
+      publishMavenStyle := true,
+      releaseCrossBuild := true,
+      licenses += ("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0")),
+      releasePublishArtifactsAction := PgpKeys.publishSigned.value,
+
+      pomExtra :=
+        <url>https://github.com/databricks/spark-redshift</url>
+        <licenses>
+          <license>
+            <name>Apache License, Verision 2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0.html</url>
+            <distribution>repo</distribution>
+          </license>
+        </licenses>
+        <scm>
+          <url>git@github.com:databricks/spark-redshift.git</url>
+          <connection>scm:git:git@github.com:databricks/spark-redshift.git</connection>
+        </scm>
+        <developers>
+          <developer>
+            <id>meng</id>
+            <name>Xiangrui Meng</name>
+            <url>https://github.com/mengxr</url>
+          </developer>
+          <developer>
+            <id>joshrosen</id>
+            <name>Josh Rosen</name>
+            <url>https://github.com/joshrosen</url>
+          </developer>
+          <developer>
+            <id>marmbrus</id>
+            <name>Michael Armbrust</name>
+            <url>https://github.com/marmbrus</url>
+          </developer>
+        </developers>,
+
+      bintrayReleaseOnPublish in ThisBuild := false,
+
+      // Add publishing to spark packages as another step.
+      releaseProcess := Seq[ReleaseStep](
+        checkSnapshotDependencies,
+        inquireVersions,
+        runTest,
+        setReleaseVersion,
+        commitReleaseVersion,
+        tagRelease,
+        publishArtifacts,
+        releaseStepTask(spPublish),
+        setNextVersion,
+        commitNextVersion,
+        pushChanges
+      )
     )
 }

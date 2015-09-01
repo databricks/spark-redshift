@@ -129,26 +129,11 @@ OPTIONS (dbtable 'my_table',
          url 'jdbc:redshift://host:port/db?user=username&password=pass');
 ```
 
-### Scala helper functions
-
-The <tt>com.databricks.spark.redshift</tt> package has some shortcuts if you're working directly
-from a Scala application and don't want to use the Data Sources API:
-
-```scala
-import com.databricks.spark.redshift._
-
-val sqlContext = new SQLContext(sc)
-
-val dataFrame = sqlContext.redshiftTable( ... )
-dataFrame.saveAsRedshiftTable( ... )
-```
-
 ### Hadoop InputFormat
 
 The library contains a Hadoop input format for Redshift tables unloaded with the ESCAPE option,
 which you may make direct use of as follows:
 
-Usage in Spark Core:
 ```scala
 import com.databricks.spark.redshift.RedshiftInputFormat
 
@@ -157,17 +142,6 @@ val records = sc.newAPIHadoopFile(
   classOf[RedshiftInputFormat],
   classOf[java.lang.Long],
   classOf[Array[String]])
-```
-
-Usage in Spark SQL:
-```scala
-import com.databricks.spark.redshift._
-
-// Call redshiftFile() that returns a SchemaRDD with all string columns.
-val records: DataFrame = sqlContext.redshiftFile(path, Seq("name", "age"))
-
-// Call redshiftFile() with the table schema.
-val records: DataFrame = sqlContext.redshiftFile(path, "name varchar(10) age integer")
 ```
 
 ## Configuration
@@ -261,14 +235,6 @@ and use that as a temp location for this data.
     <td>No</td>
     <td><tt>com.amazon.redshift.jdbc4.Driver</tt></td>
     <td>The class name of the JDBC driver to load before JDBC operations. Must be on classpath.</td>
- </tr>
- <tr>
-    <td><tt>overwrite</tt></td>
-    <td>No</td>
-    <td><tt>false</tt></td>
-    <td>
-If true, drop any existing data before writing new content. Only applies when using the Scala `saveAsRedshiftTable` function
-directly, as `SaveMode` will be preferred when using the Data Source API. See also <tt>usestagingtable</tt></td>
  </tr>
  <tr>
     <td><tt>diststyle</tt></td>
