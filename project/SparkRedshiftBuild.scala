@@ -57,6 +57,7 @@ object SparkRedshiftBuild extends Build {
       libraryDependencies ++= Seq(
         "com.amazonaws" % "aws-java-sdk-core" % "1.9.40",
         "com.amazonaws" % "aws-java-sdk-s3" % "1.9.40",
+        "com.amazonaws" % "aws-java-sdk-sts" % "1.9.40" % "test",
         // We require spark-avro, but avro-mapred must be provided to match Hadoop version.
         // In most cases, avro-mapred will be provided as part of the Spark assembly JAR.
         "com.databricks" %% "spark-avro" % "1.0.0",
