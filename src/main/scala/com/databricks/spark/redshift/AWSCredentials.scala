@@ -75,7 +75,7 @@ object AWSCredentials {
           AWSCredentials(creds.getAWSAccessKeyId, creds.getAWSSecretKey, sessionToken = None)
         }
       case other =>
-        throw new IllegalArgumentException("Unrecognized scheme $other; expected s3, s3n, or s3a")
+        throw new IllegalArgumentException(s"Unrecognized scheme $other; expected s3, s3n, or s3a")
     }
   }
 }
