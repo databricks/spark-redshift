@@ -81,6 +81,11 @@ trait IntegrationSuiteBase
   override def beforeAll(): Unit = {
     super.beforeAll()
     sc = new SparkContext("local", "RedshiftSourceSuite")
+    // Bypass Hadoop's FileSystem caching mechanism so that we don't cache the credentials:
+    sc.hadoopConfiguration.setBoolean("fs.s3.impl.disable.cache", true)
+    sc.hadoopConfiguration.setBoolean("fs.s3n.impl.disable.cache", true)
+    sc.hadoopConfiguration.set("fs.s3n.awsAccessKeyId", AWS_ACCESS_KEY_ID)
+    sc.hadoopConfiguration.set("fs.s3n.awsSecretAccessKey", AWS_SECRET_ACCESS_KEY)
     conn = DefaultJDBCWrapper.getConnector("com.amazon.redshift.jdbc4.Driver", jdbcUrl)
   }
 

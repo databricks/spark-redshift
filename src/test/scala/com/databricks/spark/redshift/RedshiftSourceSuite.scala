@@ -79,9 +79,7 @@ class RedshiftSourceSuite
   private def defaultParams: Map[String, String] = Map(
     "url" -> "jdbc:redshift://foo/bar",
     "tempdir" -> tempDir.toURI.toString,
-    "dbtable" -> "test_table",
-    "aws_access_key_id" -> "test1",
-    "aws_secret_access_key" -> "test2")
+    "dbtable" -> "test_table")
 
   override def beforeAll(): Unit = {
     super.beforeAll()
@@ -490,9 +488,7 @@ class RedshiftSourceSuite
     val invalidParams = Map(
       "url" -> "jdbc:redshift://foo/bar",
       "tempdir" -> tempDir.toURI.toString,
-      "query" -> "select * from test_table",
-      "aws_access_key_id" -> "test1",
-      "aws_secret_access_key" -> "test2")
+      "query" -> "select * from test_table")
 
     val e1 = intercept[IllegalArgumentException] {
       expectedDataDF.saveAsRedshiftTable(invalidParams)

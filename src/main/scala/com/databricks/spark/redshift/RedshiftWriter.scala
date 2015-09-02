@@ -57,9 +57,12 @@ private[redshift] class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging
    * Generate the COPY SQL command
    */
   private def copySql(sqlContext: SQLContext, params: MergedParameters): String = {
-    val creds = params.credentialsString(sqlContext.sparkContext.hadoopConfiguration)
+    val credsString: String = {
+      val creds = AWSCredentials.load(params.tempPath, sqlContext.sparkContext.hadoopConfiguration)
+      creds.credentialsString
+    }
     val fixedUrl = Utils.fixS3Url(params.tempPath)
-    s"COPY ${params.table.get} FROM '$fixedUrl' CREDENTIALS '$creds' FORMAT AS " +
+    s"COPY ${params.table.get} FROM '$fixedUrl' CREDENTIALS '$credsString' FORMAT AS " +
       "AVRO 'auto' DATEFORMAT 'YYYY-MM-DD HH:MI:SS'"
   }
 
@@ -174,7 +177,13 @@ private[redshift] class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging
   /**
    * Serialize temporary data to S3, ready for Redshift COPY
    */
-  private def unloadData(sqlContext: SQLContext, data: DataFrame, tempPath: String): Unit = {
+  private def unloadData(
+      sqlContext: SQLContext,
+      data: DataFrame,
+      params: MergedParameters): Unit = {
+    val creds: AWSCredentials = params.temporaryAWSCredentials.getOrElse(
+      AWSCredentials.load(params.tempPath, sqlContext.sparkContext.hadoopConfiguration))
+    Utils.checkThatBucketHasObjectLifecycleConfiguration(params.tempPath, creds)
     // spark-avro does not support Date types. In addition, it converts Timestamps into longs
     // (milliseconds since the Unix epoch). Redshift is capable of loading timestamps in
     // 'epochmillisecs' format but there's no equivalent format for dates. To work around this, we
@@ -231,7 +240,7 @@ private[redshift] class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging
     sqlContext.createDataFrame(convertedRows, convertedSchema)
       .write
       .format("com.databricks.spark.avro")
-      .save(tempPath)
+      .save(params.tempPath)
   }
 
   /**
@@ -244,17 +253,16 @@ private[redshift] class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging
     }
 
     val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
-    val config = sqlContext.sparkContext.hadoopConfiguration
 
     try {
       if (params.overwrite && params.useStagingTable) {
         withStagingTable(conn, params.table.get, stagingTable => {
           val updatedParams = MergedParameters(params.parameters.updated("dbtable", stagingTable))
-          unloadData(sqlContext, data, updatedParams.tempPathWithCredentials(config))
+          unloadData(sqlContext, data, updatedParams)
           doRedshiftLoad(conn, data, updatedParams)
         })
       } else {
-        unloadData(sqlContext, data, params.tempPathWithCredentials(config))
+        unloadData(sqlContext, data, params)
         doRedshiftLoad(conn, data, params)
       }
     } finally {

@@ -33,8 +33,6 @@ class STSIntegrationSuite extends IntegrationSuiteBase {
   private var STS_SECRET_ACCESS_KEY: String = _
   private var STS_SESSION_TOKEN: String = _
 
-
-
   override def beforeAll(): Unit = {
     super.beforeAll()
     val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
@@ -59,9 +57,9 @@ class STSIntegrationSuite extends IntegrationSuiteBase {
         .option("url", jdbcUrl)
         .option("dbtable", tableName)
         .option("tempdir", tempDir)
-        .option("aws_access_key_id", STS_ACCESS_KEY_ID)
-        .option("aws_secret_access_key", STS_SECRET_ACCESS_KEY)
-        .option("aws_security_token", STS_SESSION_TOKEN)
+        .option("sts_access_key_id", STS_ACCESS_KEY_ID)
+        .option("sts_secret_access_key", STS_SECRET_ACCESS_KEY)
+        .option("sts_session_token", STS_SESSION_TOKEN)
         .mode(SaveMode.ErrorIfExists)
         .save()
 
@@ -71,9 +69,9 @@ class STSIntegrationSuite extends IntegrationSuiteBase {
         .option("url", jdbcUrl)
         .option("dbtable", tableName)
         .option("tempdir", tempDir)
-        .option("aws_access_key_id", STS_ACCESS_KEY_ID)
-        .option("aws_secret_access_key", STS_SECRET_ACCESS_KEY)
-        .option("aws_security_token", STS_SESSION_TOKEN)
+        .option("sts_access_key_id", STS_ACCESS_KEY_ID)
+        .option("sts_secret_access_key", STS_SECRET_ACCESS_KEY)
+        .option("sts_session_token", STS_SESSION_TOKEN)
         .load()
       assert(loadedDf.schema.length === 1)
       assert(loadedDf.columns === Seq("a"))
