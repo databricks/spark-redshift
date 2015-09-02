@@ -57,6 +57,17 @@ object SparkRedshiftBuild extends Build {
       libraryDependencies ++= Seq(
         "com.amazonaws" % "aws-java-sdk-core" % "1.9.40",
         "com.amazonaws" % "aws-java-sdk-s3" % "1.9.40",
+        // These Amazon SDK depdencies are marked as 'provided' in order to reduce the risk of
+        // dependency conflicts with other user libraries. In many environments, such as EMR and
+        // Databricks, the Amazon SDK will already be on the classpath. In other cases, the SDK is
+        // likely to be provided via a dependency on the S3NativeFileSystem. If this was not marked
+        // as provided, then we would have to worry about the SDK's own dependencies evicting
+        // earlier versions of those dependencies that are required by the end user's own code.
+        // There's a trade-off here and we've chosen to err on the side of minimizing dependency
+        // conflicts for a majority of users while adding a minor inconvienece (adding one extra
+        // depenendecy by hand) for a smaller set of users.
+        "com.amazonaws" % "aws-java-sdk-core" % "1.9.40" % "provided",
+        "com.amazonaws" % "aws-java-sdk-s3" % "1.9.40" % "provided",
         "com.amazonaws" % "aws-java-sdk-sts" % "1.9.40" % "test",
         // We require spark-avro, but avro-mapred must be provided to match Hadoop version.
         // In most cases, avro-mapred will be provided as part of the Spark assembly JAR.
