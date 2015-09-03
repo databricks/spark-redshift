@@ -56,7 +56,8 @@ private[redshift] case class RedshiftRelation(
   }
 
   override def buildScan(requiredColumns: Array[String], filters: Array[Filter]): RDD[Row] = {
-    val creds = AWSCredentials.load(params.tempPath, sqlContext.sparkContext.hadoopConfiguration)
+    val creds =
+      AWSCredentialsUtils.load(params.tempPath, sqlContext.sparkContext.hadoopConfiguration)
     Utils.checkThatBucketHasObjectLifecycleConfiguration(params.tempPath, creds)
     if (requiredColumns.isEmpty) {
       // In the special case where no columns were requested, issue a `count(*)` against Redshift
@@ -108,9 +109,9 @@ private[redshift] case class RedshiftRelation(
     // Always quote column names:
     val columnList = requiredColumns.map(col => s""""$col"""").mkString(", ")
     val whereClause = FilterPushdown.buildWhereClause(schema, filters)
-    val credsString: String = params.temporaryAWSCredentials.getOrElse(
-      AWSCredentials.load(params.tempPath, sqlContext.sparkContext.hadoopConfiguration)
-    ).credentialsString
+    val creds = params.temporaryAWSCredentials.getOrElse(
+      AWSCredentialsUtils.load(params.tempPath, sqlContext.sparkContext.hadoopConfiguration))
+    val credsString: String =  AWSCredentialsUtils.getRedshiftCredentialsString(creds)
     val query = {
       // Since the query passed to UNLOAD will be enclosed in single quotes, we need to escape
       // any single quotes that appear in the query itself

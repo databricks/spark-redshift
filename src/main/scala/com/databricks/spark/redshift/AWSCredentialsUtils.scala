@@ -18,28 +18,24 @@ package com.databricks.spark.redshift
 
 import java.net.URI
 
-import com.amazonaws.auth.InstanceProfileCredentialsProvider
+import com.amazonaws.auth.{BasicAWSCredentials, AWSCredentials, AWSSessionCredentials, InstanceProfileCredentialsProvider}
 import org.apache.hadoop.conf.Configuration
 
-/**
- * Helper class for working with AWS Credentials.
- */
-private[redshift] case class AWSCredentials(
-    accessKey: String,
-    secretAccessKey: String,
-    sessionToken: Option[String]) {
+private[redshift] object AWSCredentialsUtils {
 
   /**
-   * Generates a credentials string for Redshift.
+   * Generates a credentials string for use in Redshift LOAD and UNLOAD statements.
    */
-  def credentialsString: String = {
-    val credentials = s"aws_access_key_id=$accessKey;aws_secret_access_key=$secretAccessKey"
-    credentials + sessionToken.map { token => s";token=$token" }.getOrElse("")
+  def getRedshiftCredentialsString(awsCredentials: AWSCredentials): String = {
+    awsCredentials match {
+      case creds: AWSSessionCredentials =>
+        s"aws_access_key_id=${creds.getAWSAccessKeyId};" +
+          s"aws_secret_access_key=${creds.getAWSSecretKey};token=${creds.getSessionToken}"
+      case creds=>
+        s"aws_access_key_id=${creds.getAWSAccessKeyId};" +
+          s"aws_secret_access_key=${creds.getAWSSecretKey}"
+    }
   }
-
-}
-
-object AWSCredentials {
 
   def load(tempPath: String, hadoopConfiguration: Configuration): AWSCredentials = {
     // A good reference on Hadoop's configuration loading / precedence is
@@ -49,14 +45,14 @@ object AWSCredentials {
       case "s3" | "s3n" =>
         val creds = new S3Credentials()
         creds.initialize(uri, hadoopConfiguration)
-        AWSCredentials(creds.getAccessKey, creds.getSecretAccessKey, sessionToken = None)
+        new BasicAWSCredentials(creds.getAccessKey, creds.getSecretAccessKey)
       case "s3a" =>
         // This matches what S3A does, with one exception: we don't support anonymous credentials.
         // First, try to parse from URI:
         Option(uri.getUserInfo).flatMap { userInfo =>
           if (userInfo.contains(":")) {
-            val (accessKey, secretKey) = userInfo.splitAt(userInfo.indexOf(":"))
-            Some(AWSCredentials(accessKey, secretKey, sessionToken = None))
+            val Array(accessKey, secretKey) = userInfo.split(":")
+            Some(new BasicAWSCredentials(accessKey, secretKey))
           } else {
             None
           }
@@ -65,14 +61,13 @@ object AWSCredentials {
           val accessKey = hadoopConfiguration.get("fs.s3a.access.key", null)
           val secretKey = hadoopConfiguration.get("fs.s3a.secret.key", null)
           if (accessKey != null && secretKey != null) {
-            Some(AWSCredentials(accessKey, secretKey, sessionToken = None))
+            Some(new BasicAWSCredentials(accessKey, secretKey))
           } else {
             None
           }
         }.getOrElse {
           // Finally, fall back on the instance profile provider
-          val creds = new InstanceProfileCredentialsProvider().getCredentials
-          AWSCredentials(creds.getAWSAccessKeyId, creds.getAWSSecretKey, sessionToken = None)
+         new InstanceProfileCredentialsProvider().getCredentials
         }
       case other =>
         throw new IllegalArgumentException(s"Unrecognized scheme $other; expected s3, s3n, or s3a")

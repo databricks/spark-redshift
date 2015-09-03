@@ -16,6 +16,8 @@
 
 package com.databricks.spark.redshift
 
+import com.amazonaws.auth.{AWSCredentials, BasicSessionCredentials}
+
 /**
  * All user-specifiable parameters for spark-redshift, along with their validation rules and
  * defaults.
@@ -183,7 +185,7 @@ private[redshift] object Parameters {
         accessKey <- parameters.get("temporary_aws_access_key");
         secretAccessKey <- parameters.get("temporary_aws_secret_access_key");
         sessionToken <- parameters.get("temporary_aws_session_token")
-      ) yield AWSCredentials(accessKey, secretAccessKey, Some(sessionToken))
+      ) yield new BasicSessionCredentials(accessKey, secretAccessKey, sessionToken)
     }
   }
 }

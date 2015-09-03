@@ -23,7 +23,7 @@ import java.util.UUID
 import scala.collection.JavaConverters._
 import scala.util.control.NonFatal
 
-import com.amazonaws.auth.BasicAWSCredentials
+import com.amazonaws.auth.{AWSCredentials, BasicAWSCredentials}
 import com.amazonaws.services.s3.{AmazonS3URI, AmazonS3Client}
 import com.amazonaws.services.s3.model.BucketLifecycleConfiguration
 import org.apache.spark.Logging
@@ -64,8 +64,9 @@ private[redshift] object Utils extends Logging {
       tempDir: String,
       awsCredentials: AWSCredentials): Unit = {
     try {
-      val s3Client = new AmazonS3Client(
-        new BasicAWSCredentials(awsCredentials.accessKey, awsCredentials.secretAccessKey))
+      // TODO: really, we should be accepting an S3 client in the constructor so that we can
+      // mock out S3 in a unit test.
+      val s3Client = new AmazonS3Client(awsCredentials)
       val s3URI = new AmazonS3URI(Utils.fixS3Url(tempDir))
       val bucket = s3URI.getBucket
       val bucketLifecycleConfiguration = s3Client.getBucketLifecycleConfiguration(bucket)
