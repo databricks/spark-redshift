@@ -80,8 +80,19 @@ object SparkRedshiftBuild extends Build {
         "org.scalamock" %% "scalamock-scalatest-support" % "3.2" % "test",
         "org.mockito" % "mockito-core" % "1.10.19" % "test"
       ),
+      libraryDependencies ++= (if (testHadoopVersion.value.startsWith("1")) {
+        Seq(
+          "org.apache.hadoop" % "hadoop-client" % testHadoopVersion.value % "test" force(),
+          "org.apache.hadoop" % "hadoop-test" % testHadoopVersion.value % "test" force()
+        )
+      } else {
+        Seq(
+          "org.apache.hadoop" % "hadoop-client" % testHadoopVersion.value % "test" force(),
+          "org.apache.hadoop" % "hadoop-common" % testHadoopVersion.value % "test" force(),
+          "org.apache.hadoop" % "hadoop-common" % testHadoopVersion.value % "test" classifier "tests" force()
+        )
+      }),
       libraryDependencies ++= Seq(
-        "org.apache.hadoop" % "hadoop-client" % testHadoopVersion.value % "test" force(),
         "org.apache.spark" %% "spark-core" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force(),
         "org.apache.spark" %% "spark-sql" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force(),
         "org.apache.spark" %% "spark-hive" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force()

@@ -25,11 +25,11 @@ import scala.util.matching.Regex
 import com.amazonaws.services.s3.AmazonS3Client
 import com.amazonaws.services.s3.model.BucketLifecycleConfiguration
 import com.amazonaws.services.s3.model.BucketLifecycleConfiguration.Rule
-import com.google.common.io.Files
 import org.mockito.Mockito
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.mapreduce.InputFormat
-import org.apache.hadoop.fs.{Path, FileSystem, LocalFileSystem}
+import org.apache.hadoop.fs.{Path, FileSystem}
+import org.apache.hadoop.fs.s3native.S3NInMemoryFileSystem
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{BeforeAndAfterEach, BeforeAndAfterAll, Matchers}
 
@@ -76,22 +76,29 @@ class RedshiftSourceSuite
 
   private var testSqlContext: SQLContext = _
 
-  /** Temporary folder for unloading data; reset after each test. */
-  private var tempDir: File = _
-
   private var expectedDataDF: DataFrame = _
 
   private var mockS3Client: AmazonS3Client = _
 
+  private var s3FileSystem: FileSystem = _
+
+  private val s3TempDir: String = "s3n://test-bucket/temp-dir/"
+
   // Parameters common to most tests. Some parameters are overridden in specific tests.
   private def defaultParams: Map[String, String] = Map(
     "url" -> "jdbc:redshift://foo/bar",
-    "tempdir" -> tempDir.toURI.toString,
+    "tempdir" -> s3TempDir,
     "dbtable" -> "test_table")
 
   override def beforeAll(): Unit = {
     super.beforeAll()
     sc = new TestContext
+    sc.hadoopConfiguration.set("fs.s3n.impl", classOf[S3NInMemoryFileSystem].getName)
+    // We need to use a DirectOutputCommitter to work around an issue which occurs with renames
+    // while using the mocked S3 filesystem.
+    sc.hadoopConfiguration.set("mapred.output.committer.class", classOf[DirectOutputCommitter].getName)
+    sc.hadoopConfiguration.set("fs.s3n.awsAccessKeyId", "test1")
+    sc.hadoopConfiguration.set("fs.s3n.awsSecretAccessKey", "test2")
     // Configure a mock S3 client so that we don't hit errors when trying to access AWS in tests.
     // ScalaMock cannot mock classes which contain final methods, even if the classes themselves
     // are not final, so we use Mockito instead:
@@ -104,8 +111,8 @@ class RedshiftSourceSuite
 
   override def beforeEach(): Unit = {
     super.beforeEach()
+    s3FileSystem = FileSystem.get(new URI(s3TempDir), sc.hadoopConfiguration)
     testSqlContext = new SQLContext(sc)
-    tempDir = Files.createTempDir()
     expectedDataDF =
       testSqlContext.createDataFrame(sc.parallelize(TestUtils.expectedData), TestUtils.testSchema)
   }
@@ -114,8 +121,7 @@ class RedshiftSourceSuite
     super.afterEach()
     testSqlContext = null
     expectedDataDF = null
-    Option(tempDir.listFiles()).getOrElse(Array.empty).foreach(_.delete())
-    tempDir.delete()
+    FileSystem.closeAll()
   }
 
   override def afterAll(): Unit = {
@@ -333,8 +339,8 @@ class RedshiftSourceSuite
     // Make sure we wrote the data out ready for Redshift load, in the expected formats.
     // The data should have been written to a random subdirectory of `tempdir`. Since we clear
     // `tempdir` between every unit test, there should only be one directory here.
-    assert(tempDir.list().length === 1)
-    val dirWithAvroFiles = tempDir.listFiles().head.toURI.toString
+    assert(s3FileSystem.listStatus(new Path(s3TempDir)).length === 1)
+    val dirWithAvroFiles = s3FileSystem.listStatus(new Path(s3TempDir)).head.getPath.toUri.toString
     val written = testSqlContext.read.format("com.databricks.spark.avro").load(dirWithAvroFiles)
     checkAnswer(written, TestUtils.expectedDataWithConvertedTimesAndDates)
   }
@@ -453,8 +459,8 @@ class RedshiftSourceSuite
     // the only content in the returned data frame.
     // The data should have been written to a random subdirectory of `tempdir`. Since we clear
     // `tempdir` between every unit test, there should only be one directory here.
-    assert(tempDir.list().length === 1)
-    val dirWithAvroFiles = tempDir.listFiles().head.toURI.toString
+    assert(s3FileSystem.listStatus(new Path(s3TempDir)).length === 1)
+    val dirWithAvroFiles = s3FileSystem.listStatus(new Path(s3TempDir)).head.getPath.toUri.toString
     val written = testSqlContext.read.format("com.databricks.spark.avro").load(dirWithAvroFiles)
     checkAnswer(written, TestUtils.expectedDataWithConvertedTimesAndDates)
   }
@@ -505,7 +511,7 @@ class RedshiftSourceSuite
   test("Cannot save when 'query' parameter is specified instead of 'dbtable'") {
     val invalidParams = Map(
       "url" -> "jdbc:redshift://foo/bar",
-      "tempdir" -> tempDir.toURI.toString,
+      "tempdir" -> s3TempDir,
       "query" -> "select * from test_table")
 
     val e1 = intercept[IllegalArgumentException] {
