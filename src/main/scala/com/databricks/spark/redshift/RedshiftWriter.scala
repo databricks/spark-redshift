@@ -92,7 +92,7 @@ private[redshift] class RedshiftWriter(
       }
       conn.prepareStatement(s"ALTER TABLE $tempTable RENAME TO $table").execute()
     } catch {
-      case e: SQLException =>
+      case NonFatal(e) =>
         if (jdbcWrapper.tableExists(conn, tempTable)) {
           conn.prepareStatement(s"DROP TABLE $tempTable").execute()
         }
