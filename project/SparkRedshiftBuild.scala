@@ -55,8 +55,6 @@ object SparkRedshiftBuild extends Build {
       resolvers +=
         "Spark 1.5.0 RC2 Staging" at "https://repository.apache.org/content/repositories/orgapachespark-1141",
       libraryDependencies ++= Seq(
-        "com.amazonaws" % "aws-java-sdk-core" % "1.9.40",
-        "com.amazonaws" % "aws-java-sdk-s3" % "1.9.40",
         // These Amazon SDK depdencies are marked as 'provided' in order to reduce the risk of
         // dependency conflicts with other user libraries. In many environments, such as EMR and
         // Databricks, the Amazon SDK will already be on the classpath. In other cases, the SDK is
