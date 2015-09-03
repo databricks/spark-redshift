@@ -91,7 +91,7 @@ trait IntegrationSuiteBase
 
   override def afterAll(): Unit = {
     try {
-      val conf = new Configuration()
+      val conf = new Configuration(false)
       conf.set("fs.s3n.awsAccessKeyId", AWS_ACCESS_KEY_ID)
       conf.set("fs.s3n.awsSecretAccessKey", AWS_SECRET_ACCESS_KEY)
       // Bypass Hadoop's FileSystem caching mechanism so that we don't cache the credentials:

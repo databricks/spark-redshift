@@ -16,6 +16,8 @@
 
 package com.databricks.spark.redshift
 
+import com.amazonaws.auth.AWSCredentials
+import com.amazonaws.services.s3.AmazonS3Client
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.Logging
 import org.apache.spark.rdd.RDD
@@ -30,6 +32,7 @@ import com.databricks.spark.redshift.Parameters.MergedParameters
  */
 private[redshift] case class RedshiftRelation(
     jdbcWrapper: JDBCWrapper,
+    s3ClientFactory: AWSCredentials => AmazonS3Client,
     params: MergedParameters,
     userSchema: Option[StructType])
     (@transient val sqlContext: SQLContext)
@@ -52,13 +55,13 @@ private[redshift] case class RedshiftRelation(
   override def insert(data: DataFrame, overwrite: Boolean): Unit = {
     val updatedParams =
       Parameters.mergeParameters(params.parameters updated ("overwrite", overwrite.toString))
-    new RedshiftWriter(jdbcWrapper).saveToRedshift(sqlContext, data, updatedParams)
+    new RedshiftWriter(jdbcWrapper, s3ClientFactory).saveToRedshift(sqlContext, data, updatedParams)
   }
 
   override def buildScan(requiredColumns: Array[String], filters: Array[Filter]): RDD[Row] = {
     val creds =
       AWSCredentialsUtils.load(params.tempPath, sqlContext.sparkContext.hadoopConfiguration)
-    Utils.checkThatBucketHasObjectLifecycleConfiguration(params.tempPath, creds)
+    Utils.checkThatBucketHasObjectLifecycleConfiguration(params.tempPath, s3ClientFactory(creds))
     if (requiredColumns.isEmpty) {
       // In the special case where no columns were requested, issue a `count(*)` against Redshift
       // rather than unloading data.

@@ -17,13 +17,19 @@
 package com.databricks.spark.redshift
 
 import java.io.File
+import java.net.URI
 import java.sql.{Connection, PreparedStatement, SQLException}
 
 import scala.util.matching.Regex
 
+import com.amazonaws.services.s3.AmazonS3Client
+import com.amazonaws.services.s3.model.BucketLifecycleConfiguration
+import com.amazonaws.services.s3.model.BucketLifecycleConfiguration.Rule
 import com.google.common.io.Files
+import org.mockito.Mockito
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.mapreduce.InputFormat
+import org.apache.hadoop.fs.{Path, FileSystem, LocalFileSystem}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{BeforeAndAfterEach, BeforeAndAfterAll, Matchers}
 
@@ -75,6 +81,8 @@ class RedshiftSourceSuite
 
   private var expectedDataDF: DataFrame = _
 
+  private var mockS3Client: AmazonS3Client = _
+
   // Parameters common to most tests. Some parameters are overridden in specific tests.
   private def defaultParams: Map[String, String] = Map(
     "url" -> "jdbc:redshift://foo/bar",
@@ -84,6 +92,14 @@ class RedshiftSourceSuite
   override def beforeAll(): Unit = {
     super.beforeAll()
     sc = new TestContext
+    // Configure a mock S3 client so that we don't hit errors when trying to access AWS in tests.
+    // ScalaMock cannot mock classes which contain final methods, even if the classes themselves
+    // are not final, so we use Mockito instead:
+    mockS3Client = Mockito.mock(classOf[AmazonS3Client], Mockito.RETURNS_SMART_NULLS)
+    Mockito.when(mockS3Client.getBucketLifecycleConfiguration(org.mockito.Matchers.any()))
+      .thenReturn(new BucketLifecycleConfiguration().withRules(
+        new Rule().withPrefix("").withStatus(BucketLifecycleConfiguration.ENABLED)
+      ))
   }
 
   override def beforeEach(): Unit = {
@@ -166,7 +182,7 @@ class RedshiftSourceSuite
     val jdbcWrapper = prepareUnloadTest(defaultParams, Seq(expectedQuery))
 
     // Assert that we've loaded and converted all data in the test file
-    val source = new DefaultSource(jdbcWrapper)
+    val source = new DefaultSource(jdbcWrapper, _ => mockS3Client)
     val relation = source.createRelation(testSqlContext, defaultParams)
     val df = testSqlContext.baseRelationToDataFrame(relation)
     checkAnswer(df, TestUtils.expectedData)
@@ -199,7 +215,8 @@ class RedshiftSourceSuite
         .returning(querySchema)
         .anyNumberOfTimes()
       // Note: Assertions covered by mocks
-      val relation = new DefaultSource(jdbcWrapper).createRelation(testSqlContext, params)
+      val relation =
+        new DefaultSource(jdbcWrapper, _ => mockS3Client).createRelation(testSqlContext, params)
       testSqlContext.baseRelationToDataFrame(relation).collect()
     }
 
@@ -215,7 +232,8 @@ class RedshiftSourceSuite
         .returning(querySchema)
         .anyNumberOfTimes()
       // Note: Assertions covered by mocks
-      val relation = new DefaultSource(jdbcWrapper).createRelation(testSqlContext, params)
+      val relation =
+        new DefaultSource(jdbcWrapper, _ => mockS3Client).createRelation(testSqlContext, params)
       testSqlContext.baseRelationToDataFrame(relation).collect()
     }
   }
@@ -228,7 +246,7 @@ class RedshiftSourceSuite
       "ESCAPE ALLOWOVERWRITE").r
     val jdbcWrapper = prepareUnloadTest(defaultParams, Seq(expectedQuery))
     // Construct the source with a custom schema
-    val source = new DefaultSource(jdbcWrapper)
+    val source = new DefaultSource(jdbcWrapper, _ => mockS3Client)
     val relation = source.createRelation(testSqlContext, defaultParams, TestUtils.testSchema)
 
     val rdd = relation.asInstanceOf[PrunedFilteredScan]
@@ -260,7 +278,7 @@ class RedshiftSourceSuite
     val jdbcWrapper = prepareUnloadTest(defaultParams, Seq(expectedQuery))
 
     // Construct the source with a custom schema
-    val source = new DefaultSource(jdbcWrapper)
+    val source = new DefaultSource(jdbcWrapper, _ => mockS3Client)
     val relation = source.createRelation(testSqlContext, defaultParams, TestUtils.testSchema)
 
     // Define a simple filter to only include a subset of rows
@@ -308,8 +326,8 @@ class RedshiftSourceSuite
       .returning("schema")
       .anyNumberOfTimes()
 
-    val relation =
-      RedshiftRelation(jdbcWrapper, Parameters.mergeParameters(params), None)(testSqlContext)
+    val relation = RedshiftRelation(
+      jdbcWrapper, _ => mockS3Client, Parameters.mergeParameters(params), None)(testSqlContext)
     relation.asInstanceOf[InsertableRelation].insert(expectedDataDF, true)
 
     // Make sure we wrote the data out ready for Redshift load, in the expected formats.
@@ -331,7 +349,7 @@ class RedshiftSourceSuite
 
     val schema = StructType(Seq(StructField("a", IntegerType), StructField("A", IntegerType)))
     val df = testSqlContext.createDataFrame(sc.emptyRDD[Row], schema)
-    val writer = new RedshiftWriter(jdbcWrapper)
+    val writer = new RedshiftWriter(jdbcWrapper, _ => mockS3Client)
 
     intercept[IllegalArgumentException] {
       writer.saveToRedshift(testSqlContext, df, Parameters.mergeParameters(defaultParams))
@@ -404,7 +422,7 @@ class RedshiftSourceSuite
       (mockedConnection.close _).expects()
     }
 
-    val source = new DefaultSource(jdbcWrapper)
+    val source = new DefaultSource(jdbcWrapper, _ => mockS3Client)
     intercept[Exception] {
       source.createRelation(testSqlContext, SaveMode.Overwrite, params, expectedDataDF)
     }
@@ -427,7 +445,7 @@ class RedshiftSourceSuite
       .returning("schema")
       .anyNumberOfTimes()
 
-    val source = new DefaultSource(jdbcWrapper)
+    val source = new DefaultSource(jdbcWrapper, _ => mockS3Client)
     val savedDf =
       source.createRelation(testSqlContext, SaveMode.Append, defaultParams, expectedDataDF)
 
@@ -465,7 +483,7 @@ class RedshiftSourceSuite
       .expects(*, "test_table")
       .returning(true)
 
-    val errIfExistsSource = new DefaultSource(errIfExistsWrapper)
+    val errIfExistsSource = new DefaultSource(errIfExistsWrapper, _ => mockS3Client)
     intercept[Exception] {
       errIfExistsSource.createRelation(
         testSqlContext, SaveMode.ErrorIfExists, defaultParams, expectedDataDF)
@@ -480,7 +498,7 @@ class RedshiftSourceSuite
       .returning(true)
 
     // Note: Assertions covered by mocks
-    val ignoreSource = new DefaultSource(ignoreWrapper)
+    val ignoreSource = new DefaultSource(ignoreWrapper,  _ => mockS3Client)
     ignoreSource.createRelation(testSqlContext, SaveMode.Ignore, defaultParams, expectedDataDF)
   }
 

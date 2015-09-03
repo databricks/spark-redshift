@@ -19,6 +19,7 @@ package com.databricks.spark.redshift
 import java.sql.{Connection, Date, SQLException, Timestamp}
 
 import com.amazonaws.auth.AWSCredentials
+import com.amazonaws.services.s3.AmazonS3Client
 
 import scala.util.Random
 import scala.util.control.NonFatal
@@ -33,7 +34,10 @@ import org.apache.spark.sql.types._
 /**
  * Functions to write data to Redshift with intermediate Avro serialisation into S3.
  */
-private[redshift] class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
+private[redshift] class RedshiftWriter(
+    jdbcWrapper: JDBCWrapper,
+    s3ClientFactory: AWSCredentials => AmazonS3Client)
+  extends Logging {
 
   /**
    * Generate CREATE TABLE statement for Redshift
@@ -183,7 +187,7 @@ private[redshift] class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging
       params: MergedParameters): Unit = {
     val creds: AWSCredentials = params.temporaryAWSCredentials.getOrElse(
       AWSCredentialsUtils.load(params.tempPath, sqlContext.sparkContext.hadoopConfiguration))
-    Utils.checkThatBucketHasObjectLifecycleConfiguration(params.tempPath, creds)
+    Utils.checkThatBucketHasObjectLifecycleConfiguration(params.tempPath, s3ClientFactory(creds))
     // spark-avro does not support Date types. In addition, it converts Timestamps into longs
     // (milliseconds since the Unix epoch). Redshift is capable of loading timestamps in
     // 'epochmillisecs' format but there's no equivalent format for dates. To work around this, we
@@ -271,4 +275,6 @@ private[redshift] class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging
   }
 }
 
-object DefaultRedshiftWriter extends RedshiftWriter(DefaultJDBCWrapper)
+object DefaultRedshiftWriter extends RedshiftWriter(
+  DefaultJDBCWrapper,
+  awsCredentials => new AmazonS3Client(awsCredentials))

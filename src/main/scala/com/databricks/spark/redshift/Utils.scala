@@ -62,11 +62,8 @@ private[redshift] object Utils extends Logging {
    */
   def checkThatBucketHasObjectLifecycleConfiguration(
       tempDir: String,
-      awsCredentials: AWSCredentials): Unit = {
+      s3Client: AmazonS3Client): Unit = {
     try {
-      // TODO: really, we should be accepting an S3 client in the constructor so that we can
-      // mock out S3 in a unit test.
-      val s3Client = new AmazonS3Client(awsCredentials)
       val s3URI = new AmazonS3URI(Utils.fixS3Url(tempDir))
       val bucket = s3URI.getBucket
       val bucketLifecycleConfiguration = s3Client.getBucketLifecycleConfiguration(bucket)

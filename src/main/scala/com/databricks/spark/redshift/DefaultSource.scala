@@ -16,6 +16,8 @@
 
 package com.databricks.spark.redshift
 
+import com.amazonaws.auth.AWSCredentials
+import com.amazonaws.services.s3.AmazonS3Client
 import org.apache.spark.Logging
 import org.apache.spark.sql.sources.{BaseRelation, CreatableRelationProvider, RelationProvider, SchemaRelationProvider}
 import org.apache.spark.sql.types.StructType
@@ -24,7 +26,7 @@ import org.apache.spark.sql.{DataFrame, SQLContext, SaveMode}
 /**
  * Redshift Source implementation for Spark SQL
  */
-class DefaultSource(jdbcWrapper: JDBCWrapper)
+class DefaultSource(jdbcWrapper: JDBCWrapper, s3ClientFactory: AWSCredentials => AmazonS3Client)
   extends RelationProvider
   with SchemaRelationProvider
   with CreatableRelationProvider
@@ -33,7 +35,7 @@ class DefaultSource(jdbcWrapper: JDBCWrapper)
   /**
    * Default constructor required by Data Source API
    */
-  def this() = this(DefaultJDBCWrapper)
+  def this() = this(DefaultJDBCWrapper, awsCredentials => new AmazonS3Client(awsCredentials))
 
   /**
    * Create a new RedshiftRelation instance using parameters from Spark SQL DDL. Resolves the schema
@@ -43,7 +45,7 @@ class DefaultSource(jdbcWrapper: JDBCWrapper)
       sqlContext: SQLContext,
       parameters: Map[String, String]): BaseRelation = {
     val params = Parameters.mergeParameters(parameters)
-    RedshiftRelation(jdbcWrapper, params, None)(sqlContext)
+    RedshiftRelation(jdbcWrapper, s3ClientFactory, params, None)(sqlContext)
   }
 
   /**
@@ -54,7 +56,7 @@ class DefaultSource(jdbcWrapper: JDBCWrapper)
       parameters: Map[String, String],
       schema: StructType): BaseRelation = {
     val params = Parameters.mergeParameters(parameters)
-    RedshiftRelation(jdbcWrapper, params, Some(schema))(sqlContext)
+    RedshiftRelation(jdbcWrapper, s3ClientFactory, params, Some(schema))(sqlContext)
   }
 
   /**
@@ -98,7 +100,7 @@ class DefaultSource(jdbcWrapper: JDBCWrapper)
 
     if (doSave) {
       val updatedParams = parameters.updated("overwrite", dropExisting.toString)
-      new RedshiftWriter(jdbcWrapper).saveToRedshift(
+      new RedshiftWriter(jdbcWrapper, s3ClientFactory).saveToRedshift(
         sqlContext, data, Parameters.mergeParameters(updatedParams))
     }
 
