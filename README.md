@@ -49,21 +49,20 @@ import org.apache.spark.sql._
 val sc = // existing SparkContext
 val sqlContext = new SQLContext(sc)
 
-
 // Get some data from a Redshift table
 val df: DataFrame = sqlContext.read
     .format("com.databricks.spark.redshift")
     .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass")
-    .option("dbtable" -> "my_table")
-    .option("tempdir" -> "s3n://path/for/temp/data")
+    .option("dbtable", "my_table")
+    .option("tempdir", "s3n://path/for/temp/data")
     .load()
 
 // Can also load data from a Redshift query
 val df: DataFrame = sqlContext.read
     .format("com.databricks.spark.redshift")
     .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass")
-    .option("query" -> "select x, count(*) my_table group by x")
-    .option("tempdir" -> "s3n://path/for/temp/data")
+    .option("query", "select x, count(*) my_table group by x")
+    .option("tempdir", "s3n://path/for/temp/data")
     .load()
 
 // Apply some transformations to the data as per normal, then you can use the
@@ -72,8 +71,8 @@ val df: DataFrame = sqlContext.read
 df.write
   .format("com.databricks.spark.redshift")
     .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass")
-    .option("dbtable" -> "my_table_copy")
-    .option("tempdir" -> "s3n://path/for/temp/data")
+    .option("dbtable", "my_table_copy")
+    .option("tempdir", "s3n://path/for/temp/data")
   .mode("error")
   .save()
 ```
@@ -90,25 +89,25 @@ sql_context = SQLContext(sc)
 df = sql_context.read \
     .format("com.databricks.spark.redshift") \
     .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass") \
-    .option("dbtable" -> "my_table") \
-    .option("tempdir" -> "s3n://path/for/temp/data") \
+    .option("dbtable", "my_table") \
+    .option("tempdir", "s3n://path/for/temp/data") \
     .load()
 
 # Read data from a query
 df = sql_context.read \
     .format("com.databricks.spark.redshift") \
     .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass") \
-    .option("query" -> "select x, count(*) my_table group by x") \
-    .option("tempdir" -> "s3n://path/for/temp/data") \
+    .option("query", "select x, count(*) my_table group by x") \
+    .option("tempdir", "s3n://path/for/temp/data") \
     .load()
 
 # Write back to a table
 df.write \
-  .format("com.databricks.spark.redshift")
+  .format("com.databricks.spark.redshift") \
   .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass") \
-  .option("dbtable" -> "my_table_copy") \
-  .option("tempdir" -> "s3n://path/for/temp/data") \
-  .mode("error")
+  .option("dbtable", "my_table_copy") \
+  .option("tempdir", "s3n://path/for/temp/data") \
+  .mode("error") \
   .save()
 ```
 
