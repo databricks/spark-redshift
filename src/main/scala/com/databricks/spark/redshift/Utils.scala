@@ -23,15 +23,17 @@ import java.util.UUID
 import scala.collection.JavaConverters._
 import scala.util.control.NonFatal
 
-import com.amazonaws.auth.{AWSCredentials, BasicAWSCredentials}
 import com.amazonaws.services.s3.{AmazonS3URI, AmazonS3Client}
 import com.amazonaws.services.s3.model.BucketLifecycleConfiguration
-import org.apache.spark.Logging
+import org.slf4j.LoggerFactory
 
 /**
  * Various arbitrary helper functions
  */
-private[redshift] object Utils extends Logging {
+private[redshift] object Utils {
+
+  private val log = LoggerFactory.getLogger(getClass)
+
   /**
    * Joins prefix URL a to path suffix b, and appends a trailing /, in order to create
    * a temp directory path for S3.
@@ -75,7 +77,7 @@ private[redshift] object Utils extends Logging {
         rule.getStatus == BucketLifecycleConfiguration.ENABLED && key.startsWith(rule.getPrefix)
       }
       if (!someRuleMatchesTempDir) {
-        logWarning(s"The S3 bucket $bucket does not have an object lifecycle configuration to " +
+        log.warn(s"The S3 bucket $bucket does not have an object lifecycle configuration to " +
           "ensure cleanup of temporary files. Consider configuring `tempdir` to point to a " +
           "bucket with an object lifecycle policy that automatically deletes files after an " +
           "expiration period. For more information, see " +
@@ -83,8 +85,7 @@ private[redshift] object Utils extends Logging {
       }
     } catch {
       case NonFatal(e) =>
-        logWarning(
-          "An error occurred while trying to read the S3 bucket lifecycle configuration", e)
+        log.warn("An error occurred while trying to read the S3 bucket lifecycle configuration", e)
     }
   }
 }

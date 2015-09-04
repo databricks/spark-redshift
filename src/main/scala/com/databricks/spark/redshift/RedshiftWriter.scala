@@ -20,13 +20,13 @@ import java.sql.{Connection, Date, SQLException, Timestamp}
 
 import com.amazonaws.auth.AWSCredentials
 import com.amazonaws.services.s3.AmazonS3Client
+import org.slf4j.LoggerFactory
 
 import scala.util.Random
 import scala.util.control.NonFatal
 
 import com.databricks.spark.redshift.Parameters.MergedParameters
 
-import org.apache.spark.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.apache.spark.sql.types._
@@ -36,8 +36,9 @@ import org.apache.spark.sql.types._
  */
 private[redshift] class RedshiftWriter(
     jdbcWrapper: JDBCWrapper,
-    s3ClientFactory: AWSCredentials => AmazonS3Client)
-  extends Logging {
+    s3ClientFactory: AWSCredentials => AmazonS3Client) {
+
+  private val log = LoggerFactory.getLogger(getClass)
 
   /**
    * Generate CREATE TABLE statement for Redshift
@@ -164,7 +165,7 @@ private[redshift] class RedshiftWriter(
           }
         } catch {
           case NonFatal(e2) =>
-            logError("Error occurred while querying STL_LOAD_ERRORS", e2)
+            log.error("Error occurred while querying STL_LOAD_ERRORS", e2)
             None
         }
       throw detailedException.getOrElse(e)

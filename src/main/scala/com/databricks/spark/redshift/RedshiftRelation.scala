@@ -19,11 +19,11 @@ package com.databricks.spark.redshift
 import com.amazonaws.auth.AWSCredentials
 import com.amazonaws.services.s3.AmazonS3Client
 import org.apache.hadoop.conf.Configuration
-import org.apache.spark.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
+import org.slf4j.LoggerFactory
 
 import com.databricks.spark.redshift.Parameters.MergedParameters
 
@@ -38,8 +38,9 @@ private[redshift] case class RedshiftRelation(
     (@transient val sqlContext: SQLContext)
   extends BaseRelation
   with PrunedFilteredScan
-  with InsertableRelation
-  with Logging {
+  with InsertableRelation {
+
+  private val log = LoggerFactory.getLogger(getClass)
 
   override def schema: StructType = {
     userSchema match {
@@ -68,7 +69,7 @@ private[redshift] case class RedshiftRelation(
       val whereClause = FilterPushdown.buildWhereClause(schema, filters)
       val tableNameOrSubquery = params.query.map(q => s"($q)").orElse(params.table).get
       val countQuery = s"SELECT count(*) FROM $tableNameOrSubquery $whereClause"
-      logInfo(countQuery)
+      log.info(countQuery)
       val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
       try {
         val results = conn.prepareStatement(countQuery).executeQuery()
@@ -86,7 +87,7 @@ private[redshift] case class RedshiftRelation(
     } else {
       // Unload data from Redshift into a temporary directory in S3:
       val unloadSql = buildUnloadStmt(requiredColumns, filters)
-      logInfo(unloadSql)
+      log.info(unloadSql)
       val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
       try {
         conn.prepareStatement(unloadSql).execute()
