@@ -182,7 +182,7 @@ private[redshift] object Parameters {
      */
     def temporaryAWSCredentials: Option[AWSCredentials] = {
       for (
-        accessKey <- parameters.get("temporary_aws_access_key");
+        accessKey <- parameters.get("temporary_aws_access_key_id");
         secretAccessKey <- parameters.get("temporary_aws_secret_access_key");
         sessionToken <- parameters.get("temporary_aws_session_token")
       ) yield new BasicSessionCredentials(accessKey, secretAccessKey, sessionToken)

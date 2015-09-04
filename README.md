@@ -39,7 +39,7 @@ You will also need to provide a JDBC driver that is compatible with Redshift. Am
 
 ### Data Sources API
 
-You can use `spark-redshift` via the Data Sources API in Scala, Python or SQL, as follows:
+Once you have [configured your AWS credentials](#aws-credentials), you can use `spark-redshift` via the Data Sources API in Scala, Python or SQL, as follows:
 
 #### Scala
 
@@ -55,7 +55,7 @@ val df: DataFrame = sqlContext.read
     .format("com.databricks.spark.redshift")
     .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass")
     .option("dbtable" -> "my_table")
-    .option("tempdir" -> "s3://path/for/temp/data")
+    .option("tempdir" -> "s3n://path/for/temp/data")
     .load()
 
 // Can also load data from a Redshift query
@@ -63,7 +63,7 @@ val df: DataFrame = sqlContext.read
     .format("com.databricks.spark.redshift")
     .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass")
     .option("query" -> "select x, count(*) my_table group by x")
-    .option("tempdir" -> "s3://path/for/temp/data")
+    .option("tempdir" -> "s3n://path/for/temp/data")
     .load()
 
 // Apply some transformations to the data as per normal, then you can use the
@@ -73,7 +73,7 @@ df.write
   .format("com.databricks.spark.redshift")
     .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass")
     .option("dbtable" -> "my_table_copy")
-    .option("tempdir" -> "s3://path/for/temp/data")
+    .option("tempdir" -> "s3n://path/for/temp/data")
   .mode("error")
   .save()
 ```
@@ -91,7 +91,7 @@ df = sql_context.read \
     .format("com.databricks.spark.redshift") \
     .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass") \
     .option("dbtable" -> "my_table") \
-    .option("tempdir" -> "s3://path/for/temp/data") \
+    .option("tempdir" -> "s3n://path/for/temp/data") \
     .load()
 
 # Read data from a query
@@ -99,7 +99,7 @@ df = sql_context.read \
     .format("com.databricks.spark.redshift") \
     .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass") \
     .option("query" -> "select x, count(*) my_table group by x") \
-    .option("tempdir" -> "s3://path/for/temp/data") \
+    .option("tempdir" -> "s3n://path/for/temp/data") \
     .load()
 
 # Write back to a table
@@ -107,7 +107,7 @@ df.write \
   .format("com.databricks.spark.redshift")
   .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass") \
   .option("dbtable" -> "my_table_copy") \
-  .option("tempdir" -> "s3://path/for/temp/data") \
+  .option("tempdir" -> "s3n://path/for/temp/data") \
   .mode("error")
   .save()
 ```
@@ -118,7 +118,7 @@ df.write \
 CREATE TABLE my_table
 USING com.databricks.spark.redshift
 OPTIONS (dbtable 'my_table',
-         tempdir 's3://my_bucket/tmp',
+         tempdir 's3n://my_bucket/tmp',
          url 'jdbc:redshift://host:port/db?user=username&password=pass');
 ```
 
@@ -141,9 +141,13 @@ val records = sc.newAPIHadoopFile(
 
 ### AWS Credentials
 
-`spark-redshift` reads and writes data to S3 when transferring data to/from Redshift. As a result, it requires AWS credentials with read and write access to a S3 bucket (specified as `tempdir` in the configuration parameters described below).
+`spark-redshift` reads and writes data to S3 when transferring data to/from Redshift. As a result, it requires AWS credentials with read and write access to a S3 bucket (specified using the `tempdir` configuration parameter). Assuming that Spark has been configured to access S3, `spark-redshift` should automatically discover the proper credentials to pass to Redshift.
 
-You can provide AWS credentials via the parameters listed below, with Hadoop `fs.*` configuration settings, or by making them available via the usual environment variables, system properties or IAM roles.
+There are three ways of configuring AWS credentials for use by this library:
+
+1. Specify AWS keys via [Hadoop configuration properties](https://github.com/apache/hadoop/blob/trunk/hadoop-tools/hadoop-aws/src/site/markdown/tools/hadoop-aws/index.md). For example, if your `tempdir` configuration points to a `s3n://` filesystem then you can set the `fs.s3n.awsAccessKeyId` and `fs.s3n.awsSecretAccessKey` properties in a Hadoop XML configuration file or call `sc.hadoopConfig.set()` to mutate Spark's global Hadoop configuration.
+2. Encode the keys into the `tempdir` URI. For example, the URI `s3n://ACCESSKEY:SECRETKEY@bucket/path/to/temp/dir` encodes the key pair (`ACCESSKEY`, `SECRETKEY`). Due to Hadoop limitations, this approach will not work for secret keys which contain forward slash (`/`) characters.
+3. If you are running on EC2 and authenticate to S3 using IAM and [instance profiles](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html), then you must must configure the `temporary_aws_access_key_id`, `temporary_aws_access_key_id`, and `temporary_aws_session_token` configuration properties to point to temporary keys created via the AWS [Security Token Service](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp.html). These temporary keys will then be passed to Redshift via `LOAD` and `UNLOAD` commands.
 
 **:warning: Note**: `spark-redshift` does not clean up the temporary files that it creates in S3. As a result, we recommend that you use a dedicated temporary S3 bucket with an [object lifecycle configuration](http://docs.aws.amazon.com/AmazonS3/latest/dev/object-lifecycle-mgmt.html) to ensure that temporary files are automatically deleted after a specified expiration period.
 
@@ -190,22 +194,22 @@ need to be configured to allow access from your driver application.
     </td>
  </tr>
  <tr>
-    <td><tt>aws_access_key_id</tt></td>
-    <td>No, unless also unavailable from environment</td>
-    <td><a href="http://docs.aws.amazon.com/AWSSdkDocsJava/latest/DeveloperGuide/credentials.html">Default Provider Chain</a></td>
+    <td><tt>temporary_aws_access_key_id</tt></td>
+    <td>No, unless using EC2 instance profile authentication</td>
+    <td>No default</td>
     <td>AWS access key, must have write permissions to the S3 bucket.</td>
  </tr>
  <tr>
-    <td><tt>aws_secret_access_key</tt></td>
-    <td>No, unless also unavailable from environment</td>
-    <td><a href="http://docs.aws.amazon.com/AWSSdkDocsJava/latest/DeveloperGuide/credentials.html">Default Provider Chain</a></td>
+    <td><tt>temporary_aws_secret_access_key</tt></td>
+    <td>No, unless using EC2 instance profile authentication</td>
+    <td>No default</td>
     <td>AWS secret access key corresponding to provided access key.</td>
  </tr>
  <tr>
-    <td><tt>aws_security_token</tt></td>
-    <td>No, unless using AWS Security Token Service</td>
+    <td><tt>temporary_aws_session_token</tt></td>
+    <td>No, unless using EC2 instance profile authentication</td>
     <td>No default</td>
-    <td>AWS security token corresponding to provided access key.</td>
+    <td>AWS session token corresponding to provided access key.</td>
  </tr>
  <tr>
     <td><tt>tempdir</tt></td>
