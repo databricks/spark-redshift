@@ -106,6 +106,7 @@ class AWSCredentialsUtilsSuite extends FunSuite {
     val e = intercept[AmazonClientException] {
       AWSCredentialsUtils.load("s3a://bucket/path", new Configuration(false))
     }
-    assert(e.getMessage === "Unable to load credentials from Amazon EC2 metadata service")
+    assert(e.getMessage === "Unable to load credentials from Amazon EC2 metadata service" ||
+      e.getMessage.contains("The requested metadata is not found at"))
   }
 }
