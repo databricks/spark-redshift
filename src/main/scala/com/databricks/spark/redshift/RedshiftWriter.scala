@@ -18,6 +18,9 @@ package com.databricks.spark.redshift
 
 import java.sql.{Connection, Date, SQLException, Timestamp}
 
+import com.amazonaws.auth.AWSCredentials
+import com.amazonaws.services.s3.AmazonS3Client
+
 import scala.util.Random
 import scala.util.control.NonFatal
 
@@ -31,7 +34,10 @@ import org.apache.spark.sql.types._
 /**
  * Functions to write data to Redshift with intermediate Avro serialisation into S3.
  */
-private[redshift] class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
+private[redshift] class RedshiftWriter(
+    jdbcWrapper: JDBCWrapper,
+    s3ClientFactory: AWSCredentials => AmazonS3Client)
+  extends Logging {
 
   /**
    * Generate CREATE TABLE statement for Redshift
@@ -57,9 +63,10 @@ private[redshift] class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging
    * Generate the COPY SQL command
    */
   private def copySql(sqlContext: SQLContext, params: MergedParameters): String = {
-    val creds = params.credentialsString(sqlContext.sparkContext.hadoopConfiguration)
+    val credsString: String = AWSCredentialsUtils.getRedshiftCredentialsString(
+      AWSCredentialsUtils.load(params.tempPath, sqlContext.sparkContext.hadoopConfiguration))
     val fixedUrl = Utils.fixS3Url(params.tempPath)
-    s"COPY ${params.table.get} FROM '$fixedUrl' CREDENTIALS '$creds' FORMAT AS " +
+    s"COPY ${params.table.get} FROM '$fixedUrl' CREDENTIALS '$credsString' FORMAT AS " +
       "AVRO 'auto' DATEFORMAT 'YYYY-MM-DD HH:MI:SS'"
   }
 
@@ -85,7 +92,7 @@ private[redshift] class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging
       }
       conn.prepareStatement(s"ALTER TABLE $tempTable RENAME TO $table").execute()
     } catch {
-      case e: SQLException =>
+      case NonFatal(e) =>
         if (jdbcWrapper.tableExists(conn, tempTable)) {
           conn.prepareStatement(s"DROP TABLE $tempTable").execute()
         }
@@ -174,7 +181,13 @@ private[redshift] class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging
   /**
    * Serialize temporary data to S3, ready for Redshift COPY
    */
-  private def unloadData(sqlContext: SQLContext, data: DataFrame, tempPath: String): Unit = {
+  private def unloadData(
+      sqlContext: SQLContext,
+      data: DataFrame,
+      params: MergedParameters): Unit = {
+    val creds: AWSCredentials = params.temporaryAWSCredentials.getOrElse(
+      AWSCredentialsUtils.load(params.tempPath, sqlContext.sparkContext.hadoopConfiguration))
+    Utils.checkThatBucketHasObjectLifecycleConfiguration(params.tempPath, s3ClientFactory(creds))
     // spark-avro does not support Date types. In addition, it converts Timestamps into longs
     // (milliseconds since the Unix epoch). Redshift is capable of loading timestamps in
     // 'epochmillisecs' format but there's no equivalent format for dates. To work around this, we
@@ -231,7 +244,7 @@ private[redshift] class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging
     sqlContext.createDataFrame(convertedRows, convertedSchema)
       .write
       .format("com.databricks.spark.avro")
-      .save(tempPath)
+      .save(params.tempPath)
   }
 
   /**
@@ -249,11 +262,11 @@ private[redshift] class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging
       if (params.overwrite && params.useStagingTable) {
         withStagingTable(conn, params.table.get, stagingTable => {
           val updatedParams = MergedParameters(params.parameters.updated("dbtable", stagingTable))
-          unloadData(sqlContext, data, updatedParams.tempPath)
+          unloadData(sqlContext, data, updatedParams)
           doRedshiftLoad(conn, data, updatedParams)
         })
       } else {
-        unloadData(sqlContext, data, params.tempPath)
+        unloadData(sqlContext, data, params)
         doRedshiftLoad(conn, data, params)
       }
     } finally {
@@ -262,4 +275,6 @@ private[redshift] class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging
   }
 }
 
-object DefaultRedshiftWriter extends RedshiftWriter(DefaultJDBCWrapper)
+object DefaultRedshiftWriter extends RedshiftWriter(
+  DefaultJDBCWrapper,
+  awsCredentials => new AmazonS3Client(awsCredentials))

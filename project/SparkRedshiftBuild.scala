@@ -53,7 +53,7 @@ object SparkRedshiftBuild extends Build {
       resolvers +=
         "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
       resolvers +=
-        "Spark 1.5.0 RC2 Staging" at "https://repository.apache.org/content/repositories/orgapachespark-1141",
+        "Spark 1.5.0 RC3 Staging" at "https://repository.apache.org/content/repositories/orgapachespark-1143",
       libraryDependencies ++= Seq(
         // These Amazon SDK depdencies are marked as 'provided' in order to reduce the risk of
         // dependency conflicts with other user libraries. In many environments, such as EMR and
@@ -66,6 +66,7 @@ object SparkRedshiftBuild extends Build {
         // depenendecy by hand) for a smaller set of users.
         "com.amazonaws" % "aws-java-sdk-core" % "1.9.40" % "provided",
         "com.amazonaws" % "aws-java-sdk-s3" % "1.9.40" % "provided",
+        "com.amazonaws" % "aws-java-sdk-sts" % "1.9.40" % "test",
         // We require spark-avro, but avro-mapred must be provided to match Hadoop version.
         // In most cases, avro-mapred will be provided as part of the Spark assembly JAR.
         "com.databricks" %% "spark-avro" % "1.0.0",
@@ -76,10 +77,22 @@ object SparkRedshiftBuild extends Build {
         "com.amazon.redshift" % "jdbc4" % "1.1.7.1007" % "test" from "https://s3.amazonaws.com/redshift-downloads/drivers/RedshiftJDBC4-1.1.7.1007.jar",
         "com.google.guava" % "guava" % "14.0.1" % "test",
         "org.scalatest" %% "scalatest" % "2.2.1" % "test",
-        "org.scalamock" %% "scalamock-scalatest-support" % "3.2" % "test"
+        "org.scalamock" %% "scalamock-scalatest-support" % "3.2" % "test",
+        "org.mockito" % "mockito-core" % "1.10.19" % "test"
       ),
+      libraryDependencies ++= (if (testHadoopVersion.value.startsWith("1")) {
+        Seq(
+          "org.apache.hadoop" % "hadoop-client" % testHadoopVersion.value % "test" force(),
+          "org.apache.hadoop" % "hadoop-test" % testHadoopVersion.value % "test" force()
+        )
+      } else {
+        Seq(
+          "org.apache.hadoop" % "hadoop-client" % testHadoopVersion.value % "test" exclude("javax.servlet", "servlet-api") force(),
+          "org.apache.hadoop" % "hadoop-common" % testHadoopVersion.value % "test" exclude("javax.servlet", "servlet-api") force(),
+          "org.apache.hadoop" % "hadoop-common" % testHadoopVersion.value % "test" classifier "tests" force()
+        )
+      }),
       libraryDependencies ++= Seq(
-        "org.apache.hadoop" % "hadoop-client" % testHadoopVersion.value % "test" force(),
         "org.apache.spark" %% "spark-core" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force(),
         "org.apache.spark" %% "spark-sql" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force(),
         "org.apache.spark" %% "spark-hive" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force()

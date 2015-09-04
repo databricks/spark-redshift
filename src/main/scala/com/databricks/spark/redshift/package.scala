@@ -17,6 +17,7 @@
 
 package com.databricks.spark
 
+import com.amazonaws.services.s3.AmazonS3Client
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, DataFrameReader, DataFrameWriter, Row, SQLContext}
@@ -63,7 +64,8 @@ package object redshift {
     def redshiftTable(parameters: Map[String, String]): DataFrame = {
       val params = Parameters.mergeParameters(parameters)
       sqlContext.baseRelationToDataFrame(
-        RedshiftRelation(DefaultJDBCWrapper, params, None)(sqlContext))
+        RedshiftRelation(
+          DefaultJDBCWrapper, creds => new AmazonS3Client(creds), params, None)(sqlContext))
     }
   }
 

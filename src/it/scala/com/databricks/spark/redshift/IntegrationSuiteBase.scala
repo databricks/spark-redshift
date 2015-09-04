@@ -38,7 +38,7 @@ trait IntegrationSuiteBase
   with BeforeAndAfterAll
   with BeforeAndAfterEach {
 
-  private def loadConfigFromEnv(envVarName: String): String = {
+  protected def loadConfigFromEnv(envVarName: String): String = {
     Option(System.getenv(envVarName)).getOrElse {
       fail(s"Must set $envVarName environment variable")
     }
@@ -81,14 +81,22 @@ trait IntegrationSuiteBase
   override def beforeAll(): Unit = {
     super.beforeAll()
     sc = new SparkContext("local", "RedshiftSourceSuite")
+    // Bypass Hadoop's FileSystem caching mechanism so that we don't cache the credentials:
+    sc.hadoopConfiguration.setBoolean("fs.s3.impl.disable.cache", true)
+    sc.hadoopConfiguration.setBoolean("fs.s3n.impl.disable.cache", true)
+    sc.hadoopConfiguration.set("fs.s3n.awsAccessKeyId", AWS_ACCESS_KEY_ID)
+    sc.hadoopConfiguration.set("fs.s3n.awsSecretAccessKey", AWS_SECRET_ACCESS_KEY)
     conn = DefaultJDBCWrapper.getConnector("com.amazon.redshift.jdbc4.Driver", jdbcUrl)
   }
 
   override def afterAll(): Unit = {
     try {
-      val conf = new Configuration()
+      val conf = new Configuration(false)
       conf.set("fs.s3n.awsAccessKeyId", AWS_ACCESS_KEY_ID)
       conf.set("fs.s3n.awsSecretAccessKey", AWS_SECRET_ACCESS_KEY)
+      // Bypass Hadoop's FileSystem caching mechanism so that we don't cache the credentials:
+      conf.setBoolean("fs.s3.impl.disable.cache", true)
+      conf.setBoolean("fs.s3n.impl.disable.cache", true)
       val fs = FileSystem.get(URI.create(tempDir), conf)
       fs.delete(new Path(tempDir), true)
       fs.close()

@@ -16,6 +16,8 @@
 
 package com.databricks.spark.redshift
 
+import com.amazonaws.auth.AWSCredentials
+import com.amazonaws.services.s3.AmazonS3Client
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.Logging
 import org.apache.spark.rdd.RDD
@@ -30,6 +32,7 @@ import com.databricks.spark.redshift.Parameters.MergedParameters
  */
 private[redshift] case class RedshiftRelation(
     jdbcWrapper: JDBCWrapper,
+    s3ClientFactory: AWSCredentials => AmazonS3Client,
     params: MergedParameters,
     userSchema: Option[StructType])
     (@transient val sqlContext: SQLContext)
@@ -52,10 +55,13 @@ private[redshift] case class RedshiftRelation(
   override def insert(data: DataFrame, overwrite: Boolean): Unit = {
     val updatedParams =
       Parameters.mergeParameters(params.parameters updated ("overwrite", overwrite.toString))
-    new RedshiftWriter(jdbcWrapper).saveToRedshift(sqlContext, data, updatedParams)
+    new RedshiftWriter(jdbcWrapper, s3ClientFactory).saveToRedshift(sqlContext, data, updatedParams)
   }
 
   override def buildScan(requiredColumns: Array[String], filters: Array[Filter]): RDD[Row] = {
+    val creds =
+      AWSCredentialsUtils.load(params.tempPath, sqlContext.sparkContext.hadoopConfiguration)
+    Utils.checkThatBucketHasObjectLifecycleConfiguration(params.tempPath, s3ClientFactory(creds))
     if (requiredColumns.isEmpty) {
       // In the special case where no columns were requested, issue a `count(*)` against Redshift
       // rather than unloading data.
@@ -88,11 +94,11 @@ private[redshift] case class RedshiftRelation(
         conn.close()
       }
       // Create a DataFrame to read the unloaded data:
-      val sc = sqlContext.sparkContext
-      val hadoopConf = new Configuration(sc.hadoopConfiguration)
-      params.setCredentials(hadoopConf)
-      val rdd = sc.newAPIHadoopFile(params.tempPath, classOf[RedshiftInputFormat],
-        classOf[java.lang.Long], classOf[Array[String]], hadoopConf)
+      val rdd = sqlContext.sparkContext.newAPIHadoopFile(
+        params.tempPath,
+        classOf[RedshiftInputFormat],
+        classOf[java.lang.Long],
+        classOf[Array[String]])
       val prunedSchema = pruneSchema(schema, requiredColumns)
       rdd.values.mapPartitions { iter =>
         val converter: Array[String] => Row = Conversions.createRowConverter(prunedSchema)
@@ -106,7 +112,9 @@ private[redshift] case class RedshiftRelation(
     // Always quote column names:
     val columnList = requiredColumns.map(col => s""""$col"""").mkString(", ")
     val whereClause = FilterPushdown.buildWhereClause(schema, filters)
-    val credsString = params.credentialsString(sqlContext.sparkContext.hadoopConfiguration)
+    val creds = params.temporaryAWSCredentials.getOrElse(
+      AWSCredentialsUtils.load(params.tempPath, sqlContext.sparkContext.hadoopConfiguration))
+    val credsString: String = AWSCredentialsUtils.getRedshiftCredentialsString(creds)
     val query = {
       // Since the query passed to UNLOAD will be enclosed in single quotes, we need to escape
       // any single quotes that appear in the query itself

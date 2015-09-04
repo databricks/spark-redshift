@@ -20,10 +20,18 @@ import java.io.File
 import java.net.URI
 import java.util.UUID
 
+import scala.collection.JavaConverters._
+import scala.util.control.NonFatal
+
+import com.amazonaws.auth.{AWSCredentials, BasicAWSCredentials}
+import com.amazonaws.services.s3.{AmazonS3URI, AmazonS3Client}
+import com.amazonaws.services.s3.model.BucketLifecycleConfiguration
+import org.apache.spark.Logging
+
 /**
  * Various arbitrary helper functions
  */
-private[redshift] object Utils {
+private[redshift] object Utils extends Logging {
   /**
    * Joins prefix URL a to path suffix b, and appends a trailing /, in order to create
    * a temp directory path for S3.
@@ -47,4 +55,36 @@ private[redshift] object Utils {
    */
   def makeTempPath(tempRoot: String): String = Utils.joinUrls(tempRoot, UUID.randomUUID().toString)
 
+  /**
+   * Checks whether the S3 bucket for the given UI has an object lifecycle configuration to
+   * ensure cleanup of temporary files. If no applicable configuration is found, this method logs
+   * a helpful warning for the user.
+   */
+  def checkThatBucketHasObjectLifecycleConfiguration(
+      tempDir: String,
+      s3Client: AmazonS3Client): Unit = {
+    try {
+      val s3URI = new AmazonS3URI(Utils.fixS3Url(tempDir))
+      val bucket = s3URI.getBucket
+      val bucketLifecycleConfiguration = s3Client.getBucketLifecycleConfiguration(bucket)
+      val key = s3URI.getKey
+      val someRuleMatchesTempDir = bucketLifecycleConfiguration.getRules.asScala.exists { rule =>
+        // Note: this only checks that there is an active rule which matches the temp directory;
+        // it does not actually check that the rule will delete the files. This check is still
+        // better than nothing, though, and we can always improve it later.
+        rule.getStatus == BucketLifecycleConfiguration.ENABLED && key.startsWith(rule.getPrefix)
+      }
+      if (!someRuleMatchesTempDir) {
+        logWarning(s"The S3 bucket $bucket does not have an object lifecycle configuration to " +
+          "ensure cleanup of temporary files. Consider configuring `tempdir` to point to a " +
+          "bucket with an object lifecycle policy that automatically deletes files after an " +
+          "expiration period. For more information, see " +
+          "https://docs.aws.amazon.com/AmazonS3/latest/dev/object-lifecycle-mgmt.html")
+      }
+    } catch {
+      case NonFatal(e) =>
+        logWarning(
+          "An error occurred while trying to read the S3 bucket lifecycle configuration", e)
+    }
+  }
 }

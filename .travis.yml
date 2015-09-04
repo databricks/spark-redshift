@@ -16,13 +16,13 @@ matrix:
       env: HADOOP_VERSION="2.2.0" SPARK_VERSION="1.4.1"
     - jdk: openjdk7
       scala: 2.10.4
-      env: HADOOP_VERSION="1.0.4" SPARK_VERSION="1.5.0-rc2"
+      env: HADOOP_VERSION="1.0.4" SPARK_VERSION="1.5.0-rc3"
     - jdk: openjdk7
       scala: 2.10.4
-      env: HADOOP_VERSION="1.2.1" SPARK_VERSION="1.5.0-rc2"
+      env: HADOOP_VERSION="1.2.1" SPARK_VERSION="1.5.0-rc3"
     - jdk: openjdk7
       scala: 2.10.4
-      env: HADOOP_VERSION="2.2.0" SPARK_VERSION="1.5.0-rc2"
+      env: HADOOP_VERSION="2.2.0" SPARK_VERSION="1.5.0-rc3"
 env:
   global:
     # AWS_REDSHIFT_JDBC_URL
@@ -35,6 +35,8 @@ env:
     - secure: "kFmNLBHXPCIMdbDtHpULFzQtQqWJOO5Q3PtHyvfXE9oHaVwmQUfNd2ygoH5qnKuHO66bfPC7GSY5cMERNIFXsdhDEbRYFj6B4OgcQsYmKAG6b3+qcFYq6htJqkeFbOZB8kUN4YOjlkZg1lPXp/RV0Ac1g72mEsm2CvIoCXmDMYg="
     # TEST_AWS_SECRET_ACCESS_KEY
     - secure: "Z34uNm0HuDhyMG9jOhf0nmFR3RKxmF4o1NGg8mNdCuuIykelgY/YDi1LXf5fLz2yQXsmSwt308iq2E1n3Dv6ZBmS4a1s1dpZjTTfjXsyMpz0Hub9ia5B3Th9y0GPjgrMhazFoDf/OQnDxarthJEdJjvTeyo935F5kCK4gikzV8A="
+    # STS_ROLE_ARN
+    - secure: "cuyemI1bqPkWBD5B1FqIKDJb5g/SX5x8lrzkO0J/jkyGY0VLbHxrl5j/9PrKFuvraBK3HC56HEP1Zg+IMvh+uv0D+p5y14C97fAzE33uNgR2aVkamOo92zHvxvXe7zBtqc8rztWsJb1pgkrY7SdgSXgQc88ohey+XecDh4TahTY="
     # AWS_S3_SCRATCH_SPACE
     - secure: "LvndQIW6dHs6nyaMHtblGI/oL+s460lOezFs2BoD0Isenb/O/IM+nY5K9HepTXjJIcq8qvUYnojZX1FCrxxOXX2/+/Iihiq7GzJYdmdMC6hLg9bJYeAFk0dWYT88/AwadrJCBOa3ockRLhiO3dkai7Ki5+M1erfaFiAHHMpJxYQ="
 
@@ -42,8 +44,7 @@ script:
   - sbt -Dhadoop.testVersion=$HADOOP_VERSION -Dspark.testVersion=$SPARK_VERSION coverage test
   - if [ "$TRAVIS_SECURE_ENV_VARS" == "true" ]; then sbt -Dhadoop.version=$HADOOP_VERSION -Dspark.version=$SPARK_VERSION coverage it:test 2> /dev/null; fi
   - sbt scalastyle
-  # Disable scalastyle for tests until https://github.com/scalastyle/scalastyle/issues/156 is fixed:
-  # - sbt "test:scalastyle"
+  - sbt "test:scalastyle"
   - sbt "it:scalastyle"
 after_success:
   - bash <(curl -s https://codecov.io/bash)

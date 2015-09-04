@@ -25,7 +25,7 @@ import org.apache.spark.sql.Row
 class DecimalIntegrationSuite extends IntegrationSuiteBase {
 
   private def testReadingDecimals(precision: Int, scale: Int, decimalStrings: Seq[String]): Unit = {
-    test(s"reading DECIMAL($precision, $scale") {
+    test(s"reading DECIMAL($precision, $scale)") {
       val tableName = s"reading_decimal_${precision}_${scale}_$randomSuffix"
       val expectedRows =
         decimalStrings.map(d => Row(if (d == null) null else Conversions.parseDecimal(d)))
@@ -42,8 +42,6 @@ class DecimalIntegrationSuite extends IntegrationSuiteBase {
           .option("url", jdbcUrl)
           .option("dbtable", tableName)
           .option("tempdir", tempDir)
-          .option("aws_access_key_id", AWS_ACCESS_KEY_ID)
-          .option("aws_secret_access_key", AWS_SECRET_ACCESS_KEY)
           .load()
         checkAnswer(loadedDf, expectedRows)
         checkAnswer(loadedDf.selectExpr("x + 0"), expectedRows)
