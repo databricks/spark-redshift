@@ -87,8 +87,8 @@ object SparkRedshiftBuild extends Build {
         )
       } else {
         Seq(
-          "org.apache.hadoop" % "hadoop-client" % testHadoopVersion.value % "test" force(),
-          "org.apache.hadoop" % "hadoop-common" % testHadoopVersion.value % "test" force(),
+          "org.apache.hadoop" % "hadoop-client" % testHadoopVersion.value % "test" exclude("javax.servlet", "servlet-api") force(),
+          "org.apache.hadoop" % "hadoop-common" % testHadoopVersion.value % "test" exclude("javax.servlet", "servlet-api") force(),
           "org.apache.hadoop" % "hadoop-common" % testHadoopVersion.value % "test" classifier "tests" force()
         )
       }),
