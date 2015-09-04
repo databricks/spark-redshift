@@ -31,15 +31,17 @@ private[redshift] object AWSCredentialsUtils {
       case creds: AWSSessionCredentials =>
         s"aws_access_key_id=${creds.getAWSAccessKeyId};" +
           s"aws_secret_access_key=${creds.getAWSSecretKey};token=${creds.getSessionToken}"
-      case creds=>
+      case creds =>
         s"aws_access_key_id=${creds.getAWSAccessKeyId};" +
           s"aws_secret_access_key=${creds.getAWSSecretKey}"
     }
   }
 
   def load(tempPath: String, hadoopConfiguration: Configuration): AWSCredentials = {
+    // scalastyle:off
     // A good reference on Hadoop's configuration loading / precedence is
     // https://github.com/apache/hadoop/blob/trunk/hadoop-tools/hadoop-aws/src/site/markdown/tools/hadoop-aws/index.md
+    // scalastyle:on
     val uri = new URI(tempPath)
     uri.getScheme match {
       case "s3" | "s3n" =>

@@ -96,7 +96,8 @@ class RedshiftSourceSuite
     sc.hadoopConfiguration.set("fs.s3n.impl", classOf[S3NInMemoryFileSystem].getName)
     // We need to use a DirectOutputCommitter to work around an issue which occurs with renames
     // while using the mocked S3 filesystem.
-    sc.hadoopConfiguration.set("mapred.output.committer.class", classOf[DirectOutputCommitter].getName)
+    sc.hadoopConfiguration.set("mapred.output.committer.class",
+      classOf[DirectOutputCommitter].getName)
     sc.hadoopConfiguration.set("fs.s3n.awsAccessKeyId", "test1")
     sc.hadoopConfiguration.set("fs.s3n.awsSecretAccessKey", "test2")
     // Configure a mock S3 client so that we don't hit errors when trying to access AWS in tests.
@@ -504,7 +505,7 @@ class RedshiftSourceSuite
       .returning(true)
 
     // Note: Assertions covered by mocks
-    val ignoreSource = new DefaultSource(ignoreWrapper,  _ => mockS3Client)
+    val ignoreSource = new DefaultSource(ignoreWrapper, _ => mockS3Client)
     ignoreSource.createRelation(testSqlContext, SaveMode.Ignore, defaultParams, expectedDataDF)
   }
 

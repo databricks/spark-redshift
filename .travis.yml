@@ -44,8 +44,7 @@ script:
   - sbt -Dhadoop.testVersion=$HADOOP_VERSION -Dspark.testVersion=$SPARK_VERSION coverage test
   - if [ "$TRAVIS_SECURE_ENV_VARS" == "true" ]; then sbt -Dhadoop.version=$HADOOP_VERSION -Dspark.version=$SPARK_VERSION coverage it:test 2> /dev/null; fi
   - sbt scalastyle
-  # Disable scalastyle for tests until https://github.com/scalastyle/scalastyle/issues/156 is fixed:
-  # - sbt "test:scalastyle"
+  - sbt "test:scalastyle"
   - sbt "it:scalastyle"
 after_success:
   - bash <(curl -s https://codecov.io/bash)
