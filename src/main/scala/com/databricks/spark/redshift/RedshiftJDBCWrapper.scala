@@ -23,14 +23,16 @@ import java.util.Properties
 import scala.util.Try
 
 import org.apache.spark.SPARK_VERSION
-import org.apache.spark.Logging
 import org.apache.spark.sql.types._
+import org.slf4j.LoggerFactory
 
 /**
  * Shim which exposes some JDBC helper functions. Most of this code is copied from Spark SQL, with
  * minor modifications for Redshift-specific features and limitations.
  */
-private[redshift] class JDBCWrapper extends Logging {
+private[redshift] class JDBCWrapper {
+
+  private val log = LoggerFactory.getLogger(getClass)
 
   def registerDriver(driverClass: String): Unit = {
     // DriverRegistry.register() is one of the few pieces of private Spark functionality which
@@ -114,7 +116,7 @@ private[redshift] class JDBCWrapper extends Logging {
       if (driver != null) registerDriver(driver)
     } catch {
       case e: ClassNotFoundException =>
-        logWarning(s"Couldn't find class $driver", e)
+        log.warn(s"Couldn't find class $driver", e)
     }
     DriverManager.getConnection(url, new Properties())
   }

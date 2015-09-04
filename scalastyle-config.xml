@@ -123,6 +123,11 @@ This file is divided into 3 sections:
       // scalastyle:on println]]></customMessage>
   </check>
 
+  <check customId="sparklogging" level="error" class="org.scalastyle.file.RegexChecker" enabled="true">
+    <parameters><parameter name="regex">org.apache.spark.Logging</parameter></parameters>
+    <customMessage><![CDATA[Do not rely on Spark's Logging trait.]]></customMessage>
+  </check>
+
   <check customId="classforname" level="error" class="org.scalastyle.file.RegexChecker" enabled="true">
     <parameters><parameter name="regex">Class\.forName</parameter></parameters>
     <customMessage><![CDATA[

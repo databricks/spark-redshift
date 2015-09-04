@@ -55,6 +55,8 @@ object SparkRedshiftBuild extends Build {
       resolvers +=
         "Spark 1.5.0 RC3 Staging" at "https://repository.apache.org/content/repositories/orgapachespark-1143",
       libraryDependencies ++= Seq(
+        // The SLF4J API is provided by Spark:
+        "org.slf4j" % "slf4j-api" % "1.7.5" % "provided",
         // These Amazon SDK depdencies are marked as 'provided' in order to reduce the risk of
         // dependency conflicts with other user libraries. In many environments, such as EMR and
         // Databricks, the Amazon SDK will already be on the classpath. In other cases, the SDK is
