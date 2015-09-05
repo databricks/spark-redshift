@@ -69,7 +69,7 @@ object SparkRedshiftBuild extends Build {
         "com.amazonaws" % "aws-java-sdk-sts" % "1.9.40" % "test",
         // We require spark-avro, but avro-mapred must be provided to match Hadoop version.
         // In most cases, avro-mapred will be provided as part of the Spark assembly JAR.
-        "com.databricks" %% "spark-avro" % "1.0.0",
+        "com.databricks" %% "spark-avro" % "2.0.0",
         "org.apache.avro" % "avro-mapred" % "1.7.6" % "provided" exclude("org.mortbay.jetty", "servlet-api"),
         // A Redshift-compatible JDBC driver must be present on the classpath for spark-redshift to work.
         // For testing, we use an Amazon driver, which is available from
