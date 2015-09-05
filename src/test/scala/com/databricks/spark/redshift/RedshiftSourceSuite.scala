@@ -185,7 +185,7 @@ class RedshiftSourceSuite
       "FROM test_table '\\) " +
       "TO '.*' " +
       "WITH CREDENTIALS 'aws_access_key_id=test1;aws_secret_access_key=test2' " +
-      "ESCAPE ALLOWOVERWRITE").r
+      "ESCAPE").r
     val jdbcWrapper = prepareUnloadTest(defaultParams, Seq(expectedQuery))
 
     // Assert that we've loaded and converted all data in the test file
@@ -250,7 +250,7 @@ class RedshiftSourceSuite
       "UNLOAD \\('SELECT \"testbyte\", \"testbool\" FROM test_table '\\) " +
       "TO '.*' " +
       "WITH CREDENTIALS 'aws_access_key_id=test1;aws_secret_access_key=test2' " +
-      "ESCAPE ALLOWOVERWRITE").r
+      "ESCAPE").r
     val jdbcWrapper = prepareUnloadTest(defaultParams, Seq(expectedQuery))
     // Construct the source with a custom schema
     val source = new DefaultSource(jdbcWrapper, _ => mockS3Client)
@@ -280,7 +280,7 @@ class RedshiftSourceSuite
         "AND \"testint\" <= 43'\\) " +
       "TO '.*' " +
       "WITH CREDENTIALS 'aws_access_key_id=test1;aws_secret_access_key=test2' " +
-      "ESCAPE ALLOWOVERWRITE").r
+      "ESCAPE").r
     // scalastyle:on
     val jdbcWrapper = prepareUnloadTest(defaultParams, Seq(expectedQuery))
 
