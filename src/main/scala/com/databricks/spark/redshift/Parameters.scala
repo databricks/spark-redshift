@@ -70,12 +70,12 @@ private[redshift] object Parameters {
      * somewhere that can be written to and read from by Redshift. Make sure that AWS credentials
      * are available for S3.
      */
-    private def tempDir: String = parameters("tempdir")
+    def rootTempDir: String = parameters("tempdir")
 
     /**
-     * Each instance will create its own subdirectory in the tempDir, with a random UUID.
+     * Creates a per-query subdirectory in the [[rootTempDir]], with a random UUID.
      */
-    val tempPath: String = Utils.makeTempPath(tempDir)
+    def createPerQueryTempDir(): String = Utils.makeTempPath(rootTempDir)
 
     /**
      * The Redshift table to be used as the target when loading or writing data.

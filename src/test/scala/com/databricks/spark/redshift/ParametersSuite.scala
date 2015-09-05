@@ -31,7 +31,8 @@ class ParametersSuite extends FunSuite with Matchers {
 
     val mergedParams = Parameters.mergeParameters(params)
 
-    mergedParams.tempPath should startWith (params("tempdir"))
+    mergedParams.rootTempDir should startWith (params("tempdir"))
+    mergedParams.createPerQueryTempDir() should startWith (params("tempdir"))
     mergedParams.jdbcUrl shouldBe params("url")
     mergedParams.table shouldBe Some(params("dbtable"))
 
@@ -41,16 +42,15 @@ class ParametersSuite extends FunSuite with Matchers {
     }
   }
 
-  test("New instances have distinct temp paths") {
+  test("createPerQueryTempDir() returns distinct temp paths") {
     val params = Map(
       "tempdir" -> "s3://foo/bar",
       "dbtable" -> "test_table",
       "url" -> "jdbc:redshift://foo/bar")
 
-    val mergedParams1 = Parameters.mergeParameters(params)
-    val mergedParams2 = Parameters.mergeParameters(params)
+    val mergedParams = Parameters.mergeParameters(params)
 
-    mergedParams1.tempPath should not equal mergedParams2.tempPath
+    mergedParams.createPerQueryTempDir() should not equal mergedParams.createPerQueryTempDir()
   }
 
   test("Errors are thrown when mandatory parameters are not provided") {
