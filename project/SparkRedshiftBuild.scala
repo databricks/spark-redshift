@@ -168,10 +168,10 @@ object SparkRedshiftBuild extends Build {
         commitReleaseVersion,
         tagRelease,
         publishArtifacts,
-        releaseStepTask(spPublish),
         setNextVersion,
         commitNextVersion,
-        pushChanges
+        pushChanges,
+        releaseStepTask(spPublish)
       )
     )
 }
