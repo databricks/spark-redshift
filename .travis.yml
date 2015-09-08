@@ -12,16 +12,20 @@ matrix:
     # https://github.com/apache/spark/pull/6599 is not present in 1.4.1,
     # so the published Spark Maven artifacts will not work with Hadoop 1.x.
     - jdk: openjdk6
-      scala: 2.10.4
+      scala: 2.10.5
       env: HADOOP_VERSION="2.2.0" SPARK_VERSION="1.4.1"
     - jdk: openjdk7
-      scala: 2.10.4
+      scala: 2.10.5
       env: HADOOP_VERSION="1.0.4" SPARK_VERSION="1.5.0-rc3"
     - jdk: openjdk7
-      scala: 2.10.4
+      scala: 2.10.5
       env: HADOOP_VERSION="1.2.1" SPARK_VERSION="1.5.0-rc3"
     - jdk: openjdk7
-      scala: 2.10.4
+      scala: 2.10.5
+      env: HADOOP_VERSION="2.2.0" SPARK_VERSION="1.5.0-rc3"
+    # Scala 2.11 tests:
+    - jdk: openjdk7
+      scala: 2.11.7
       env: HADOOP_VERSION="2.2.0" SPARK_VERSION="1.5.0-rc3"
 env:
   global:
