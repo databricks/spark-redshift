@@ -538,4 +538,20 @@ class RedshiftSourceSuite
   test("DefaultSource has default constructor, required by Data Source API") {
     new DefaultSource()
   }
+
+  test("Saves throw error message if S3 Block FileSystem would be used") {
+    val params = defaultParams + ("tempdir" -> defaultParams("tempdir").replace("s3n", "s3"))
+    val e = intercept[IllegalArgumentException] {
+      expectedDataDF.saveAsRedshiftTable(params)
+    }
+    assert(e.getMessage.contains("Block FileSystem"))
+  }
+
+  test("Loads throw error message if S3 Block FileSystem would be used") {
+    val params = defaultParams + ("tempdir" -> defaultParams("tempdir").replace("s3n", "s3"))
+    val e = intercept[IllegalArgumentException] {
+      testSqlContext.read.format("com.databricks.spark.redshift").options(params).load()
+    }
+    assert(e.getMessage.contains("Block FileSystem"))
+  }
 }

@@ -16,6 +16,8 @@
 
 package com.databricks.spark.redshift
 
+import java.net.URI
+
 import com.amazonaws.auth.AWSCredentials
 import com.amazonaws.services.s3.AmazonS3Client
 import org.apache.hadoop.conf.Configuration
@@ -41,6 +43,11 @@ private[redshift] case class RedshiftRelation(
   with InsertableRelation {
 
   private val log = LoggerFactory.getLogger(getClass)
+
+  if (sqlContext != null) {
+    Utils.assertThatFileSystemIsNotS3BlockStore(
+      new URI(params.rootTempDir), sqlContext.sparkContext.hadoopConfiguration)
+  }
 
   override def schema: StructType = {
     userSchema match {

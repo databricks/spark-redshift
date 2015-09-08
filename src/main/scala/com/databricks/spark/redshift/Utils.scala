@@ -25,6 +25,9 @@ import scala.util.control.NonFatal
 
 import com.amazonaws.services.s3.{AmazonS3URI, AmazonS3Client}
 import com.amazonaws.services.s3.model.BucketLifecycleConfiguration
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.FileSystem
+import org.apache.hadoop.fs.s3.S3FileSystem
 import org.slf4j.LoggerFactory
 
 /**
@@ -86,6 +89,22 @@ private[redshift] object Utils {
     } catch {
       case NonFatal(e) =>
         log.warn("An error occurred while trying to read the S3 bucket lifecycle configuration", e)
+    }
+  }
+
+  /**
+   * Given a URI, verify that the Hadoop FileSystem for that URI is not the classic S3 block storage
+   * filesystem. `spark-redshift` cannot use this FileSystem because the files written to it will
+   * not be readable by Redshift (and vice versa).
+   */
+  def assertThatFileSystemIsNotS3BlockStore(uri: URI, hadoopConfig: Configuration): Unit = {
+    val fs = FileSystem.get(uri, hadoopConfig)
+    // Note that we do not want to use isInstanceOf here, since we're only interested in detecting
+    // exact matches
+    if (fs.getClass == classOf[S3FileSystem]) {
+      throw new IllegalArgumentException(
+        "spark-redshift does not support the S3 Block FileSystem. Please reconfigure `tempdir` to" +
+        "use a s3n:// or s3a:// scheme.")
     }
   }
 }
