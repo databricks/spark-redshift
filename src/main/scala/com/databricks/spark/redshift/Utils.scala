@@ -93,11 +93,11 @@ private[redshift] object Utils {
   }
 
   /**
-   * Given a URI, verify that the Hadoop FileSystem for that URI is not the classic S3 block storage
-   * filesystem. `spark-redshift` cannot use this FileSystem because the files written to it will
-   * not be readable by Redshift (and vice versa).
+   * Given a URI, verify that the Hadoop FileSystem for that URI is not the S3 block FileSystem.
+   * `spark-redshift` cannot use this FileSystem because the files written to it will not be
+   * readable by Redshift (and vice versa).
    */
-  def assertThatFileSystemIsNotS3BlockStore(uri: URI, hadoopConfig: Configuration): Unit = {
+  def assertThatFileSystemIsNotS3BlockFileSystem(uri: URI, hadoopConfig: Configuration): Unit = {
     val fs = FileSystem.get(uri, hadoopConfig)
     // Note that we do not want to use isInstanceOf here, since we're only interested in detecting
     // exact matches

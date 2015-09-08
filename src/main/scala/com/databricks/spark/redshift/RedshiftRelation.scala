@@ -45,7 +45,7 @@ private[redshift] case class RedshiftRelation(
   private val log = LoggerFactory.getLogger(getClass)
 
   if (sqlContext != null) {
-    Utils.assertThatFileSystemIsNotS3BlockStore(
+    Utils.assertThatFileSystemIsNotS3BlockFileSystem(
       new URI(params.rootTempDir), sqlContext.sparkContext.hadoopConfiguration)
   }
 

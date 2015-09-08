@@ -266,7 +266,7 @@ private[redshift] class RedshiftWriter(
         "For save operations you must specify a Redshift table name with the 'dbtable' parameter")
     }
 
-    Utils.assertThatFileSystemIsNotS3BlockStore(
+    Utils.assertThatFileSystemIsNotS3BlockFileSystem(
       new URI(params.rootTempDir), sqlContext.sparkContext.hadoopConfiguration)
 
     val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
