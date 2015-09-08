@@ -98,6 +98,8 @@ class RedshiftSourceSuite
     // while using the mocked S3 filesystem.
     sc.hadoopConfiguration.set("spark.sql.sources.outputCommitterClass",
       classOf[DirectOutputCommitter].getName)
+    sc.hadoopConfiguration.set("fs.s3.awsAccessKeyId", "test1")
+    sc.hadoopConfiguration.set("fs.s3.awsSecretAccessKey", "test2")
     sc.hadoopConfiguration.set("fs.s3n.awsAccessKeyId", "test1")
     sc.hadoopConfiguration.set("fs.s3n.awsSecretAccessKey", "test2")
     // Configure a mock S3 client so that we don't hit errors when trying to access AWS in tests.
