@@ -7,6 +7,8 @@ A library to load data into Spark SQL DataFrames from Amazon Redshift, and write
 Redshift tables. Amazon S3 is used to efficiently transfer data in and out of Redshift, and
 JDBC is used to automatically trigger the appropriate `COPY` and `UNLOAD` commands on Redshift.
 
+This library is more suited to ETL than interactive queries. If you plan to perform many queries against Redshift tables then we recommend caching / saving those tables.
+
 - [Installation](#installation)
 - Usage:
   - Data sources API: [Scala](#scala), [Python](#python), [SQL](#sql)
