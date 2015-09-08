@@ -70,7 +70,11 @@ object SparkRedshiftBuild extends Build {
         // We require spark-avro, but avro-mapred must be provided to match Hadoop version.
         // In most cases, avro-mapred will be provided as part of the Spark assembly JAR.
         "com.databricks" %% "spark-avro" % "2.0.0",
-        "org.apache.avro" % "avro-mapred" % "1.7.6" % "provided" exclude("org.mortbay.jetty", "servlet-api"),
+        if (testHadoopVersion.value.startsWith("1")) {
+          "org.apache.avro" % "avro-mapred" % "1.7.7" % "provided" classifier "hadoop1" exclude("org.mortbay.jetty", "servlet-api")
+        } else {
+          "org.apache.avro" % "avro-mapred" % "1.7.7" % "provided" classifier "hadoop2" exclude("org.mortbay.jetty", "servlet-api")
+        },
         // A Redshift-compatible JDBC driver must be present on the classpath for spark-redshift to work.
         // For testing, we use an Amazon driver, which is available from
         // http://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-connection.html
@@ -97,9 +101,21 @@ object SparkRedshiftBuild extends Build {
         "org.apache.spark" %% "spark-sql" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force(),
         "org.apache.spark" %% "spark-hive" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force()
       ),
+      // Although spark-avro declares its avro-mapred dependency as `provided`, its version of the
+      // dependency can still end up on the classpath during tests, which breaks the tests for
+      // Hadoop 1.x. To work around this, we filter out the incompatible JARs here:
+      (fullClasspath in Test) := (if (testHadoopVersion.value.startsWith("1")) {
+        (fullClasspath in Test).value.filterNot {
+          x => x.data.getName.contains("hadoop2") && x.data.getName.contains("avro")
+        }
+      } else {
+        (fullClasspath in Test).value.filterNot {
+          x => x.data.getName.contains("hadoop1") && x.data.getName.contains("avro")
+        }
+      }),
       ScoverageSbtPlugin.ScoverageKeys.coverageHighlighting := {
         if (scalaBinaryVersion.value == "2.10") false
-        else false
+        else true
       },
       logBuffered := false,
       // Display full-length stacktraces from ScalaTest:
