@@ -65,7 +65,7 @@ class DefaultSource(jdbcWrapper: JDBCWrapper, s3ClientFactory: AWSCredentials =>
    */
   override def createRelation(
       sqlContext: SQLContext,
-      mode: SaveMode,
+      saveMode: SaveMode,
       parameters: Map[String, String],
       data: DataFrame): BaseRelation = {
     val params = Parameters.mergeParameters(parameters)
@@ -81,7 +81,7 @@ class DefaultSource(jdbcWrapper: JDBCWrapper, s3ClientFactory: AWSCredentials =>
       exists
     }
 
-    val (doSave, dropExisting) = mode match {
+    val (doSave, dropExisting) = saveMode match {
       case SaveMode.Append => (true, false)
       case SaveMode.Overwrite => (true, true)
       case SaveMode.ErrorIfExists =>
@@ -102,7 +102,7 @@ class DefaultSource(jdbcWrapper: JDBCWrapper, s3ClientFactory: AWSCredentials =>
     if (doSave) {
       val updatedParams = parameters.updated("overwrite", dropExisting.toString)
       new RedshiftWriter(jdbcWrapper, s3ClientFactory).saveToRedshift(
-        sqlContext, data, Parameters.mergeParameters(updatedParams))
+        sqlContext, data, saveMode, Parameters.mergeParameters(updatedParams))
     }
 
     createRelation(sqlContext, parameters)

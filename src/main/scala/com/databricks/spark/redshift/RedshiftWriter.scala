@@ -28,7 +28,7 @@ import scala.util.control.NonFatal
 import com.databricks.spark.redshift.Parameters.MergedParameters
 
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{DataFrame, Row, SQLContext}
+import org.apache.spark.sql.{DataFrame, Row, SaveMode, SQLContext}
 import org.apache.spark.sql.types._
 
 /**
@@ -116,11 +116,12 @@ private[redshift] class RedshiftWriter(
   private def doRedshiftLoad(
       conn: Connection,
       data: DataFrame,
+      saveMode: SaveMode,
       params: MergedParameters,
       tempDir: String): Unit = {
 
     // Overwrites must drop the table, in case there has been a schema update
-    if (params.overwrite) {
+    if (saveMode == SaveMode.Overwrite) {
       val deleteExisting = conn.prepareStatement(s"DROP TABLE IF EXISTS ${params.table.get}")
       deleteExisting.execute()
     }
@@ -259,7 +260,11 @@ private[redshift] class RedshiftWriter(
   /**
    * Write a DataFrame to a Redshift table, using S3 and Avro serialization
    */
-  def saveToRedshift(sqlContext: SQLContext, data: DataFrame, params: MergedParameters) : Unit = {
+  def saveToRedshift(
+      sqlContext: SQLContext,
+      data: DataFrame,
+      saveMode: SaveMode,
+      params: MergedParameters) : Unit = {
     if (params.table.isEmpty) {
       throw new IllegalArgumentException(
         "For save operations you must specify a Redshift table name with the 'dbtable' parameter")
@@ -269,15 +274,15 @@ private[redshift] class RedshiftWriter(
 
     val tempDir = params.createPerQueryTempDir()
     try {
-      if (params.overwrite && params.useStagingTable) {
+      if (saveMode == SaveMode.Overwrite && params.useStagingTable) {
         withStagingTable(conn, params.table.get, stagingTable => {
           val updatedParams = MergedParameters(params.parameters.updated("dbtable", stagingTable))
           unloadData(sqlContext, data, updatedParams, tempDir)
-          doRedshiftLoad(conn, data, updatedParams, tempDir)
+          doRedshiftLoad(conn, data, saveMode, updatedParams, tempDir)
         })
       } else {
         unloadData(sqlContext, data, params, tempDir)
-        doRedshiftLoad(conn, data, params, tempDir)
+        doRedshiftLoad(conn, data, saveMode, params, tempDir)
       }
     } finally {
       conn.close()

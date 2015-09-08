@@ -359,7 +359,8 @@ class RedshiftSourceSuite
     val writer = new RedshiftWriter(jdbcWrapper, _ => mockS3Client)
 
     intercept[IllegalArgumentException] {
-      writer.saveToRedshift(testSqlContext, df, Parameters.mergeParameters(defaultParams))
+      writer.saveToRedshift(
+        testSqlContext, df, SaveMode.Append, Parameters.mergeParameters(defaultParams))
     }
   }
 
