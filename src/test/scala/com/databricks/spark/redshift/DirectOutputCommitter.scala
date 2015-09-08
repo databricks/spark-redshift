@@ -16,8 +16,10 @@
 
 package com.databricks.spark.redshift
 
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.hadoop.mapred._
+import org.apache.hadoop.mapreduce._
+import org.apache.hadoop.mapreduce.lib.output.{FileOutputCommitter, FileOutputFormat}
 
 class DirectOutputCommitter extends OutputCommitter {
   override def setupJob(jobContext: JobContext): Unit = { }
@@ -40,9 +42,9 @@ class DirectOutputCommitter extends OutputCommitter {
    * This mimics the behavior of FileOutputCommitter, reusing the same file name and conf option.
    */
   override def commitJob(context: JobContext): Unit = {
-    val conf = context.getJobConf
+    val conf = context.getConfiguration
     if (shouldCreateSuccessFile(conf)) {
-      val outputPath = FileOutputFormat.getOutputPath(conf)
+      val outputPath = FileOutputFormat.getOutputPath(context)
       if (outputPath != null) {
         val fileSys = outputPath.getFileSystem(conf)
         val filePath = new Path(outputPath, FileOutputCommitter.SUCCEEDED_FILE_NAME)
@@ -52,7 +54,7 @@ class DirectOutputCommitter extends OutputCommitter {
   }
 
   /** By default, we do create the _SUCCESS file, but we allow it to be turned off. */
-  private def shouldCreateSuccessFile(conf: JobConf): Boolean = {
+  private def shouldCreateSuccessFile(conf: Configuration): Boolean = {
     conf.getBoolean("mapreduce.fileoutputcommitter.marksuccessfuljobs", true)
   }
 }
