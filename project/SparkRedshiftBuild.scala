@@ -135,13 +135,6 @@ object SparkRedshiftBuild extends Build {
 
       pomExtra :=
         <url>https://github.com/databricks/spark-redshift</url>
-        <licenses>
-          <license>
-            <name>Apache License, Verision 2.0</name>
-            <url>http://www.apache.org/licenses/LICENSE-2.0.html</url>
-            <distribution>repo</distribution>
-          </license>
-        </licenses>
         <scm>
           <url>git@github.com:databricks/spark-redshift.git</url>
           <connection>scm:git:git@github.com:databricks/spark-redshift.git</connection>
@@ -153,9 +146,9 @@ object SparkRedshiftBuild extends Build {
             <url>https://github.com/mengxr</url>
           </developer>
           <developer>
-            <id>joshrosen</id>
+            <id>JoshRosen</id>
             <name>Josh Rosen</name>
-            <url>https://github.com/joshrosen</url>
+            <url>https://github.com/JoshRosen</url>
           </developer>
           <developer>
             <id>marmbrus</id>
