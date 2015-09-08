@@ -63,10 +63,13 @@ private[redshift] class RedshiftWriter(
   /**
    * Generate the COPY SQL command
    */
-  private def copySql(sqlContext: SQLContext, params: MergedParameters): String = {
+  private def copySql(
+      sqlContext: SQLContext,
+      params: MergedParameters,
+      tempDir: String): String = {
     val credsString: String = AWSCredentialsUtils.getRedshiftCredentialsString(
-      AWSCredentialsUtils.load(params.tempPath, sqlContext.sparkContext.hadoopConfiguration))
-    val fixedUrl = Utils.fixS3Url(params.tempPath)
+      AWSCredentialsUtils.load(tempDir, sqlContext.sparkContext.hadoopConfiguration))
+    val fixedUrl = Utils.fixS3Url(tempDir)
     s"COPY ${params.table.get} FROM '$fixedUrl' CREDENTIALS '$credsString' FORMAT AS " +
       "AVRO 'auto' DATEFORMAT 'YYYY-MM-DD HH:MI:SS'"
   }
@@ -110,7 +113,11 @@ private[redshift] class RedshiftWriter(
    * Perform the Redshift load, including deletion of existing data in the case of an overwrite,
    * and creating the table if it doesn't already exist.
    */
-  private def doRedshiftLoad(conn: Connection, data: DataFrame, params: MergedParameters): Unit = {
+  private def doRedshiftLoad(
+      conn: Connection,
+      data: DataFrame,
+      params: MergedParameters,
+      tempDir: String): Unit = {
 
     // Overwrites must drop the table, in case there has been a schema update
     if (params.overwrite) {
@@ -125,7 +132,7 @@ private[redshift] class RedshiftWriter(
     createTable.execute()
 
     // Load the temporary data into the new file
-    val copyStatement = copySql(data.sqlContext, params)
+    val copyStatement = copySql(data.sqlContext, params, tempDir)
     val copyData = conn.prepareStatement(copyStatement)
     try {
       copyData.execute()
@@ -185,10 +192,11 @@ private[redshift] class RedshiftWriter(
   private def unloadData(
       sqlContext: SQLContext,
       data: DataFrame,
-      params: MergedParameters): Unit = {
+      params: MergedParameters,
+      tempDir: String): Unit = {
     val creds: AWSCredentials = params.temporaryAWSCredentials.getOrElse(
-      AWSCredentialsUtils.load(params.tempPath, sqlContext.sparkContext.hadoopConfiguration))
-    Utils.checkThatBucketHasObjectLifecycleConfiguration(params.tempPath, s3ClientFactory(creds))
+      AWSCredentialsUtils.load(params.rootTempDir, sqlContext.sparkContext.hadoopConfiguration))
+    Utils.checkThatBucketHasObjectLifecycleConfiguration(params.rootTempDir, s3ClientFactory(creds))
     // spark-avro does not support Date types. In addition, it converts Timestamps into longs
     // (milliseconds since the Unix epoch). Redshift is capable of loading timestamps in
     // 'epochmillisecs' format but there's no equivalent format for dates. To work around this, we
@@ -245,7 +253,7 @@ private[redshift] class RedshiftWriter(
     sqlContext.createDataFrame(convertedRows, convertedSchema)
       .write
       .format("com.databricks.spark.avro")
-      .save(params.tempPath)
+      .save(tempDir)
   }
 
   /**
@@ -259,16 +267,17 @@ private[redshift] class RedshiftWriter(
 
     val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
 
+    val tempDir = params.createPerQueryTempDir()
     try {
       if (params.overwrite && params.useStagingTable) {
         withStagingTable(conn, params.table.get, stagingTable => {
           val updatedParams = MergedParameters(params.parameters.updated("dbtable", stagingTable))
-          unloadData(sqlContext, data, updatedParams)
-          doRedshiftLoad(conn, data, updatedParams)
+          unloadData(sqlContext, data, updatedParams, tempDir)
+          doRedshiftLoad(conn, data, updatedParams, tempDir)
         })
       } else {
-        unloadData(sqlContext, data, params)
-        doRedshiftLoad(conn, data, params)
+        unloadData(sqlContext, data, params, tempDir)
+        doRedshiftLoad(conn, data, params, tempDir)
       }
     } finally {
       conn.close()

@@ -61,8 +61,8 @@ private[redshift] case class RedshiftRelation(
 
   override def buildScan(requiredColumns: Array[String], filters: Array[Filter]): RDD[Row] = {
     val creds =
-      AWSCredentialsUtils.load(params.tempPath, sqlContext.sparkContext.hadoopConfiguration)
-    Utils.checkThatBucketHasObjectLifecycleConfiguration(params.tempPath, s3ClientFactory(creds))
+      AWSCredentialsUtils.load(params.rootTempDir, sqlContext.sparkContext.hadoopConfiguration)
+    Utils.checkThatBucketHasObjectLifecycleConfiguration(params.rootTempDir, s3ClientFactory(creds))
     if (requiredColumns.isEmpty) {
       // In the special case where no columns were requested, issue a `count(*)` against Redshift
       // rather than unloading data.
@@ -86,7 +86,8 @@ private[redshift] case class RedshiftRelation(
       }
     } else {
       // Unload data from Redshift into a temporary directory in S3:
-      val unloadSql = buildUnloadStmt(requiredColumns, filters)
+      val tempDir = params.createPerQueryTempDir()
+      val unloadSql = buildUnloadStmt(requiredColumns, filters, tempDir)
       log.info(unloadSql)
       val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
       try {
@@ -96,7 +97,7 @@ private[redshift] case class RedshiftRelation(
       }
       // Create a DataFrame to read the unloaded data:
       val rdd = sqlContext.sparkContext.newAPIHadoopFile(
-        params.tempPath,
+        tempDir,
         classOf[RedshiftInputFormat],
         classOf[java.lang.Long],
         classOf[Array[String]])
@@ -108,13 +109,16 @@ private[redshift] case class RedshiftRelation(
     }
   }
 
-  private def buildUnloadStmt(requiredColumns: Array[String], filters: Array[Filter]): String = {
+  private def buildUnloadStmt(
+      requiredColumns: Array[String],
+      filters: Array[Filter],
+      tempDir: String): String = {
     assert(!requiredColumns.isEmpty)
     // Always quote column names:
     val columnList = requiredColumns.map(col => s""""$col"""").mkString(", ")
     val whereClause = FilterPushdown.buildWhereClause(schema, filters)
     val creds = params.temporaryAWSCredentials.getOrElse(
-      AWSCredentialsUtils.load(params.tempPath, sqlContext.sparkContext.hadoopConfiguration))
+      AWSCredentialsUtils.load(params.rootTempDir, sqlContext.sparkContext.hadoopConfiguration))
     val credsString: String = AWSCredentialsUtils.getRedshiftCredentialsString(creds)
     val query = {
       // Since the query passed to UNLOAD will be enclosed in single quotes, we need to escape
@@ -125,9 +129,9 @@ private[redshift] case class RedshiftRelation(
       }
       s"SELECT $columnList FROM $tableNameOrSubquery $whereClause"
     }
-    val fixedUrl = Utils.fixS3Url(params.tempPath)
+    val fixedUrl = Utils.fixS3Url(tempDir)
 
-    s"UNLOAD ('$query') TO '$fixedUrl' WITH CREDENTIALS '$credsString' ESCAPE ALLOWOVERWRITE"
+    s"UNLOAD ('$query') TO '$fixedUrl' WITH CREDENTIALS '$credsString' ESCAPE"
   }
 
   private def pruneSchema(schema: StructType, columns: Array[String]): StructType = {
