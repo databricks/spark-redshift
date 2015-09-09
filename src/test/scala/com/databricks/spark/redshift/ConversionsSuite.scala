@@ -29,7 +29,7 @@ import org.apache.spark.sql.types.{StructField, BooleanType, StructType}
 class ConversionsSuite extends FunSuite {
 
   test("Data should be correctly converted") {
-    val convertRow = Conversions.rowConverter(TestUtils.testSchema)
+    val convertRow = Conversions.createRowConverter(TestUtils.testSchema)
     val doubleMin = Double.MinValue.toString
     val longMax = Long.MaxValue.toString
     // scalastyle:off
@@ -53,13 +53,13 @@ class ConversionsSuite extends FunSuite {
   }
 
   test("Row conversion handles null values") {
-    val convertRow = Conversions.rowConverter(TestUtils.testSchema)
+    val convertRow = Conversions.createRowConverter(TestUtils.testSchema)
     val emptyRow = List.fill(TestUtils.testSchema.length)(null).toArray[String]
     assert(convertRow(emptyRow) === Row(emptyRow: _*))
   }
 
   test("Booleans are correctly converted") {
-    val convertRow = Conversions.rowConverter(StructType(StructField("a", BooleanType) :: Nil))
+    val convertRow = Conversions.createRowConverter(StructType(Seq(StructField("a", BooleanType))))
     assert(convertRow(Array("t")) === Row(true))
     assert(convertRow(Array("f")) === Row(false))
     assert(convertRow(Array(null)) === Row(null))

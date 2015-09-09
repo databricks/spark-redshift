@@ -16,14 +16,18 @@
 
 package com.databricks.spark.redshift
 
+import java.net.URI
 import java.sql.{Connection, Date, SQLException, Timestamp}
-import java.util.Properties
+
+import com.amazonaws.auth.AWSCredentials
+import com.amazonaws.services.s3.AmazonS3Client
+import org.slf4j.LoggerFactory
 
 import scala.util.Random
+import scala.util.control.NonFatal
 
 import com.databricks.spark.redshift.Parameters.MergedParameters
 
-import org.apache.spark.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.apache.spark.sql.types._
@@ -31,12 +35,17 @@ import org.apache.spark.sql.types._
 /**
  * Functions to write data to Redshift with intermediate Avro serialisation into S3.
  */
-class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
+private[redshift] class RedshiftWriter(
+    jdbcWrapper: JDBCWrapper,
+    s3ClientFactory: AWSCredentials => AmazonS3Client) {
+
+  private val log = LoggerFactory.getLogger(getClass)
 
   /**
    * Generate CREATE TABLE statement for Redshift
    */
-  private def createTableSql(data: DataFrame, params: MergedParameters): String = {
+  // Visible for testing.
+  private[redshift] def createTableSql(data: DataFrame, params: MergedParameters): String = {
     val schemaSql = jdbcWrapper.schemaString(data.schema)
     val distStyleDef = params.distStyle match {
       case Some(style) => s"DISTSTYLE $style"
@@ -55,10 +64,14 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
   /**
    * Generate the COPY SQL command
    */
-  private def copySql(sqlContext: SQLContext, params: MergedParameters): String = {
-    val creds = params.credentialsString(sqlContext.sparkContext.hadoopConfiguration)
-    val fixedUrl = Utils.fixS3Url(params.tempPath)
-    s"COPY ${params.table.get} FROM '$fixedUrl' CREDENTIALS '$creds' FORMAT AS " +
+  private def copySql(
+      sqlContext: SQLContext,
+      params: MergedParameters,
+      tempDir: String): String = {
+    val credsString: String = AWSCredentialsUtils.getRedshiftCredentialsString(
+      AWSCredentialsUtils.load(tempDir, sqlContext.sparkContext.hadoopConfiguration))
+    val fixedUrl = Utils.fixS3Url(tempDir)
+    s"COPY ${params.table.get} FROM '$fixedUrl' CREDENTIALS '$credsString' FORMAT AS " +
       "AVRO 'auto' DATEFORMAT 'YYYY-MM-DD HH:MI:SS'"
   }
 
@@ -84,7 +97,7 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
       }
       conn.prepareStatement(s"ALTER TABLE $tempTable RENAME TO $table").execute()
     } catch {
-      case e: SQLException =>
+      case NonFatal(e) =>
         if (jdbcWrapper.tableExists(conn, tempTable)) {
           conn.prepareStatement(s"DROP TABLE $tempTable").execute()
         }
@@ -101,7 +114,11 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
    * Perform the Redshift load, including deletion of existing data in the case of an overwrite,
    * and creating the table if it doesn't already exist.
    */
-  private def doRedshiftLoad(conn: Connection, data: DataFrame, params: MergedParameters): Unit = {
+  private def doRedshiftLoad(
+      conn: Connection,
+      data: DataFrame,
+      params: MergedParameters,
+      tempDir: String): Unit = {
 
     // Overwrites must drop the table, in case there has been a schema update
     if (params.overwrite) {
@@ -116,9 +133,51 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
     createTable.execute()
 
     // Load the temporary data into the new file
-    val copyStatement = copySql(data.sqlContext, params)
+    val copyStatement = copySql(data.sqlContext, params, tempDir)
     val copyData = conn.prepareStatement(copyStatement)
-    copyData.execute()
+    try {
+      copyData.execute()
+    } catch {
+      case e: SQLException =>
+        // Try to query Redshift's STL_LOAD_ERRORS table to figure out why the load failed.
+        // See http://docs.aws.amazon.com/redshift/latest/dg/r_STL_LOAD_ERRORS.html for details.
+        val errorLookupQuery =
+          """
+            | SELECT *
+            | FROM stl_load_errors
+            | WHERE query = pg_last_query_id()
+          """.stripMargin
+        val detailedException: Option[SQLException] = try {
+          val results = conn.prepareStatement(errorLookupQuery).executeQuery()
+          if (results.next()) {
+            val errCode = results.getInt("err_code")
+            val errReason = results.getString("err_reason").trim
+            val columnLength: String =
+              Option(results.getString("col_length"))
+                .map(_.trim)
+                .filter(_.nonEmpty)
+                .map(n => s"($n)")
+                .getOrElse("")
+            val exceptionMessage =
+              s"""
+                 |Error (code $errCode) while loading data into Redshift: "$errReason"
+                 |Table name: ${params.table.get}
+                 |Column name: ${results.getString("colname").trim}
+                 |Column type: ${results.getString("type").trim}$columnLength
+                 |Raw line: ${results.getString("raw_line")}
+                 |Raw field value: ${results.getString("raw_field_value")}
+                """.stripMargin
+            Some(new SQLException(exceptionMessage, e))
+          } else {
+            None
+          }
+        } catch {
+          case NonFatal(e2) =>
+            log.error("Error occurred while querying STL_LOAD_ERRORS", e2)
+            None
+        }
+      throw detailedException.getOrElse(e)
+    }
 
     // Execute postActions
     params.postActions.foreach { action =>
@@ -131,7 +190,14 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
   /**
    * Serialize temporary data to S3, ready for Redshift COPY
    */
-  private def unloadData(sqlContext: SQLContext, data: DataFrame, tempPath: String): Unit = {
+  private def unloadData(
+      sqlContext: SQLContext,
+      data: DataFrame,
+      params: MergedParameters,
+      tempDir: String): Unit = {
+    val creds: AWSCredentials = params.temporaryAWSCredentials.getOrElse(
+      AWSCredentialsUtils.load(params.rootTempDir, sqlContext.sparkContext.hadoopConfiguration))
+    Utils.checkThatBucketHasObjectLifecycleConfiguration(params.rootTempDir, s3ClientFactory(creds))
     // spark-avro does not support Date types. In addition, it converts Timestamps into longs
     // (milliseconds since the Unix epoch). Redshift is capable of loading timestamps in
     // 'epochmillisecs' format but there's no equivalent format for dates. To work around this, we
@@ -188,7 +254,7 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
     sqlContext.createDataFrame(convertedRows, convertedSchema)
       .write
       .format("com.databricks.spark.avro")
-      .save(tempPath)
+      .save(tempDir)
   }
 
   /**
@@ -200,7 +266,12 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
         "For save operations you must specify a Redshift table name with the 'dbtable' parameter")
     }
 
-    val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, new Properties()).apply()
+    Utils.assertThatFileSystemIsNotS3BlockFileSystem(
+      new URI(params.rootTempDir), sqlContext.sparkContext.hadoopConfiguration)
+
+    val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
+
+    val tempDir = params.createPerQueryTempDir()
 
     if (params.avrocompression != null && params.avrocompression.nonEmpty) {
       val conf = sqlContext.sparkContext.hadoopConfiguration
@@ -208,16 +279,17 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
       conf.set("mapred.output.compression.type", "BLOCK")
       conf.set("avro.output.codec", params.avrocompression)
     }
+
     try {
       if (params.overwrite && params.useStagingTable) {
         withStagingTable(conn, params.table.get, stagingTable => {
           val updatedParams = MergedParameters(params.parameters.updated("dbtable", stagingTable))
-          unloadData(sqlContext, data, updatedParams.tempPath)
-          doRedshiftLoad(conn, data, updatedParams)
+          unloadData(sqlContext, data, updatedParams, tempDir)
+          doRedshiftLoad(conn, data, updatedParams, tempDir)
         })
       } else {
-        unloadData(sqlContext, data, params.tempPath)
-        doRedshiftLoad(conn, data, params)
+        unloadData(sqlContext, data, params, tempDir)
+        doRedshiftLoad(conn, data, params, tempDir)
       }
     } finally {
       conn.close()
@@ -225,4 +297,6 @@ class RedshiftWriter(jdbcWrapper: JDBCWrapper) extends Logging {
   }
 }
 
-object DefaultRedshiftWriter extends RedshiftWriter(DefaultJDBCWrapper)
+object DefaultRedshiftWriter extends RedshiftWriter(
+  DefaultJDBCWrapper,
+  awsCredentials => new AmazonS3Client(awsCredentials))

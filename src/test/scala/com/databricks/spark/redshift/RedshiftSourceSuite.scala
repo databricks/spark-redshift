@@ -17,13 +17,19 @@
 package com.databricks.spark.redshift
 
 import java.io.File
+import java.net.URI
 import java.sql.{Connection, PreparedStatement, SQLException}
 
 import scala.util.matching.Regex
 
-import com.google.common.io.Files
+import com.amazonaws.services.s3.AmazonS3Client
+import com.amazonaws.services.s3.model.BucketLifecycleConfiguration
+import com.amazonaws.services.s3.model.BucketLifecycleConfiguration.Rule
+import org.mockito.Mockito
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.mapreduce.InputFormat
+import org.apache.hadoop.fs.{Path, FileSystem}
+import org.apache.hadoop.fs.s3native.S3NInMemoryFileSystem
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{BeforeAndAfterEach, BeforeAndAfterAll, Matchers}
 
@@ -32,6 +38,8 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql._
 import org.apache.spark.sql.types._
+
+import com.databricks.spark.redshift.Parameters.MergedParameters
 
 private class TestContext extends SparkContext("local", "RedshiftSourceSuite") {
 
@@ -68,28 +76,46 @@ class RedshiftSourceSuite
 
   private var testSqlContext: SQLContext = _
 
-  /** Temporary folder for unloading data; reset after each test. */
-  private var tempDir: File = _
-
   private var expectedDataDF: DataFrame = _
+
+  private var mockS3Client: AmazonS3Client = _
+
+  private var s3FileSystem: FileSystem = _
+
+  private val s3TempDir: String = "s3n://test-bucket/temp-dir/"
 
   // Parameters common to most tests. Some parameters are overridden in specific tests.
   private def defaultParams: Map[String, String] = Map(
     "url" -> "jdbc:redshift://foo/bar",
-    "tempdir" -> tempDir.toURI.toString,
-    "dbtable" -> "test_table",
-    "aws_access_key_id" -> "test1",
-    "aws_secret_access_key" -> "test2")
+    "tempdir" -> s3TempDir,
+    "dbtable" -> "test_table")
 
   override def beforeAll(): Unit = {
     super.beforeAll()
     sc = new TestContext
+    sc.hadoopConfiguration.set("fs.s3n.impl", classOf[S3NInMemoryFileSystem].getName)
+    // We need to use a DirectOutputCommitter to work around an issue which occurs with renames
+    // while using the mocked S3 filesystem.
+    sc.hadoopConfiguration.set("spark.sql.sources.outputCommitterClass",
+      classOf[DirectOutputCommitter].getName)
+    sc.hadoopConfiguration.set("fs.s3.awsAccessKeyId", "test1")
+    sc.hadoopConfiguration.set("fs.s3.awsSecretAccessKey", "test2")
+    sc.hadoopConfiguration.set("fs.s3n.awsAccessKeyId", "test1")
+    sc.hadoopConfiguration.set("fs.s3n.awsSecretAccessKey", "test2")
+    // Configure a mock S3 client so that we don't hit errors when trying to access AWS in tests.
+    // ScalaMock cannot mock classes which contain final methods, even if the classes themselves
+    // are not final, so we use Mockito instead:
+    mockS3Client = Mockito.mock(classOf[AmazonS3Client], Mockito.RETURNS_SMART_NULLS)
+    Mockito.when(mockS3Client.getBucketLifecycleConfiguration(org.mockito.Matchers.any()))
+      .thenReturn(new BucketLifecycleConfiguration().withRules(
+        new Rule().withPrefix("").withStatus(BucketLifecycleConfiguration.ENABLED)
+      ))
   }
 
   override def beforeEach(): Unit = {
     super.beforeEach()
+    s3FileSystem = FileSystem.get(new URI(s3TempDir), sc.hadoopConfiguration)
     testSqlContext = new SQLContext(sc)
-    tempDir = Files.createTempDir()
     expectedDataDF =
       testSqlContext.createDataFrame(sc.parallelize(TestUtils.expectedData), TestUtils.testSchema)
   }
@@ -98,8 +124,7 @@ class RedshiftSourceSuite
     super.afterEach()
     testSqlContext = null
     expectedDataDF = null
-    Option(tempDir.listFiles()).getOrElse(Array.empty).foreach(_.delete())
-    tempDir.delete()
+    FileSystem.closeAll()
   }
 
   override def afterAll(): Unit = {
@@ -115,7 +140,7 @@ class RedshiftSourceSuite
     val jdbcWrapper = mock[JDBCWrapper]
     val mockedConnection = mock[Connection]
 
-    (jdbcWrapper.getConnector _).expects(*, expectedUrl, *).returning(() => mockedConnection)
+    (jdbcWrapper.getConnector _).expects(*, expectedUrl).returning(mockedConnection)
 
     inSequence {
       expectedQueries foreach { r =>
@@ -147,7 +172,7 @@ class RedshiftSourceSuite
       .expects(*)
       .anyNumberOfTimes()
     (jdbcWrapper.resolveTable _)
-      .expects(jdbcUrl, "test_table", *)
+      .expects(jdbcUrl, "test_table")
       .returning(TestUtils.testSchema)
       .anyNumberOfTimes()
 
@@ -162,11 +187,11 @@ class RedshiftSourceSuite
       "FROM test_table '\\) " +
       "TO '.*' " +
       "WITH CREDENTIALS 'aws_access_key_id=test1;aws_secret_access_key=test2' " +
-      "ESCAPE ALLOWOVERWRITE").r
+      "ESCAPE").r
     val jdbcWrapper = prepareUnloadTest(defaultParams, Seq(expectedQuery))
 
     // Assert that we've loaded and converted all data in the test file
-    val source = new DefaultSource(jdbcWrapper)
+    val source = new DefaultSource(jdbcWrapper, _ => mockS3Client)
     val relation = source.createRelation(testSqlContext, defaultParams)
     val df = testSqlContext.baseRelationToDataFrame(relation)
     checkAnswer(df, TestUtils.expectedData)
@@ -195,11 +220,12 @@ class RedshiftSourceSuite
         .expects(*)
         .anyNumberOfTimes()
       (jdbcWrapper.resolveTable _)
-        .expects(params("url"), *, *)
+        .expects(params("url"), *)
         .returning(querySchema)
         .anyNumberOfTimes()
       // Note: Assertions covered by mocks
-      val relation = new DefaultSource(jdbcWrapper).createRelation(testSqlContext, params)
+      val relation =
+        new DefaultSource(jdbcWrapper, _ => mockS3Client).createRelation(testSqlContext, params)
       testSqlContext.baseRelationToDataFrame(relation).collect()
     }
 
@@ -211,11 +237,12 @@ class RedshiftSourceSuite
         .expects(*)
         .anyNumberOfTimes()
       (jdbcWrapper.resolveTable _)
-        .expects(params("url"), *, *)
+        .expects(params("url"), *)
         .returning(querySchema)
         .anyNumberOfTimes()
       // Note: Assertions covered by mocks
-      val relation = new DefaultSource(jdbcWrapper).createRelation(testSqlContext, params)
+      val relation =
+        new DefaultSource(jdbcWrapper, _ => mockS3Client).createRelation(testSqlContext, params)
       testSqlContext.baseRelationToDataFrame(relation).collect()
     }
   }
@@ -225,10 +252,10 @@ class RedshiftSourceSuite
       "UNLOAD \\('SELECT \"testbyte\", \"testbool\" FROM test_table '\\) " +
       "TO '.*' " +
       "WITH CREDENTIALS 'aws_access_key_id=test1;aws_secret_access_key=test2' " +
-      "ESCAPE ALLOWOVERWRITE").r
+      "ESCAPE").r
     val jdbcWrapper = prepareUnloadTest(defaultParams, Seq(expectedQuery))
     // Construct the source with a custom schema
-    val source = new DefaultSource(jdbcWrapper)
+    val source = new DefaultSource(jdbcWrapper, _ => mockS3Client)
     val relation = source.createRelation(testSqlContext, defaultParams, TestUtils.testSchema)
 
     val rdd = relation.asInstanceOf[PrunedFilteredScan]
@@ -255,12 +282,12 @@ class RedshiftSourceSuite
         "AND \"testint\" <= 43'\\) " +
       "TO '.*' " +
       "WITH CREDENTIALS 'aws_access_key_id=test1;aws_secret_access_key=test2' " +
-      "ESCAPE ALLOWOVERWRITE").r
+      "ESCAPE").r
     // scalastyle:on
     val jdbcWrapper = prepareUnloadTest(defaultParams, Seq(expectedQuery))
 
     // Construct the source with a custom schema
-    val source = new DefaultSource(jdbcWrapper)
+    val source = new DefaultSource(jdbcWrapper, _ => mockS3Client)
     val relation = source.createRelation(testSqlContext, defaultParams, TestUtils.testSchema)
 
     // Define a simple filter to only include a subset of rows
@@ -308,15 +335,15 @@ class RedshiftSourceSuite
       .returning("schema")
       .anyNumberOfTimes()
 
-    val relation =
-      RedshiftRelation(jdbcWrapper, Parameters.mergeParameters(params), None)(testSqlContext)
+    val relation = RedshiftRelation(
+      jdbcWrapper, _ => mockS3Client, Parameters.mergeParameters(params), None)(testSqlContext)
     relation.asInstanceOf[InsertableRelation].insert(expectedDataDF, true)
 
     // Make sure we wrote the data out ready for Redshift load, in the expected formats.
     // The data should have been written to a random subdirectory of `tempdir`. Since we clear
     // `tempdir` between every unit test, there should only be one directory here.
-    assert(tempDir.list().length === 1)
-    val dirWithAvroFiles = tempDir.listFiles().head.toURI.toString
+    assert(s3FileSystem.listStatus(new Path(s3TempDir)).length === 1)
+    val dirWithAvroFiles = s3FileSystem.listStatus(new Path(s3TempDir)).head.getPath.toUri.toString
     val written = testSqlContext.read.format("com.databricks.spark.avro").load(dirWithAvroFiles)
     checkAnswer(written, TestUtils.expectedDataWithConvertedTimesAndDates)
   }
@@ -368,13 +395,13 @@ class RedshiftSourceSuite
     val jdbcWrapper = mock[JDBCWrapper]
     val mockedConnection = mock[Connection]
     (jdbcWrapper.getConnector _)
-      .expects(*, defaultParams("url"), *)
-      .returning(() => mockedConnection)
+      .expects(*, defaultParams("url"))
+      .returning(mockedConnection)
     (mockedConnection.close _).expects()
 
     val schema = StructType(Seq(StructField("a", IntegerType), StructField("A", IntegerType)))
     val df = testSqlContext.createDataFrame(sc.emptyRDD[Row], schema)
-    val writer = new RedshiftWriter(jdbcWrapper)
+    val writer = new RedshiftWriter(jdbcWrapper, _ => mockS3Client)
 
     intercept[IllegalArgumentException] {
       writer.saveToRedshift(testSqlContext, df, Parameters.mergeParameters(defaultParams))
@@ -388,8 +415,8 @@ class RedshiftSourceSuite
     val mockedConnection = mock[Connection]
 
     (jdbcWrapper.getConnector _)
-      .expects(*, params("url"), *)
-      .returning(() => mockedConnection)
+      .expects(*, params("url"))
+      .returning(mockedConnection)
 
     def successfulStatement(pattern: Regex): PreparedStatement = {
       val mockedStatement = mock[PreparedStatement]
@@ -447,7 +474,7 @@ class RedshiftSourceSuite
       (mockedConnection.close _).expects()
     }
 
-    val source = new DefaultSource(jdbcWrapper)
+    val source = new DefaultSource(jdbcWrapper, _ => mockS3Client)
     intercept[Exception] {
       source.createRelation(testSqlContext, SaveMode.Overwrite, params, expectedDataDF)
     }
@@ -470,7 +497,7 @@ class RedshiftSourceSuite
       .returning("schema")
       .anyNumberOfTimes()
 
-    val source = new DefaultSource(jdbcWrapper)
+    val source = new DefaultSource(jdbcWrapper, _ => mockS3Client)
     val savedDf =
       source.createRelation(testSqlContext, SaveMode.Append, defaultParams, expectedDataDF)
 
@@ -478,10 +505,27 @@ class RedshiftSourceSuite
     // the only content in the returned data frame.
     // The data should have been written to a random subdirectory of `tempdir`. Since we clear
     // `tempdir` between every unit test, there should only be one directory here.
-    assert(tempDir.list().length === 1)
-    val dirWithAvroFiles = tempDir.listFiles().head.toURI.toString
+    assert(s3FileSystem.listStatus(new Path(s3TempDir)).length === 1)
+    val dirWithAvroFiles = s3FileSystem.listStatus(new Path(s3TempDir)).head.getPath.toUri.toString
     val written = testSqlContext.read.format("com.databricks.spark.avro").load(dirWithAvroFiles)
     checkAnswer(written, TestUtils.expectedDataWithConvertedTimesAndDates)
+  }
+
+  test("configuring maxlength on string columns") {
+    val longStrMetadata = new MetadataBuilder().putLong("maxlength", 512).build()
+    val shortStrMetadata = new MetadataBuilder().putLong("maxlength", 10).build()
+    val schema = StructType(
+      StructField("long_str", StringType, metadata = longStrMetadata) ::
+      StructField("short_str", StringType, metadata = shortStrMetadata) ::
+      StructField("default_str", StringType) ::
+      Nil)
+    val df = testSqlContext.createDataFrame(sc.emptyRDD[Row], schema)
+    val createTableCommand =
+      DefaultRedshiftWriter.createTableSql(df, MergedParameters.apply(defaultParams)).trim
+    val expectedCreateTableCommand =
+      "CREATE TABLE IF NOT EXISTS test_table (long_str VARCHAR(512), short_str VARCHAR(10), " +
+        "default_str TEXT)"
+    assert(createTableCommand === expectedCreateTableCommand)
   }
 
   test("Respect SaveMode.ErrorIfExists when table exists") {
@@ -491,7 +535,7 @@ class RedshiftSourceSuite
       .expects(*, "test_table")
       .returning(true)
 
-    val errIfExistsSource = new DefaultSource(errIfExistsWrapper)
+    val errIfExistsSource = new DefaultSource(errIfExistsWrapper, _ => mockS3Client)
     intercept[Exception] {
       errIfExistsSource.createRelation(
         testSqlContext, SaveMode.ErrorIfExists, defaultParams, expectedDataDF)
@@ -506,17 +550,15 @@ class RedshiftSourceSuite
       .returning(true)
 
     // Note: Assertions covered by mocks
-    val ignoreSource = new DefaultSource(ignoreWrapper)
+    val ignoreSource = new DefaultSource(ignoreWrapper, _ => mockS3Client)
     ignoreSource.createRelation(testSqlContext, SaveMode.Ignore, defaultParams, expectedDataDF)
   }
 
   test("Cannot save when 'query' parameter is specified instead of 'dbtable'") {
     val invalidParams = Map(
       "url" -> "jdbc:redshift://foo/bar",
-      "tempdir" -> tempDir.toURI.toString,
-      "query" -> "select * from test_table",
-      "aws_access_key_id" -> "test1",
-      "aws_secret_access_key" -> "test2")
+      "tempdir" -> s3TempDir,
+      "query" -> "select * from test_table")
 
     val e1 = intercept[IllegalArgumentException] {
       expectedDataDF.saveAsRedshiftTable(invalidParams)
@@ -540,5 +582,21 @@ class RedshiftSourceSuite
 
   test("DefaultSource has default constructor, required by Data Source API") {
     new DefaultSource()
+  }
+
+  test("Saves throw error message if S3 Block FileSystem would be used") {
+    val params = defaultParams + ("tempdir" -> defaultParams("tempdir").replace("s3n", "s3"))
+    val e = intercept[IllegalArgumentException] {
+      expectedDataDF.saveAsRedshiftTable(params)
+    }
+    assert(e.getMessage.contains("Block FileSystem"))
+  }
+
+  test("Loads throw error message if S3 Block FileSystem would be used") {
+    val params = defaultParams + ("tempdir" -> defaultParams("tempdir").replace("s3n", "s3"))
+    val e = intercept[IllegalArgumentException] {
+      testSqlContext.read.format("com.databricks.spark.redshift").options(params).load()
+    }
+    assert(e.getMessage.contains("Block FileSystem"))
   }
 }

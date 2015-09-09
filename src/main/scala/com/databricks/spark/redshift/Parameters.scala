@@ -16,18 +16,13 @@
 
 package com.databricks.spark.redshift
 
-import java.net.URI
-
-import com.amazonaws.auth.DefaultAWSCredentialsProviderChain
-import org.apache.hadoop.conf.Configuration
-
-import org.apache.spark.Logging
+import com.amazonaws.auth.{AWSCredentials, BasicSessionCredentials}
 
 /**
  * All user-specifiable parameters for spark-redshift, along with their validation rules and
  * defaults.
  */
-private[redshift] object Parameters extends Logging {
+private[redshift] object Parameters {
 
   val DEFAULT_PARAMETERS: Map[String, String] = Map(
     // Notes:
@@ -76,12 +71,12 @@ private[redshift] object Parameters extends Logging {
      * somewhere that can be written to and read from by Redshift. Make sure that AWS credentials
      * are available for S3.
      */
-    private def tempDir: String = parameters("tempdir")
+    def rootTempDir: String = parameters("tempdir")
 
     /**
-     * Each instance will create its own subdirectory in the tempDir, with a random UUID.
+     * Creates a per-query subdirectory in the [[rootTempDir]], with a random UUID.
      */
-    val tempPath: String = Utils.makeTempPath(tempDir)
+    def createPerQueryTempDir(): String = Utils.makeTempPath(rootTempDir)
 
     /**
      * The Redshift table to be used as the target when loading or writing data.
@@ -124,6 +119,7 @@ private[redshift] object Parameters extends Logging {
      *
      * Defaults to false.
      */
+    @deprecated("Use SaveMode instead", "0.5.0")
     def overwrite: Boolean = parameters("overwrite").toBoolean
 
     /**
@@ -181,46 +177,16 @@ private[redshift] object Parameters extends Logging {
     def postActions: Array[String] = parameters("postactions").split(";")
 
     /**
-     * Looks up "aws_access_key_id" and "aws_secret_access_key" in the parameter map and generates a
-     * credentials string for Redshift. If no credentials have been provided, this function will
-     * instead try using the Hadoop Configuration `fs.* settings` for the provided tempDir scheme,
-     * and if that also fails, it finally tries AWS DefaultCredentialsProviderChain, which makes
-     * use of standard system properties, environment variables, or IAM role configuration if
-     * available.
+     * Temporary AWS credentials which are passed to Redshift. These only need to be supplied by
+     * the user when Hadoop is configured to authenticate to S3 via IAM roles assigned to EC2
+     * instances.
      */
-    def credentialsString(configuration: Configuration): String = {
-      val scheme = new URI(tempDir).getScheme
-      val hadoopConfPrefix = s"fs.$scheme"
-
-      val (accessKeyId, secretAccessKey) = {
-        if (parameters.contains("aws_access_key_id")) {
-          log.info("Using credentials provided in parameter map.")
-          (parameters("aws_access_key_id"), parameters("aws_secret_access_key"))
-        } else if (configuration.get(s"$hadoopConfPrefix.awsAccessKeyId") != null) {
-          log.info(s"Using hadoopConfiguration credentials for scheme $scheme}")
-          (configuration.get(s"$hadoopConfPrefix.awsAccessKeyId"),
-            configuration.get(s"$hadoopConfPrefix.awsSecretAccessKey"))
-        } else {
-          try {
-            log.info(
-              "Using default provider chain for AWS credentials, as none provided explicitly.")
-            val awsCredentials = (new DefaultAWSCredentialsProviderChain).getCredentials
-            (awsCredentials.getAWSAccessKeyId, awsCredentials.getAWSSecretKey)
-          } catch {
-            case e: Exception =>
-              throw new Exception("No credentials provided and unable to detect automatically.", e)
-          }
-        }
-      }
-
-      val credentials = s"aws_access_key_id=$accessKeyId;aws_secret_access_key=$secretAccessKey"
-
-      if (parameters.contains("aws_security_token")) {
-        val securityToken = parameters("aws_security_token")
-        credentials + s";token=$securityToken"
-      } else {
-        credentials
-      }
+    def temporaryAWSCredentials: Option[AWSCredentials] = {
+      for (
+        accessKey <- parameters.get("temporary_aws_access_key_id");
+        secretAccessKey <- parameters.get("temporary_aws_secret_access_key");
+        sessionToken <- parameters.get("temporary_aws_session_token")
+      ) yield new BasicSessionCredentials(accessKey, secretAccessKey, sessionToken)
     }
 
     /**

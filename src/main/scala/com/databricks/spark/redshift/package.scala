@@ -17,10 +17,10 @@
 
 package com.databricks.spark
 
-import com.databricks.spark.redshift.DefaultJDBCWrapper
-import org.apache.spark.sql.functions._
+import com.amazonaws.services.s3.AmazonS3Client
+import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
-import org.apache.spark.sql.{DataFrame, Row, SQLContext}
+import org.apache.spark.sql.{DataFrame, DataFrameReader, DataFrameWriter, Row, SQLContext}
 
 package object redshift {
 
@@ -47,6 +47,7 @@ package object redshift {
     /**
      * Reads a table unload from Redshift with its schema in format "name0 type0 name1 type1 ...".
      */
+    @deprecated("Use data sources API or perform string -> data type casts yourself", "0.5.0")
     def redshiftFile(path: String, schema: String): DataFrame = {
       val structType = SchemaParser.parseSchema(schema)
       val casts = structType.fields.map { field =>
@@ -59,21 +60,25 @@ package object redshift {
      * Read a Redshift table into a DataFrame, using S3 for data transfer and JDBC
      * to control Redshift and resolve the schema
      */
+    @deprecated("Use sqlContext.read()", "0.5.0")
     def redshiftTable(parameters: Map[String, String]): DataFrame = {
       val params = Parameters.mergeParameters(parameters)
       sqlContext.baseRelationToDataFrame(
-        RedshiftRelation(DefaultJDBCWrapper, params, None)(sqlContext))
+        RedshiftRelation(
+          DefaultJDBCWrapper, creds => new AmazonS3Client(creds), params, None)(sqlContext))
     }
   }
 
   /**
    * Add write functionality to DataFrame
    */
+  @deprecated("Use DataFrame.write()", "0.5.0")
   implicit class RedshiftDataFrame(dataFrame: DataFrame) {
 
     /**
      * Load the DataFrame into a Redshift database table
      */
+    @deprecated("Use DataFrame.write()", "0.5.0")
     def saveAsRedshiftTable(parameters: Map[String, String]): Unit = {
       val params = Parameters.mergeParameters(parameters)
       DefaultRedshiftWriter.saveToRedshift(dataFrame.sqlContext, dataFrame, params)

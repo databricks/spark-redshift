@@ -23,14 +23,16 @@ import java.util.Properties
 import scala.util.Try
 
 import org.apache.spark.SPARK_VERSION
-import org.apache.spark.Logging
 import org.apache.spark.sql.types._
+import org.slf4j.LoggerFactory
 
 /**
  * Shim which exposes some JDBC helper functions. Most of this code is copied from Spark SQL, with
  * minor modifications for Redshift-specific features and limitations.
  */
-private[redshift] class JDBCWrapper extends Logging {
+private[redshift] class JDBCWrapper {
+
+  private val log = LoggerFactory.getLogger(getClass)
 
   def registerDriver(driverClass: String): Unit = {
     // DriverRegistry.register() is one of the few pieces of private Spark functionality which
@@ -70,8 +72,8 @@ private[redshift] class JDBCWrapper extends Logging {
    * @throws SQLException if the table specification is garbage.
    * @throws SQLException if the table contains an unsupported type.
    */
-  def resolveTable(url: String, table: String, properties: Properties): StructType = {
-    val conn: Connection = DriverManager.getConnection(url, properties)
+  def resolveTable(url: String, table: String): StructType = {
+    val conn: Connection = DriverManager.getConnection(url, new Properties())
     try {
       val rs = conn.prepareStatement(s"SELECT * FROM $table WHERE 1=0").executeQuery()
       try {
@@ -104,26 +106,19 @@ private[redshift] class JDBCWrapper extends Logging {
   }
 
   /**
-   * Given a driver string and an url, return a function that loads the
-   * specified driver string then returns a connection to the JDBC url.
-   * getConnector is run on the driver code, while the function it returns
-   * is run on the executor.
+   * Given a driver string and a JDBC url, load the specified driver and return a DB connection.
    *
-   * @param driver - The class name of the JDBC driver for the given url.
-   * @param url - The JDBC url to connect to.
-   *
-   * @return A function that loads the driver and connects to the url.
+   * @param driver the class name of the JDBC driver for the given url.
+   * @param url the JDBC url to connect to.
    */
-  def getConnector(driver: String, url: String, properties: Properties): () => Connection = {
-    () => {
-      try {
-        if (driver != null) registerDriver(driver)
-      } catch {
-        case e: ClassNotFoundException =>
-          logWarning(s"Couldn't find class $driver", e)
-      }
-      DriverManager.getConnection(url, properties)
+  def getConnector(driver: String, url: String): Connection = {
+    try {
+      if (driver != null) registerDriver(driver)
+    } catch {
+      case e: ClassNotFoundException =>
+        log.warn(s"Couldn't find class $driver", e)
     }
+    DriverManager.getConnection(url, new Properties())
   }
 
   /**
@@ -141,7 +136,12 @@ private[redshift] class JDBCWrapper extends Logging {
         case ShortType => "INTEGER"
         case ByteType => "SMALLINT" // Redshift does not support the BYTE type.
         case BooleanType => "BOOLEAN"
-        case StringType => "TEXT"
+        case StringType =>
+          if (field.metadata.contains("maxlength")) {
+            s"VARCHAR(${field.metadata.getLong("maxlength")})"
+          } else {
+            "TEXT"
+          }
         case BinaryType => "BLOB"
         case TimestampType => "TIMESTAMP"
         case DateType => "DATE"
@@ -149,7 +149,7 @@ private[redshift] class JDBCWrapper extends Logging {
         case _ => throw new IllegalArgumentException(s"Don't know how to save $field to JDBC")
       }
       val nullable = if (field.nullable) "" else "NOT NULL"
-      sb.append(s", $name $typ $nullable")
+      sb.append(s", $name $typ $nullable".trim)
     }}
     if (sb.length < 2) "" else sb.substring(2)
   }

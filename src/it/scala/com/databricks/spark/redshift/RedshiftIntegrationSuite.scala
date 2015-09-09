@@ -16,68 +16,15 @@
 
 package com.databricks.spark.redshift
 
-import java.net.URI
-import java.sql.Connection
-import java.util.Properties
+import java.sql.SQLException
 
-import scala.util.Random
-
-import org.scalatest.{BeforeAndAfterEach, BeforeAndAfterAll, Matchers}
-import org.apache.hadoop.fs.{FileSystem, Path}
-
-import org.apache.spark.SparkContext
 import org.apache.spark.sql.{AnalysisException, Row, SQLContext, SaveMode}
-import org.apache.spark.sql.hive.test.TestHiveContext
 import org.apache.spark.sql.types._
 
 /**
  * End-to-end tests which run against a real Redshift cluster.
  */
-class RedshiftIntegrationSuite
-  extends QueryTest
-  with Matchers
-  with BeforeAndAfterAll
-  with BeforeAndAfterEach {
-
-  private def loadConfigFromEnv(envVarName: String): String = {
-    Option(System.getenv(envVarName)).getOrElse {
-      fail(s"Must set $envVarName environment variable")
-    }
-  }
-
-  // The following configurations must be set in order to run these tests. In Travis, these
-  // environment variables are set using Travis's encrypted environment variables feature:
-  // http://docs.travis-ci.com/user/environment-variables/#Encrypted-Variables
-
-  // JDBC URL listed in the AWS console (should not contain username and password).
-  private val AWS_REDSHIFT_JDBC_URL: String = loadConfigFromEnv("AWS_REDSHIFT_JDBC_URL")
-  private val AWS_REDSHIFT_USER: String = loadConfigFromEnv("AWS_REDSHIFT_USER")
-  private val AWS_REDSHIFT_PASSWORD: String = loadConfigFromEnv("AWS_REDSHIFT_PASSWORD")
-  private val AWS_ACCESS_KEY_ID: String = loadConfigFromEnv("TEST_AWS_ACCESS_KEY_ID")
-  private val AWS_SECRET_ACCESS_KEY: String = loadConfigFromEnv("TEST_AWS_SECRET_ACCESS_KEY")
-  // Path to a directory in S3 (e.g. 's3n://bucket-name/path/to/scratch/space').
-  private val AWS_S3_SCRATCH_SPACE: String = loadConfigFromEnv("AWS_S3_SCRATCH_SPACE")
-  require(AWS_S3_SCRATCH_SPACE.contains("s3n"), "must use s3n:// URL")
-
-  private val jdbcUrl: String = {
-    s"$AWS_REDSHIFT_JDBC_URL?user=$AWS_REDSHIFT_USER&password=$AWS_REDSHIFT_PASSWORD"
-  }
-
-  /**
-   * Random suffix appended appended to table and directory names in order to avoid collisions
-   * between separate Travis builds.
-   */
-  private val randomSuffix: String = Math.abs(Random.nextLong()).toString
-
-  private val tempDir: String = AWS_S3_SCRATCH_SPACE + randomSuffix + "/"
-
-  /**
-   * Spark Context with Hadoop file overridden to point at our local test data file for this suite,
-   * no-matter what temp directory was generated and requested.
-   */
-  private var sc: SparkContext = _
-  private var sqlContext: SQLContext = _
-  private var conn: Connection = _
+class RedshiftIntegrationSuite extends IntegrationSuiteBase {
 
   private val test_table: String = s"test_table_$randomSuffix"
   private val test_table2: String = s"test_table2_$randomSuffix"
@@ -85,14 +32,6 @@ class RedshiftIntegrationSuite
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    sc = new SparkContext("local", "RedshiftSourceSuite")
-    sc.hadoopConfiguration.set("fs.s3.awsAccessKeyId", AWS_ACCESS_KEY_ID)
-    sc.hadoopConfiguration.set("fs.s3.awsSecretAccessKey", AWS_SECRET_ACCESS_KEY)
-    sc.hadoopConfiguration.set("fs.s3n.awsAccessKeyId", AWS_ACCESS_KEY_ID)
-    sc.hadoopConfiguration.set("fs.s3n.awsSecretAccessKey", AWS_SECRET_ACCESS_KEY)
-
-    conn = DefaultJDBCWrapper.getConnector(
-      "com.amazon.redshift.jdbc4.Driver", jdbcUrl, new Properties())()
 
     conn.prepareStatement("drop table if exists test_table").executeUpdate()
     conn.prepareStatement("drop table if exists test_table2").executeUpdate()
@@ -138,28 +77,17 @@ class RedshiftIntegrationSuite
 
   override def afterAll(): Unit = {
     try {
-      val fs = FileSystem.get(URI.create(tempDir), sc.hadoopConfiguration)
-      fs.delete(new Path(tempDir), true)
-      fs.close()
+      conn.prepareStatement(s"drop table if exists $test_table").executeUpdate()
+      conn.prepareStatement(s"drop table if exists $test_table2").executeUpdate()
+      conn.prepareStatement(s"drop table if exists $test_table3").executeUpdate()
+      conn.commit()
     } finally {
-      try {
-        conn.prepareStatement(s"drop table if exists $test_table").executeUpdate()
-        conn.prepareStatement(s"drop table if exists $test_table2").executeUpdate()
-        conn.prepareStatement(s"drop table if exists $test_table3").executeUpdate()
-        conn.commit()
-        conn.close()
-      } finally {
-        try {
-          sc.stop()
-        } finally {
-          super.afterAll()
-        }
-      }
+      super.afterAll()
     }
   }
 
   override def beforeEach(): Unit = {
-    sqlContext = new TestHiveContext(sc)
+    super.beforeEach()
     sqlContext.sql(
       s"""
          | create temporary table test_table(
@@ -234,6 +162,28 @@ class RedshiftIntegrationSuite
     checkAnswer(
       sqlContext.sql("select * from test_table"),
       TestUtils.expectedData)
+  }
+
+  test("count() on DataFrame created from a Redshift table") {
+    checkAnswer(
+      sqlContext.sql("select count(*) from test_table"),
+      Seq(Row(TestUtils.expectedData.length))
+    )
+  }
+
+  test("count() on DataFrame created from a Redshift query") {
+    val loadedDf = sqlContext.read
+      .format("com.databricks.spark.redshift")
+      .option("url", jdbcUrl)
+      // scalastyle:off
+      .option("query", s"select * from $test_table where teststring = 'Unicode''s樂趣'")
+      // scalastyle:on
+      .option("tempdir", tempDir)
+      .load()
+    checkAnswer(
+      loadedDf.selectExpr("count(*)"),
+      Seq(Row(1))
+    )
   }
 
   test("Can load output when 'dbtable' is a subquery wrapped in parentheses") {
@@ -367,6 +317,75 @@ class RedshiftIntegrationSuite
       assert(loadedDf.schema.length === 1)
       assert(loadedDf.columns === Seq("a"))
       checkAnswer(loadedDf, Seq(Row(1)))
+    } finally {
+      conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
+      conn.commit()
+    }
+  }
+
+  test("multiple scans on same table") {
+    // .rdd() forces the first query to be unloaded from Redshift
+    val rdd1 = sqlContext.sql("select testint from test_table").rdd
+    // Similarly, this also forces an unload:
+    val rdd2 = sqlContext.sql("select testdouble from test_table").rdd
+    // If the unloads were performed into the same directory then this call would fail: the
+    // second unload from rdd2 would have overwritten the integers with doubles, so we'd get
+    // a NumberFormatException.
+    rdd1.count()
+  }
+
+  test("configuring maxlength on string columns") {
+    val tableName = s"configuring_maxlength_on_string_column_$randomSuffix"
+    try {
+      val metadata = new MetadataBuilder().putLong("maxlength", 512).build()
+      val schema = StructType(
+        StructField("x", StringType, metadata = metadata) :: Nil)
+      sqlContext.createDataFrame(sc.parallelize(Seq(Row("a" * 512))), schema).write
+        .format("com.databricks.spark.redshift")
+        .option("url", jdbcUrl)
+        .option("dbtable", tableName)
+        .option("tempdir", tempDir)
+        .mode(SaveMode.ErrorIfExists)
+        .save()
+      assert(DefaultJDBCWrapper.tableExists(conn, tableName))
+      val loadedDf = sqlContext.read
+        .format("com.databricks.spark.redshift")
+        .option("url", jdbcUrl)
+        .option("dbtable", tableName)
+        .option("tempdir", tempDir)
+        .load()
+      checkAnswer(loadedDf, Seq(Row("a" * 512)))
+      // This append should fail due to the string being longer than the maxlength
+      intercept[SQLException] {
+        sqlContext.createDataFrame(sc.parallelize(Seq(Row("a" * 513))), schema).write
+          .format("com.databricks.spark.redshift")
+          .option("url", jdbcUrl)
+          .option("dbtable", tableName)
+          .option("tempdir", tempDir)
+          .mode(SaveMode.Append)
+          .save()
+      }
+    } finally {
+      conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
+      conn.commit()
+    }
+  }
+
+  test("informative error message when saving a table with string that is longer than max length") {
+    val tableName = s"error_message_when_string_too_long_$randomSuffix"
+    try {
+      val df = sqlContext.createDataFrame(sc.parallelize(Seq(Row("a" * 512))),
+        StructType(StructField("A", StringType) :: Nil))
+      val e = intercept[SQLException] {
+        df.write
+          .format("com.databricks.spark.redshift")
+          .option("url", jdbcUrl)
+          .option("dbtable", tableName)
+          .option("tempdir", tempDir)
+          .mode(SaveMode.ErrorIfExists)
+          .save()
+      }
+      assert(e.getMessage.contains("while loading data into Redshift"))
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
       conn.commit()
