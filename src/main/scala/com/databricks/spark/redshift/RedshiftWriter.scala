@@ -16,6 +16,7 @@
 
 package com.databricks.spark.redshift
 
+import java.net.URI
 import java.sql.{Connection, Date, SQLException, Timestamp}
 
 import com.amazonaws.auth.AWSCredentials
@@ -264,6 +265,9 @@ private[redshift] class RedshiftWriter(
       throw new IllegalArgumentException(
         "For save operations you must specify a Redshift table name with the 'dbtable' parameter")
     }
+
+    Utils.assertThatFileSystemIsNotS3BlockFileSystem(
+      new URI(params.rootTempDir), sqlContext.sparkContext.hadoopConfiguration)
 
     val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
 

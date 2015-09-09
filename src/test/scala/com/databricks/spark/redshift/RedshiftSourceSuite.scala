@@ -98,6 +98,8 @@ class RedshiftSourceSuite
     // while using the mocked S3 filesystem.
     sc.hadoopConfiguration.set("spark.sql.sources.outputCommitterClass",
       classOf[DirectOutputCommitter].getName)
+    sc.hadoopConfiguration.set("fs.s3.awsAccessKeyId", "test1")
+    sc.hadoopConfiguration.set("fs.s3.awsSecretAccessKey", "test2")
     sc.hadoopConfiguration.set("fs.s3n.awsAccessKeyId", "test1")
     sc.hadoopConfiguration.set("fs.s3n.awsSecretAccessKey", "test2")
     // Configure a mock S3 client so that we don't hit errors when trying to access AWS in tests.
@@ -537,5 +539,21 @@ class RedshiftSourceSuite
 
   test("DefaultSource has default constructor, required by Data Source API") {
     new DefaultSource()
+  }
+
+  test("Saves throw error message if S3 Block FileSystem would be used") {
+    val params = defaultParams + ("tempdir" -> defaultParams("tempdir").replace("s3n", "s3"))
+    val e = intercept[IllegalArgumentException] {
+      expectedDataDF.saveAsRedshiftTable(params)
+    }
+    assert(e.getMessage.contains("Block FileSystem"))
+  }
+
+  test("Loads throw error message if S3 Block FileSystem would be used") {
+    val params = defaultParams + ("tempdir" -> defaultParams("tempdir").replace("s3n", "s3"))
+    val e = intercept[IllegalArgumentException] {
+      testSqlContext.read.format("com.databricks.spark.redshift").options(params).load()
+    }
+    assert(e.getMessage.contains("Block FileSystem"))
   }
 }
