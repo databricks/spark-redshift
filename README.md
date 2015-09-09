@@ -7,6 +7,8 @@ A library to load data into Spark SQL DataFrames from Amazon Redshift, and write
 Redshift tables. Amazon S3 is used to efficiently transfer data in and out of Redshift, and
 JDBC is used to automatically trigger the appropriate `COPY` and `UNLOAD` commands on Redshift.
 
+This library is more suited to ETL than interactive queries, since large amounts of data could be extracted to S3 for each query execution. If you plan to perform many queries against the same Redshift tables then we recommend saving the extracted data in a format such as Parquet.
+
 - [Installation](#installation)
 - Usage:
   - Data sources API: [Scala](#scala), [Python](#python), [SQL](#sql)
@@ -49,21 +51,20 @@ import org.apache.spark.sql._
 val sc = // existing SparkContext
 val sqlContext = new SQLContext(sc)
 
-
 // Get some data from a Redshift table
 val df: DataFrame = sqlContext.read
     .format("com.databricks.spark.redshift")
     .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass")
-    .option("dbtable" -> "my_table")
-    .option("tempdir" -> "s3n://path/for/temp/data")
+    .option("dbtable", "my_table")
+    .option("tempdir", "s3n://path/for/temp/data")
     .load()
 
 // Can also load data from a Redshift query
 val df: DataFrame = sqlContext.read
     .format("com.databricks.spark.redshift")
     .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass")
-    .option("query" -> "select x, count(*) my_table group by x")
-    .option("tempdir" -> "s3n://path/for/temp/data")
+    .option("query", "select x, count(*) my_table group by x")
+    .option("tempdir", "s3n://path/for/temp/data")
     .load()
 
 // Apply some transformations to the data as per normal, then you can use the
@@ -72,8 +73,8 @@ val df: DataFrame = sqlContext.read
 df.write
   .format("com.databricks.spark.redshift")
     .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass")
-    .option("dbtable" -> "my_table_copy")
-    .option("tempdir" -> "s3n://path/for/temp/data")
+    .option("dbtable", "my_table_copy")
+    .option("tempdir", "s3n://path/for/temp/data")
   .mode("error")
   .save()
 ```
@@ -90,25 +91,25 @@ sql_context = SQLContext(sc)
 df = sql_context.read \
     .format("com.databricks.spark.redshift") \
     .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass") \
-    .option("dbtable" -> "my_table") \
-    .option("tempdir" -> "s3n://path/for/temp/data") \
+    .option("dbtable", "my_table") \
+    .option("tempdir", "s3n://path/for/temp/data") \
     .load()
 
 # Read data from a query
 df = sql_context.read \
     .format("com.databricks.spark.redshift") \
     .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass") \
-    .option("query" -> "select x, count(*) my_table group by x") \
-    .option("tempdir" -> "s3n://path/for/temp/data") \
+    .option("query", "select x, count(*) my_table group by x") \
+    .option("tempdir", "s3n://path/for/temp/data") \
     .load()
 
 # Write back to a table
 df.write \
-  .format("com.databricks.spark.redshift")
+  .format("com.databricks.spark.redshift") \
   .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass") \
-  .option("dbtable" -> "my_table_copy") \
-  .option("tempdir" -> "s3n://path/for/temp/data") \
-  .mode("error")
+  .option("dbtable", "my_table_copy") \
+  .option("tempdir", "s3n://path/for/temp/data") \
+  .mode("error") \
   .save()
 ```
 
@@ -145,9 +146,23 @@ val records = sc.newAPIHadoopFile(
 
 There are three ways of configuring AWS credentials for use by this library:
 
-1. Specify AWS keys via [Hadoop configuration properties](https://github.com/apache/hadoop/blob/trunk/hadoop-tools/hadoop-aws/src/site/markdown/tools/hadoop-aws/index.md). For example, if your `tempdir` configuration points to a `s3n://` filesystem then you can set the `fs.s3n.awsAccessKeyId` and `fs.s3n.awsSecretAccessKey` properties in a Hadoop XML configuration file or call `sc.hadoopConfig.set()` to mutate Spark's global Hadoop configuration.
-2. Encode the keys into the `tempdir` URI. For example, the URI `s3n://ACCESSKEY:SECRETKEY@bucket/path/to/temp/dir` encodes the key pair (`ACCESSKEY`, `SECRETKEY`). Due to Hadoop limitations, this approach will not work for secret keys which contain forward slash (`/`) characters.
-3. If you are running on EC2 and authenticate to S3 using IAM and [instance profiles](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html), then you must must configure the `temporary_aws_access_key_id`, `temporary_aws_access_key_id`, and `temporary_aws_session_token` configuration properties to point to temporary keys created via the AWS [Security Token Service](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp.html). These temporary keys will then be passed to Redshift via `LOAD` and `UNLOAD` commands.
+1. **Set keys in Hadoop conf (best option for most users):** You can specify AWS keys via [Hadoop configuration properties](https://github.com/apache/hadoop/blob/trunk/hadoop-tools/hadoop-aws/src/site/markdown/tools/hadoop-aws/index.md). For example, if your `tempdir` configuration points to a `s3n://` filesystem then you can set the `fs.s3n.awsAccessKeyId` and `fs.s3n.awsSecretAccessKey` properties in a Hadoop XML configuration file or call `sc.hadoopConfig.set()` to mutate Spark's global Hadoop configuration.
+
+ For example, if you are using the `s3n` filesystem then add
+
+ ```scala
+ sc.hadoopConfig.set("fs.s3n.awsAccessKeyId", "YOUR_KEY_ID")
+ sc.hadoopConfig.set("fs.s3n.awsSecretAccessKey", "YOUR_SECRET_ACCESS_KEY")
+ ```
+
+ and for the `s3a` filesystem add
+
+ ```scala
+ sc.hadoopConfig.set("fs.s3a.access.key", "YOUR_KEY_ID")
+ sc.hadoopConfig.set("fs.s3a.secret.key", "YOUR_SECRET_ACCESS_KEY")
+ ```
+2. **Encode keys in `tempdir` URI**: For example, the URI `s3n://ACCESSKEY:SECRETKEY@bucket/path/to/temp/dir` encodes the key pair (`ACCESSKEY`, `SECRETKEY`). Due to [Hadoop limitations](https://issues.apache.org/jira/browse/HADOOP-3733), this approach will not work for secret keys which contain forward slash (`/`) characters.
+3. **IAM instance profiles:** If you are running on EC2 and authenticate to S3 using IAM and [instance profiles](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html), then you must must configure the `temporary_aws_access_key_id`, `temporary_aws_access_key_id`, and `temporary_aws_session_token` configuration properties to point to temporary keys created via the AWS [Security Token Service](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp.html). These temporary keys will then be passed to Redshift via `LOAD` and `UNLOAD` commands.
 
 **:warning: Note**: `spark-redshift` does not clean up the temporary files that it creates in S3. As a result, we recommend that you use a dedicated temporary S3 bucket with an [object lifecycle configuration](http://docs.aws.amazon.com/AmazonS3/latest/dev/object-lifecycle-mgmt.html) to ensure that temporary files are automatically deleted after a specified expiration period.
 
