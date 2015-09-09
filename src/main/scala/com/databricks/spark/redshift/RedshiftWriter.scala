@@ -94,12 +94,12 @@ private[redshift] class RedshiftWriter(
       if (jdbcWrapper.tableExists(conn, table)) {
         conn.prepareStatement(
           s"""
-             | begin;
-             | ALTER TABLE $table RENAME TO $backupTable";
+             | BEGIN;
+             | ALTER TABLE $table RENAME TO $backupTable;
              | ALTER TABLE $tempTable RENAME TO $table;
              | DROP TABLE $backupTable;
-             | end;
-           """.stripMargin).execute()
+             | END;
+           """.stripMargin.trim).execute()
       } else {
         conn.prepareStatement(s"ALTER TABLE $tempTable RENAME TO $table").execute()
       }
