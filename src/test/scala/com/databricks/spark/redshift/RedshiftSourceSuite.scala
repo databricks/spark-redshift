@@ -377,16 +377,16 @@ class RedshiftSourceSuite
       .returning("schema")
       .anyNumberOfTimes()
 
-    val relation =
-      RedshiftRelation(jdbcWrapper, Parameters.mergeParameters(params), None)(testSqlContext)
+    val relation = RedshiftRelation(
+      jdbcWrapper, _ => mockS3Client, Parameters.mergeParameters(params), None)(testSqlContext)
     relation.asInstanceOf[InsertableRelation].insert(expectedDataDF, true)
 
     // Make sure we wrote the data out ready for Redshift load, in the expected formats
     // The data should have been written to a random subdirectory of `tempdir`. Since we clear
     // `tempdir` between every unit test, there should only be one directory here.
     // Note: this does not actually test that the written files are properly compressed.
-    assert(tempDir.list().length === 1)
-    val dirWithAvroFiles = tempDir.listFiles().head.toURI.toString
+    assert(s3FileSystem.listStatus(new Path(s3TempDir)).length === 1)
+    val dirWithAvroFiles = s3FileSystem.listStatus(new Path(s3TempDir)).head.getPath.toUri.toString
     val written = testSqlContext.read.format("com.databricks.spark.avro").load(dirWithAvroFiles)
     checkAnswer(written, TestUtils.expectedDataWithConvertedTimesAndDates)
   }
