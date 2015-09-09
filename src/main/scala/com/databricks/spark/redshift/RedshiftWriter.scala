@@ -85,28 +85,27 @@ private[redshift] class RedshiftWriter(
     val randomSuffix = Math.abs(Random.nextInt()).toString
     val tempTable = s"${table}_staging_$randomSuffix"
     val backupTable = s"${table}_backup_$randomSuffix"
+    log.info("Loading new Redshift data to: " + tempTable)
+    log.info("Existing data will be backed up in: " + backupTable)
 
     try {
-      log.info("Loading new Redshift data to: " + tempTable)
-      log.info("Existing data will be backed up in: " + backupTable)
-
       action(tempTable)
-      if (jdbcWrapper.tableExists(conn, table)) {
-        conn.prepareStatement(s"ALTER TABLE $table RENAME TO $backupTable").execute()
-      }
-      conn.prepareStatement(s"ALTER TABLE $tempTable RENAME TO $table").execute()
-    } catch {
-      case NonFatal(e) =>
-        if (jdbcWrapper.tableExists(conn, tempTable)) {
-          conn.prepareStatement(s"DROP TABLE $tempTable").execute()
-        }
-        if (jdbcWrapper.tableExists(conn, backupTable)) {
-          conn.prepareStatement(s"ALTER TABLE $backupTable RENAME TO $table").execute()
-        }
-        throw new Exception("Error loading data to Redshift, changes reverted.", e)
-    }
 
-    conn.prepareStatement(s"DROP TABLE IF EXISTS $backupTable").execute()
+      if (jdbcWrapper.tableExists(conn, table)) {
+        conn.prepareStatement(
+          s"""
+             | begin;
+             | ALTER TABLE $table RENAME TO $backupTable";
+             | ALTER TABLE $tempTable RENAME TO $table;
+             | DROP TABLE $backupTable;
+             | end;
+           """.stripMargin).execute()
+      } else {
+        conn.prepareStatement(s"ALTER TABLE $tempTable RENAME TO $table").execute()
+      }
+    } finally {
+      conn.prepareStatement(s"DROP TABLE IF EXISTS $tempTable").execute()
+    }
   }
 
   /**
