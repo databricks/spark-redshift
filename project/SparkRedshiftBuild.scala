@@ -40,7 +40,7 @@ object SparkRedshiftBuild extends Build {
     .settings(
       name := "spark-redshift",
       organization := "com.databricks",
-      scalaVersion := "2.10.4",
+      scalaVersion := "2.10.5",
       crossScalaVersions := Seq("2.10.5", "2.11.7"),
       sparkVersion := "1.4.1",
       testSparkVersion := sys.props.get("spark.testVersion").getOrElse(sparkVersion.value),
@@ -70,7 +70,7 @@ object SparkRedshiftBuild extends Build {
         "com.amazonaws" % "aws-java-sdk-sts" % "1.9.40" % "test",
         // We require spark-avro, but avro-mapred must be provided to match Hadoop version.
         // In most cases, avro-mapred will be provided as part of the Spark assembly JAR.
-        "com.databricks" %% "spark-avro" % "2.0.0",
+        "com.databricks" %% "spark-avro" % "2.0.1",
         if (testHadoopVersion.value.startsWith("1")) {
           "org.apache.avro" % "avro-mapred" % "1.7.7" % "provided" classifier "hadoop1" exclude("org.mortbay.jetty", "servlet-api")
         } else {
@@ -135,13 +135,6 @@ object SparkRedshiftBuild extends Build {
 
       pomExtra :=
         <url>https://github.com/databricks/spark-redshift</url>
-        <licenses>
-          <license>
-            <name>Apache License, Verision 2.0</name>
-            <url>http://www.apache.org/licenses/LICENSE-2.0.html</url>
-            <distribution>repo</distribution>
-          </license>
-        </licenses>
         <scm>
           <url>git@github.com:databricks/spark-redshift.git</url>
           <connection>scm:git:git@github.com:databricks/spark-redshift.git</connection>
@@ -153,9 +146,9 @@ object SparkRedshiftBuild extends Build {
             <url>https://github.com/mengxr</url>
           </developer>
           <developer>
-            <id>joshrosen</id>
+            <id>JoshRosen</id>
             <name>Josh Rosen</name>
-            <url>https://github.com/joshrosen</url>
+            <url>https://github.com/JoshRosen</url>
           </developer>
           <developer>
             <id>marmbrus</id>
@@ -175,7 +168,6 @@ object SparkRedshiftBuild extends Build {
         commitReleaseVersion,
         tagRelease,
         publishArtifacts,
-        releaseStepTask(spPublish),
         setNextVersion,
         commitNextVersion,
         pushChanges
