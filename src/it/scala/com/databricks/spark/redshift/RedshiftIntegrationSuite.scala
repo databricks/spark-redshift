@@ -419,6 +419,44 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
     }
   }
 
+  test("SaveMode.Overwrite with existing table") {
+    val tableName = s"overwrite_existing_table$randomSuffix"
+    try {
+      // Create a table to overwrite
+      sqlContext.createDataFrame(sc.parallelize(Seq(Row(1))),
+        StructType(StructField("a", IntegerType) :: Nil))
+        .write
+        .format("com.databricks.spark.redshift")
+        .option("url", jdbcUrl)
+        .option("dbtable", tableName)
+        .option("tempdir", tempDir)
+        .mode(SaveMode.ErrorIfExists)
+        .save()
+      assert(DefaultJDBCWrapper.tableExists(conn, tableName))
+
+      sqlContext.createDataFrame(sc.parallelize(TestUtils.expectedData), TestUtils.testSchema)
+        .write
+        .format("com.databricks.spark.redshift")
+        .option("url", jdbcUrl)
+        .option("dbtable", tableName)
+        .option("tempdir", tempDir)
+        .mode(SaveMode.Overwrite)
+        .save()
+
+      assert(DefaultJDBCWrapper.tableExists(conn, tableName))
+      val loadedDf = sqlContext.read
+        .format("com.databricks.spark.redshift")
+        .option("url", jdbcUrl)
+        .option("dbtable", tableName)
+        .option("tempdir", tempDir)
+        .load()
+      checkAnswer(loadedDf, TestUtils.expectedData)
+    } finally {
+      conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
+      conn.commit()
+    }
+  }
+
   // TODO:test overwrite that fails.
 
   test("Append SaveMode doesn't destroy existing data") {
