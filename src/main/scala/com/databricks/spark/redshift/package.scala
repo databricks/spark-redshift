@@ -20,7 +20,7 @@ package com.databricks.spark
 import com.amazonaws.services.s3.AmazonS3Client
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
-import org.apache.spark.sql.{DataFrame, DataFrameReader, DataFrameWriter, Row, SQLContext}
+import org.apache.spark.sql.{DataFrame, DataFrameReader, DataFrameWriter, Row, SaveMode, SQLContext}
 
 package object redshift {
 
@@ -76,12 +76,19 @@ package object redshift {
   implicit class RedshiftDataFrame(dataFrame: DataFrame) {
 
     /**
-     * Load the DataFrame into a Redshift database table
+     * Load the DataFrame into a Redshift database table. By default, this will append to the
+     * specified table. If the `overwrite` parameter is set to `true` then this will drop the
+     * existing table and re-create it with the contents of this DataFrame.
      */
     @deprecated("Use DataFrame.write()", "0.5.0")
     def saveAsRedshiftTable(parameters: Map[String, String]): Unit = {
       val params = Parameters.mergeParameters(parameters)
-      DefaultRedshiftWriter.saveToRedshift(dataFrame.sqlContext, dataFrame, params)
+      val saveMode = if (params.overwrite) {
+        SaveMode.Overwrite
+      } else {
+        SaveMode.Append
+      }
+      DefaultRedshiftWriter.saveToRedshift(dataFrame.sqlContext, dataFrame, saveMode, params)
     }
   }
 }

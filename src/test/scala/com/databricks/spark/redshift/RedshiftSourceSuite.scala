@@ -319,9 +319,14 @@ class RedshiftSourceSuite
       "CREATE TABLE IF NOT EXISTS test_table_staging.* DISTSTYLE KEY DISTKEY \\(testint\\).*".r,
       "COPY test_table_staging_.*".r,
       "GRANT SELECT ON test_table_staging.+ TO jeremy".r,
-      "ALTER TABLE test_table RENAME TO test_table_backup_.*".r,
-      "ALTER TABLE test_table_staging_.* RENAME TO test_table".r,
-      "DROP TABLE IF EXISTS test_table_backup.*".r)
+      """
+        | BEGIN;
+        | ALTER TABLE test_table RENAME TO test_table_backup_.*;
+        | ALTER TABLE test_table_staging_.* RENAME TO test_table;
+        | DROP TABLE test_table_backup_.*;
+        | END;
+      """.stripMargin.trim.r,
+      "DROP TABLE IF EXISTS test_table_staging_.*".r)
 
     val jdbcWrapper = mockJdbcWrapper(params("url"), expectedCommands)
 
@@ -361,7 +366,8 @@ class RedshiftSourceSuite
     val writer = new RedshiftWriter(jdbcWrapper, _ => mockS3Client)
 
     intercept[IllegalArgumentException] {
-      writer.saveToRedshift(testSqlContext, df, Parameters.mergeParameters(defaultParams))
+      writer.saveToRedshift(
+        testSqlContext, df, SaveMode.Append, Parameters.mergeParameters(defaultParams))
     }
   }
 
@@ -416,17 +422,7 @@ class RedshiftSourceSuite
       failedStatement("COPY test_table_staging_.*".r)
 
       // Expect recovery operations
-      (jdbcWrapper.tableExists _)
-        .expects(where {(conn: Connection, sql: String) =>
-          "test_table_staging.*".r.findFirstIn(sql).nonEmpty})
-        .returning(true)
-      successfulStatement("DROP TABLE test_table_staging.*".r)
-
-      (jdbcWrapper.tableExists _)
-        .expects(where {(conn: Connection, sql: String) =>
-          "test_table_backup.*".r.findFirstIn(sql).nonEmpty})
-        .returning(true)
-      successfulStatement("ALTER TABLE test_table_backup.+ RENAME TO test_table".r)
+      successfulStatement("DROP TABLE IF EXISTS test_table_staging.*".r)
 
       (mockedConnection.close _).expects()
     }

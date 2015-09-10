@@ -24,7 +24,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{DataFrame, Row, SQLContext}
+import org.apache.spark.sql.{DataFrame, Row, SaveMode, SQLContext}
 import org.slf4j.LoggerFactory
 
 import com.databricks.spark.redshift.Parameters.MergedParameters
@@ -61,9 +61,13 @@ private[redshift] case class RedshiftRelation(
   }
 
   override def insert(data: DataFrame, overwrite: Boolean): Unit = {
-    val updatedParams =
-      Parameters.mergeParameters(params.parameters updated ("overwrite", overwrite.toString))
-    new RedshiftWriter(jdbcWrapper, s3ClientFactory).saveToRedshift(sqlContext, data, updatedParams)
+    val saveMode = if (overwrite) {
+      SaveMode.Overwrite
+    } else {
+      SaveMode.Append
+    }
+    val writer = new RedshiftWriter(jdbcWrapper, s3ClientFactory)
+    writer.saveToRedshift(sqlContext, data, saveMode, params)
   }
 
   override def buildScan(requiredColumns: Array[String], filters: Array[Filter]): RDD[Row] = {
