@@ -36,6 +36,7 @@ object SparkRedshiftBuild extends Build {
     .configs(IntegrationTest)
     .settings(net.virtualvoid.sbt.graph.Plugin.graphSettings: _*)
     .settings(Project.inConfig(IntegrationTest)(rawScalastyleSettings()): _*)
+    .settings(Defaults.coreDefaultSettings: _*)
     .settings(Defaults.itSettings: _*)
     .settings(
       name := "spark-redshift",
@@ -52,8 +53,6 @@ object SparkRedshiftBuild extends Build {
       credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"),
       resolvers +=
         "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
-      resolvers +=
-        "Spark 1.5.0 RC3 Staging" at "https://repository.apache.org/content/repositories/orgapachespark-1143",
       libraryDependencies ++= Seq(
         "org.slf4j" % "slf4j-api" % "1.7.5",
         // These Amazon SDK depdencies are marked as 'provided' in order to reduce the risk of
