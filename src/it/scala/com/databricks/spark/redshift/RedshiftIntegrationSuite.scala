@@ -323,6 +323,25 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
     }
   }
 
+  test("save with column names that are reserved words") {
+    val tableName = s"save_with_column_names_that_are_reserved_words_$randomSuffix"
+    val df = sqlContext.createDataFrame(sc.parallelize(Seq(Row(1))),
+      StructType(StructField("table", IntegerType) :: Nil))
+    try {
+      df.write
+        .format("com.databricks.spark.redshift")
+        .option("url", jdbcUrl)
+        .option("dbtable", tableName)
+        .option("tempdir", tempDir)
+        .mode(SaveMode.ErrorIfExists)
+        .save()
+      assert(DefaultJDBCWrapper.tableExists(conn, tableName))
+    } finally {
+      conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
+      conn.commit()
+    }
+  }
+
   test("multiple scans on same table") {
     // .rdd() forces the first query to be unloaded from Redshift
     val rdd1 = sqlContext.sql("select testint from test_table").rdd
