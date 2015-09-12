@@ -36,7 +36,7 @@ object SparkRedshiftBuild extends Build {
     .configs(IntegrationTest)
     .settings(net.virtualvoid.sbt.graph.Plugin.graphSettings: _*)
     .settings(Project.inConfig(IntegrationTest)(rawScalastyleSettings()): _*)
-    .settings(Defaults.defaultSettings: _*)
+    .settings(Defaults.coreDefaultSettings: _*)
     .settings(Defaults.itSettings: _*)
     .settings(
       name := "spark-redshift",
