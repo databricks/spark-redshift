@@ -89,9 +89,8 @@ private[redshift] class JDBCWrapper {
           val fieldScale = rsmd.getScale(i + 1)
           val isSigned = rsmd.isSigned(i + 1)
           val nullable = rsmd.isNullable(i + 1) != ResultSetMetaData.columnNoNulls
-          val metadata = new MetadataBuilder().putString("name", columnName)
           val columnType = getCatalystType(dataType, fieldSize, fieldScale, isSigned)
-          fields(i) = StructField(columnName, columnType, nullable, metadata.build())
+          fields(i) = StructField(columnName, columnType, nullable)
           i = i + 1
         }
         return new StructType(fields)
