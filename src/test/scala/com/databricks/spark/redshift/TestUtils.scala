@@ -31,22 +31,18 @@ object TestUtils {
    * Simple schema that includes all data types we support
    */
   val testSchema: StructType = {
-    def makeField(name: String, typ: DataType) = {
-      val md = (new MetadataBuilder).putString("name", name).build()
-      StructField(name, typ, nullable = true, metadata = md)
-    }
     // These column names need to be lowercase; see #51
     StructType(Seq(
-      makeField("testbyte", ByteType),
-      makeField("testbool", BooleanType),
-      makeField("testdate", DateType),
-      makeField("testdouble", DoubleType),
-      makeField("testfloat", FloatType),
-      makeField("testint", IntegerType),
-      makeField("testlong", LongType),
-      makeField("testshort", ShortType),
-      makeField("teststring", StringType),
-      makeField("testtimestamp", TimestampType)))
+      StructField("testbyte", ByteType),
+      StructField("testbool", BooleanType),
+      StructField("testdate", DateType),
+      StructField("testdouble", DoubleType),
+      StructField("testfloat", FloatType),
+      StructField("testint", IntegerType),
+      StructField("testlong", LongType),
+      StructField("testshort", ShortType),
+      StructField("teststring", StringType),
+      StructField("testtimestamp", TimestampType)))
   }
 
   // scalastyle:off
