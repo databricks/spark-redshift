@@ -476,8 +476,8 @@ class RedshiftSourceSuite
     val createTableCommand =
       DefaultRedshiftWriter.createTableSql(df, MergedParameters.apply(defaultParams)).trim
     val expectedCreateTableCommand =
-      "CREATE TABLE IF NOT EXISTS test_table (long_str VARCHAR(512), short_str VARCHAR(10), " +
-        "default_str TEXT)"
+      """CREATE TABLE IF NOT EXISTS test_table ("long_str" VARCHAR(512),""" +
+        """ "short_str" VARCHAR(10), "default_str" TEXT)"""
     assert(createTableCommand === expectedCreateTableCommand)
   }
 
