@@ -38,23 +38,15 @@ private[redshift] class JDBCWrapper {
     // DriverRegistry.register() is one of the few pieces of private Spark functionality which
     // we need to rely on. This class was relocated in Spark 1.5.0, so we need to use reflection
     // in order to support both Spark 1.4.x and 1.5.x.
-    // TODO: once 1.5.0 snapshots are on Maven, update this to switch the class name based on
-    // SPARK_VERSION.
-    val classLoader =
-      Option(Thread.currentThread().getContextClassLoader).getOrElse(this.getClass.getClassLoader)
     if (SPARK_VERSION.startsWith("1.4")) {
       val className = "org.apache.spark.sql.jdbc.package$DriverRegistry$"
-      // scalastyle:off
-      val driverRegistryClass = Class.forName(className, true, classLoader)
-      // scalastyle:on
+      val driverRegistryClass = Utils.classForName(className)
       val registerMethod = driverRegistryClass.getDeclaredMethod("register", classOf[String])
       val companionObject = driverRegistryClass.getDeclaredField("MODULE$").get(null)
       registerMethod.invoke(companionObject, driverClass)
     } else { // Spark 1.5.0+
       val className = "org.apache.spark.sql.execution.datasources.jdbc.DriverRegistry"
-      // scalastyle:off
-      val driverRegistryClass = Class.forName(className, true, classLoader)
-      // scalastyle:on
+      val driverRegistryClass = Utils.classForName(className)
       val registerMethod = driverRegistryClass.getDeclaredMethod("register", classOf[String])
       registerMethod.invoke(null, driverClass)
     }
