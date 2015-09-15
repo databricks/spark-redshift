@@ -29,8 +29,8 @@ private[redshift] object Parameters {
     // * tempdir, dbtable and url have no default and they *must* be provided
     // * sortkeyspec has no default, but is optional
     // * distkey has no default, but is optional unless using diststyle KEY
+    // * jdbcdriver has no default, but is optional
 
-    "jdbcdriver" -> "com.amazon.redshift.jdbc4.Driver",
     "overwrite" -> "false",
     "diststyle" -> "EVEN",
     "usestagingtable" -> "true",
@@ -106,9 +106,9 @@ private[redshift] object Parameters {
 
     /**
      * The JDBC driver class name. This is used to make sure the driver is registered before
-     * connecting over JDBC. Default is "com.amazon.redshift.jdbc4.Driver"
+     * connecting over JDBC.
      */
-    def jdbcDriver: String = parameters("jdbcdriver")
+    def jdbcDriver: Option[String] = parameters.get("jdbcdriver")
 
     /**
      * If true, when writing, replace any existing data. When false, append to the table instead.

@@ -63,9 +63,10 @@ class MockRedshift(
     conn
   }
 
-  when(jdbcWrapper.getConnector(anyString(), same(jdbcUrl))).thenAnswer(new Answer[Connection] {
-    override def answer(invocation: InvocationOnMock): Connection = createMockConnection()
-  })
+  when(jdbcWrapper.getConnector(any[Option[String]](), same(jdbcUrl))).thenAnswer(
+    new Answer[Connection] {
+      override def answer(invocation: InvocationOnMock): Connection = createMockConnection()
+    })
 
   when(jdbcWrapper.tableExists(any[Connection], anyString())).thenAnswer(new Answer[Boolean] {
     override def answer(invocation: InvocationOnMock): Boolean = {
@@ -73,7 +74,7 @@ class MockRedshift(
     }
   })
 
-  when(jdbcWrapper.resolveTable(same(jdbcUrl), anyString())).thenAnswer(new Answer[StructType] {
+  when(jdbcWrapper.resolveTable(any[Connection], anyString())).thenAnswer(new Answer[StructType] {
     override def answer(invocation: InvocationOnMock): StructType = {
       existingTablesAndSchemas(invocation.getArguments()(1).asInstanceOf[String])
     }

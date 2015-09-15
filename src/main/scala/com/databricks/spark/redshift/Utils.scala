@@ -37,6 +37,14 @@ private[redshift] object Utils {
 
   private val log = LoggerFactory.getLogger(getClass)
 
+  def classForName(className: String): Class[_] = {
+    val classLoader =
+      Option(Thread.currentThread().getContextClassLoader).getOrElse(this.getClass.getClassLoader)
+    // scalastyle:off
+    Class.forName(className, true, classLoader)
+    // scalastyle:on
+  }
+
   /**
    * Joins prefix URL a to path suffix b, and appends a trailing /, in order to create
    * a temp directory path for S3.
