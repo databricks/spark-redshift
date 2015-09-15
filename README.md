@@ -239,8 +239,8 @@ and use that as a temp location for this data.
  <tr>
     <td><tt>jdbcdriver</tt></td>
     <td>No</td>
-    <td><tt>com.amazon.redshift.jdbc4.Driver</tt></td>
-    <td>The class name of the JDBC driver to load before JDBC operations. Must be on classpath.</td>
+    <td>Determined by the JDBC URL's subprotocol</td>
+    <td>The class name of the JDBC driver to load before JDBC operations. This class must be on the classpath. In most cases, it should not be necessary to specify this option, as the appropriate driver classname should automatically be determined by the JDBC URL's subprotocol.</td>
  </tr>
  <tr>
     <td><tt>diststyle</tt></td>

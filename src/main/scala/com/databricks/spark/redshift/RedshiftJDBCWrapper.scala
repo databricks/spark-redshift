@@ -17,7 +17,8 @@
 
 package com.databricks.spark.redshift
 
-import java.sql.{Connection, DriverManager, ResultSetMetaData, SQLException}
+import java.net.URI
+import java.sql.{Connection, Driver, DriverManager, ResultSetMetaData, SQLException}
 import java.util.Properties
 
 import scala.util.Try
@@ -34,7 +35,42 @@ private[redshift] class JDBCWrapper {
 
   private val log = LoggerFactory.getLogger(getClass)
 
-  def registerDriver(driverClass: String): Unit = {
+  /**
+   * Given a JDBC subprotocol, returns the appropriate driver class so that it can be registered
+   * with Spark. If the user has explicitly specified a driver class in their configuration then
+   * that class will be used. Otherwise, we will attempt to load the correct driver class based on
+   * the JDBC subprotocol.
+   *
+   * @param jdbcSubprotocol 'redshift' or 'postgres'
+   * @param userProvidedDriverClass an optional user-provided explicit driver class name
+   * @return the driver class
+   */
+  private def getDriverClass(
+      jdbcSubprotocol: String,
+      userProvidedDriverClass: Option[String]): Class[Driver] = {
+    userProvidedDriverClass.map(Utils.classForName).getOrElse {
+      jdbcSubprotocol match {
+        case "redshift" =>
+          try {
+            Utils.classForName("com.amazon.redshift.jdbc41.Driver")
+          } catch {
+            case _: ClassNotFoundException =>
+              try {
+                Utils.classForName("com.amazon.redshift.jdbc4.Driver")
+              } catch {
+                case e: ClassNotFoundException =>
+                  throw new ClassNotFoundException(
+                    "Could not load an Amazon Redshift JDBC driver; see the README for " +
+                      "instructions on downloading and configuring the official Amazon driver.", e)
+              }
+          }
+        case "postgres" => Utils.classForName("org.postgresql.Driver")
+        case other => throw new IllegalArgumentException(s"Unsupported JDBC protocol: '$other'")
+      }
+    }.asInstanceOf[Class[Driver]]
+  }
+
+  private def registerDriver(driverClass: String): Unit = {
     // DriverRegistry.register() is one of the few pieces of private Spark functionality which
     // we need to rely on. This class was relocated in Spark 1.5.0, so we need to use reflection
     // in order to support both Spark 1.4.x and 1.5.x.
@@ -56,59 +92,51 @@ private[redshift] class JDBCWrapper {
    * Takes a (schema, table) specification and returns the table's Catalyst
    * schema.
    *
-   * @param url - The JDBC url to fetch information from.
-   * @param table - The table name of the desired table.  This may also be a
+   * @param conn A JDBC connection to the database.
+   * @param table The table name of the desired table.  This may also be a
    *   SQL query wrapped in parentheses.
    *
    * @return A StructType giving the table's Catalyst schema.
    * @throws SQLException if the table specification is garbage.
    * @throws SQLException if the table contains an unsupported type.
    */
-  def resolveTable(url: String, table: String): StructType = {
-    val conn: Connection = DriverManager.getConnection(url, new Properties())
+  def resolveTable(conn: Connection, table: String): StructType = {
+    val rs = conn.prepareStatement(s"SELECT * FROM $table WHERE 1=0").executeQuery()
     try {
-      val rs = conn.prepareStatement(s"SELECT * FROM $table WHERE 1=0").executeQuery()
-      try {
-        val rsmd = rs.getMetaData
-        val ncols = rsmd.getColumnCount
-        val fields = new Array[StructField](ncols)
-        var i = 0
-        while (i < ncols) {
-          val columnName = rsmd.getColumnLabel(i + 1)
-          val dataType = rsmd.getColumnType(i + 1)
-          val typeName = rsmd.getColumnTypeName(i + 1)
-          val fieldSize = rsmd.getPrecision(i + 1)
-          val fieldScale = rsmd.getScale(i + 1)
-          val isSigned = rsmd.isSigned(i + 1)
-          val nullable = rsmd.isNullable(i + 1) != ResultSetMetaData.columnNoNulls
-          val columnType = getCatalystType(dataType, fieldSize, fieldScale, isSigned)
-          fields(i) = StructField(columnName, columnType, nullable)
-          i = i + 1
-        }
-        return new StructType(fields)
-      } finally {
-        rs.close()
+      val rsmd = rs.getMetaData
+      val ncols = rsmd.getColumnCount
+      val fields = new Array[StructField](ncols)
+      var i = 0
+      while (i < ncols) {
+        val columnName = rsmd.getColumnLabel(i + 1)
+        val dataType = rsmd.getColumnType(i + 1)
+        val typeName = rsmd.getColumnTypeName(i + 1)
+        val fieldSize = rsmd.getPrecision(i + 1)
+        val fieldScale = rsmd.getScale(i + 1)
+        val isSigned = rsmd.isSigned(i + 1)
+        val nullable = rsmd.isNullable(i + 1) != ResultSetMetaData.columnNoNulls
+        val columnType = getCatalystType(dataType, fieldSize, fieldScale, isSigned)
+        fields(i) = StructField(columnName, columnType, nullable)
+        i = i + 1
       }
+      new StructType(fields)
     } finally {
-      conn.close()
+      rs.close()
     }
-
-    throw new RuntimeException("This line is unreachable.")
   }
 
   /**
    * Given a driver string and a JDBC url, load the specified driver and return a DB connection.
    *
-   * @param driver the class name of the JDBC driver for the given url.
+   * @param userProvidedDriverClass the class name of the JDBC driver for the given url. If this
+   *                                is None then `spark-redshift` will attempt to automatically
+   *                                discover the appropriate driver class.
    * @param url the JDBC url to connect to.
    */
-  def getConnector(driver: String, url: String): Connection = {
-    try {
-      if (driver != null) registerDriver(driver)
-    } catch {
-      case e: ClassNotFoundException =>
-        log.warn(s"Couldn't find class $driver", e)
-    }
+  def getConnector(userProvidedDriverClass: Option[String], url: String): Connection = {
+    val subprotocol = new URI(url.stripPrefix("jdbc:")).getScheme
+    val driverClass: Class[Driver] = getDriverClass(subprotocol, userProvidedDriverClass)
+    registerDriver(driverClass.getCanonicalName)
     DriverManager.getConnection(url, new Properties())
   }
 

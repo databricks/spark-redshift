@@ -49,13 +49,14 @@ private[redshift] case class RedshiftRelation(
       new URI(params.rootTempDir), sqlContext.sparkContext.hadoopConfiguration)
   }
 
-  override def schema: StructType = {
-    userSchema match {
-      case Some(schema) => schema
-      case None => {
-        jdbcWrapper.registerDriver(params.jdbcDriver)
-        val tableNameOrSubquery = params.query.map(q => s"($q)").orElse(params.table).get
-        jdbcWrapper.resolveTable(params.jdbcUrl, tableNameOrSubquery)
+  override lazy val schema: StructType = {
+    userSchema.getOrElse {
+      val tableNameOrSubquery = params.query.map(q => s"($q)").orElse(params.table).get
+      val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
+      try {
+        jdbcWrapper.resolveTable(conn, tableNameOrSubquery)
+      } finally {
+        conn.close()
       }
     }
   }
