@@ -27,7 +27,6 @@ import com.amazonaws.services.s3.{AmazonS3URI, AmazonS3Client}
 import com.amazonaws.services.s3.model.BucketLifecycleConfiguration
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.FileSystem
-import org.apache.hadoop.fs.s3.S3FileSystem
 import org.slf4j.LoggerFactory
 
 /**
@@ -108,8 +107,10 @@ private[redshift] object Utils {
   def assertThatFileSystemIsNotS3BlockFileSystem(uri: URI, hadoopConfig: Configuration): Unit = {
     val fs = FileSystem.get(uri, hadoopConfig)
     // Note that we do not want to use isInstanceOf here, since we're only interested in detecting
-    // exact matches
-    if (fs.getClass == classOf[S3FileSystem]) {
+    // exact matches. We compare the class names as strings in order to avoid introducing a binary
+    // dependency on classes which belong to the `hadoop-aws` JAR, as that artifact is not present
+    // in some environments (such as EMR). See #92 for details.
+    if (fs.getClass.getCanonicalName == "org.apache.hadoop.fs.s3.S3FileSystem") {
       throw new IllegalArgumentException(
         "spark-redshift does not support the S3 Block FileSystem. Please reconfigure `tempdir` to" +
         "use a s3n:// or s3a:// scheme.")
