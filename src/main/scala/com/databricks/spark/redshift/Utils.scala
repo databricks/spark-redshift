@@ -80,7 +80,7 @@ private[redshift] object Utils {
       val s3URI = new AmazonS3URI(Utils.fixS3Url(tempDir))
       val bucket = s3URI.getBucket
       val bucketLifecycleConfiguration = s3Client.getBucketLifecycleConfiguration(bucket)
-      val key = s3URI.getKey
+      val key = Option(s3URI.getKey).getOrElse("")
       val someRuleMatchesTempDir = bucketLifecycleConfiguration.getRules.asScala.exists { rule =>
         // Note: this only checks that there is an active rule which matches the temp directory;
         // it does not actually check that the rule will delete the files. This check is still
