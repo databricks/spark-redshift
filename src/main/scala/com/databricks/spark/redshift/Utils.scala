@@ -16,7 +16,6 @@
 
 package com.databricks.spark.redshift
 
-import java.io.File
 import java.net.URI
 import java.util.UUID
 
@@ -49,9 +48,7 @@ private[redshift] object Utils {
    * a temp directory path for S3.
    */
   def joinUrls(a: String, b: String): String = {
-    val aUri = new URI(a)
-    val joinedPath = new File(aUri.getPath, b).toString
-    new URI(aUri.getScheme, aUri.getHost, joinedPath, null).toString + "/"
+    a.stripSuffix("/") + "/" + b.stripPrefix("/").stripSuffix("/") + "/"
   }
 
   /**
