@@ -287,6 +287,7 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
         .option("dbtable", tableName)
         .option("tempdir", tempDir)
         .load()
+      assert(loadedDf.schema === TestUtils.testSchema)
       checkAnswer(loadedDf, TestUtils.expectedData)
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
