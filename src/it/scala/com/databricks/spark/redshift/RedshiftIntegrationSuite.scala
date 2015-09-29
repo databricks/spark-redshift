@@ -287,7 +287,10 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
         .option("dbtable", tableName)
         .option("tempdir", tempDir)
         .load()
-      assert(loadedDf.schema === TestUtils.testSchema)
+      // Redshift doesn't have a BYTE type, so these schemas won't match for that column:
+      assert(
+        loadedDf.schema.filterNot(_.name == "testbyte") ===
+        TestUtils.testSchema.filterNot(_.name == "testbyte"))
       checkAnswer(loadedDf, TestUtils.expectedData)
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
