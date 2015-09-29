@@ -350,6 +350,34 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
     }
   }
 
+  test("save with one empty partition (regression test for #96)") {
+    val tableName = s"save_with_one_empty_partition_$randomSuffix"
+    val df = sqlContext.createDataFrame(sc.parallelize(Seq(Row(1)), 2),
+      StructType(StructField("table", IntegerType) :: Nil))
+    assert(df.rdd.glom.collect() === Array(Array.empty[Row], Array(Row(1))))
+    try {
+      df.write
+        .format("com.databricks.spark.redshift")
+        .option("url", jdbcUrl)
+        .option("dbtable", tableName)
+        .option("tempdir", tempDir)
+        .mode(SaveMode.ErrorIfExists)
+        .save()
+      assert(DefaultJDBCWrapper.tableExists(conn, tableName))
+      val loadedDf = sqlContext.read
+        .format("com.databricks.spark.redshift")
+        .option("url", jdbcUrl)
+        .option("dbtable", tableName)
+        .option("tempdir", tempDir)
+        .load()
+      assert(loadedDf.schema === df.schema)
+      checkAnswer(loadedDf, Seq(Row(1)))
+    } finally {
+      conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
+      conn.commit()
+    }
+  }
+
   test("multiple scans on same table") {
     // .rdd() forces the first query to be unloaded from Redshift
     val rdd1 = sqlContext.sql("select testint from test_table").rdd
