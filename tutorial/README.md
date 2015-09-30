@@ -21,7 +21,7 @@ For the purpose of this article my Redshift database runs on a 2 node cluster. E
 
 ## Usage##
 
-We are ready to interact with Redshift using the spark-redshift library. The skeleton of the program we will be using is shown in Listing 1. The entire program can be accessed from [here](tutorial/SparkRedshiftTutorial.scala). You can also use the Spark REPL to run the lines listed in the program below. 
+We are ready to interact with Redshift using the spark-redshift library. The skeleton of the program we will be using is shown in Listing 1. The entire program can be accessed from [here](SparkRedshiftTutorial.scala). You can also use the Spark REPL to run the lines listed in the program below. 
 
 ```scala
 package com.databricks.spark.redshift.tutorial
