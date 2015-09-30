@@ -24,8 +24,9 @@ import scala.util.Random
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{Path, FileSystem}
 import org.apache.spark.SparkContext
-import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.{DataFrame, SaveMode, SQLContext}
 import org.apache.spark.sql.hive.test.TestHiveContext
+import org.apache.spark.sql.types.StructType
 import org.scalatest.{BeforeAndAfterEach, BeforeAndAfterAll, Matchers}
 
 
@@ -116,5 +117,44 @@ trait IntegrationSuiteBase
   override protected def beforeEach(): Unit = {
     super.beforeEach()
     sqlContext = new TestHiveContext(sc)
+  }
+
+  /**
+   * Save the given DataFrame to Redshift, then load the results back into a DataFrame and check
+   * that the returned DataFrame matches the one that we saved.
+   *
+   * @param tableName the table name to use
+   * @param df the DataFrame to save
+   * @param expectedSchemaAfterLoad if specified, the expected schema after loading the data back
+   *                                from Redshift. This should be used in cases where you expect
+   *                                the schema to differ due to reasons like case-sensitivity.
+   * @param saveMode the [[SaveMode]] to use when writing data back to Redshift
+   */
+  def testRoundtripSaveAndLoad(
+      tableName: String,
+      df: DataFrame,
+      expectedSchemaAfterLoad: Option[StructType] = None,
+      saveMode: SaveMode = SaveMode.ErrorIfExists): Unit = {
+    try {
+      df.write
+        .format("com.databricks.spark.redshift")
+        .option("url", jdbcUrl)
+        .option("dbtable", tableName)
+        .option("tempdir", tempDir)
+        .mode(saveMode)
+        .save()
+      assert(DefaultJDBCWrapper.tableExists(conn, tableName))
+      val loadedDf = sqlContext.read
+        .format("com.databricks.spark.redshift")
+        .option("url", jdbcUrl)
+        .option("dbtable", tableName)
+        .option("tempdir", tempDir)
+        .load()
+      assert(loadedDf.schema === expectedSchemaAfterLoad.getOrElse(df.schema))
+      checkAnswer(loadedDf, df.collect())
+    } finally {
+      conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
+      conn.commit()
+    }
   }
 }
