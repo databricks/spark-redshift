@@ -103,6 +103,11 @@ object SparkRedshiftTutorial {
 		eventsDF.registerTempTable("myevent") 
 
     /** Save to a redshift table from a table registered in spark */
+    
+    /*
+     * Create a new table redshiftevent after dropping any existing redshiftevent table
+     * and write event records with event id less than 1000
+     */
 		sqlContext.sql("select * from myevent where eventid<=1000").withColumnRenamed("eventid", "id")
 			.write.format("com.databricks.spark.redshift")
 			.option("url", jdbcURL)
@@ -111,7 +116,10 @@ object SparkRedshiftTutorial {
 			.mode(SaveMode.Overwrite)
 			.save()
     
-    /** Demonstration of Append capability */
+    /*
+     * Append to an existing table redshiftevent if it exists or create a new one if it does not
+     * exist and write event records with event id greater than 1000
+     */
 		sqlContext.sql("select * from myevent where eventid>1000").withColumnRenamed("eventid", "id")
 			.write.format("com.databricks.spark.redshift")
 			.option("url", jdbcURL) 
