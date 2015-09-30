@@ -24,6 +24,9 @@ class TableNameSuite extends FunSuite {
     assert(TableName.parseFromEscaped("foo") === TableName("PUBLIC", "foo"))
     assert(TableName.parseFromEscaped("\"foo\"") === TableName("PUBLIC", "foo"))
     assert(TableName.parseFromEscaped("\"\"\"foo\"\"\".bar") === TableName("\"foo\"", "bar"))
+    // Dots (.) can also appear inside of valid identifiers.
+    assert(TableName.parseFromEscaped("\"foo.bar\".baz") === TableName("foo.bar", "baz"))
+    assert(TableName.parseFromEscaped("\"foo\"\".bar\".baz") === TableName("foo\".bar", "baz"))
   }
 
   test("TableName.toString") {
