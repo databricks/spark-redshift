@@ -379,6 +379,34 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
     }
   }
 
+  test("SaveMode.Overwrite with schema-qualified table name (#97)") {
+    val tableName = s"overwrite_schema_qualified_table_name$randomSuffix"
+    val df = sqlContext.createDataFrame(sc.parallelize(Seq(Row(1))),
+      StructType(StructField("a", IntegerType) :: Nil))
+    try {
+      // Ensure that the table exists:
+      df.write
+        .format("com.databricks.spark.redshift")
+        .option("url", jdbcUrl)
+        .option("dbtable", tableName)
+        .option("tempdir", tempDir)
+        .mode(SaveMode.ErrorIfExists)
+        .save()
+      assert(DefaultJDBCWrapper.tableExists(conn, s"PUBLIC.$tableName"))
+      // Try overwriting that table while using the schema-qualified table name:
+      df.write
+        .format("com.databricks.spark.redshift")
+        .option("url", jdbcUrl)
+        .option("dbtable", s"PUBLIC.$tableName")
+        .option("tempdir", tempDir)
+        .mode(SaveMode.Overwrite)
+        .save()
+    } finally {
+      conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
+      conn.commit()
+    }
+  }
+
   test("SaveMode.Overwrite with non-existent table") {
     testRoundtripSaveAndLoad(
       s"overwrite_non_existent_table$randomSuffix",
