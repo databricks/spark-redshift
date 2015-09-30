@@ -26,7 +26,7 @@ class ParametersSuite extends FunSuite with Matchers {
   test("Minimal valid parameter map is accepted") {
     val params = Map(
       "tempdir" -> "s3://foo/bar",
-      "dbtable" -> "test_table",
+      "dbtable" -> "test_schema.test_table",
       "url" -> "jdbc:redshift://foo/bar")
 
     val mergedParams = Parameters.mergeParameters(params)
@@ -34,7 +34,7 @@ class ParametersSuite extends FunSuite with Matchers {
     mergedParams.rootTempDir should startWith (params("tempdir"))
     mergedParams.createPerQueryTempDir() should startWith (params("tempdir"))
     mergedParams.jdbcUrl shouldBe params("url")
-    mergedParams.table shouldBe Some(params("dbtable"))
+    mergedParams.table shouldBe Some(TableName("test_schema", "test_table"))
 
     // Check that the defaults have been added
     Parameters.DEFAULT_PARAMETERS foreach {

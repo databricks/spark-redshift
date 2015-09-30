@@ -80,12 +80,26 @@ private[redshift] object Parameters {
     /**
      * The Redshift table to be used as the target when loading or writing data.
      */
-    def table: Option[TableName] = parameters.get("dbtable").map(TableName.parseFromEscaped)
+    def table: Option[TableName] = parameters.get("dbtable").flatMap { dbtable =>
+      // We technically allow queries to be passed using `dbtable` as long as they are wrapped
+      // in parentheses. Valid SQL identifiers may contain parentheses but cannot begin with them,
+      // so there is no ambiguity in ignoring subqeries here and leaving their handling up to
+      // the `query` function defined below.
+      if (dbtable.startsWith("(") && dbtable.endsWith(")")) {
+        None
+      } else {
+        Some(TableName.parseFromEscaped(dbtable))
+      }
+    }
 
     /**
      * The Redshift query to be used as the target when loading data.
      */
-    def query: Option[String] = parameters.get("query")
+    def query: Option[String] = parameters.get("query").orElse {
+      parameters.get("dbtable")
+        .filter(t => t.startsWith("(") && t.endsWith(")"))
+        .map(t => t.drop(1).dropRight(1))
+    }
 
     /**
      * A JDBC URL, of the format:
