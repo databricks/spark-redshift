@@ -81,28 +81,31 @@ private[redshift] class RedshiftWriter(
    */
   private def withStagingTable(
       conn: Connection,
-      table: String,
+      table: TableName,
       action: (String) => Unit) {
     val randomSuffix = Math.abs(Random.nextInt()).toString
-    val tempTable = s"${table}_staging_$randomSuffix"
-    val backupTable = s"${table}_backup_$randomSuffix"
+    val tempTable =
+      table.copy(unescapedTableName = s"${table.unescapedTableName}_staging_$randomSuffix")
+    val backupTable =
+      table.copy(unescapedTableName = s"${table.unescapedTableName}_backup_$randomSuffix")
     log.info("Loading new Redshift data to: " + tempTable)
     log.info("Existing data will be backed up in: " + backupTable)
 
     try {
-      action(tempTable)
+      action(tempTable.toString)
 
-      if (jdbcWrapper.tableExists(conn, table)) {
+      if (jdbcWrapper.tableExists(conn, table.toString)) {
         conn.prepareStatement(
           s"""
              | BEGIN;
-             | ALTER TABLE $table RENAME TO $backupTable;
-             | ALTER TABLE $tempTable RENAME TO $table;
+             | ALTER TABLE $table RENAME TO ${backupTable.escapedTableName};
+             | ALTER TABLE $tempTable RENAME TO ${table.escapedTableName};
              | DROP TABLE $backupTable;
              | END;
            """.stripMargin.trim).execute()
       } else {
-        conn.prepareStatement(s"ALTER TABLE $tempTable RENAME TO $table").execute()
+        conn.prepareStatement(
+          s"ALTER TABLE $tempTable RENAME TO ${table.escapedTableName}").execute()
       }
     } finally {
       conn.prepareStatement(s"DROP TABLE IF EXISTS $tempTable").execute()

@@ -51,7 +51,8 @@ private[redshift] case class RedshiftRelation(
 
   override lazy val schema: StructType = {
     userSchema.getOrElse {
-      val tableNameOrSubquery = params.query.map(q => s"($q)").orElse(params.table).get
+      val tableNameOrSubquery =
+        params.query.map(q => s"($q)").orElse(params.table.map(_.toString)).get
       val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
       try {
         jdbcWrapper.resolveTable(conn, tableNameOrSubquery)
@@ -136,7 +137,7 @@ private[redshift] case class RedshiftRelation(
       // Since the query passed to UNLOAD will be enclosed in single quotes, we need to escape
       // any single quotes that appear in the query itself
       val tableNameOrSubquery: String = {
-        val unescaped = params.query.map(q => s"($q)").orElse(params.table).get
+        val unescaped = params.query.map(q => s"($q)").orElse(params.table.map(_.toString)).get
         unescaped.replace("'", "\\'")
       }
       s"SELECT $columnList FROM $tableNameOrSubquery $whereClause"

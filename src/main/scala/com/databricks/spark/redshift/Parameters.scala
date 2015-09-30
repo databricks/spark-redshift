@@ -80,7 +80,7 @@ private[redshift] object Parameters {
     /**
      * The Redshift table to be used as the target when loading or writing data.
      */
-    def table: Option[String] = parameters.get("dbtable")
+    def table: Option[TableName] = parameters.get("dbtable").map(TableName.parseFromEscaped)
 
     /**
      * The Redshift query to be used as the target when loading data.
