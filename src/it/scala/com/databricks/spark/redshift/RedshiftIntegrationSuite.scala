@@ -269,6 +269,7 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
   }
 
   test("roundtrip save and load") {
+    // This test can be simplified once #98 is fixed.
     val tableName = s"roundtrip_save_and_load_$randomSuffix"
     try {
       sqlContext.createDataFrame(sc.parallelize(TestUtils.expectedData), TestUtils.testSchema)
@@ -295,59 +296,18 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
   }
 
   test("roundtrip save and load with uppercase column names") {
-    val tableName = s"roundtrip_write_and_read_with_uppercase_column_names_$randomSuffix"
-    val df = sqlContext.createDataFrame(sc.parallelize(Seq(Row(1))),
-      StructType(StructField("A", IntegerType) :: Nil))
-    try {
-      df.write
-        .format("com.databricks.spark.redshift")
-        .option("url", jdbcUrl)
-        .option("dbtable", tableName)
-        .option("tempdir", tempDir)
-        .mode(SaveMode.ErrorIfExists)
-        .save()
-
-      assert(DefaultJDBCWrapper.tableExists(conn, tableName))
-      val loadedDf = sqlContext.read
-        .format("com.databricks.spark.redshift")
-        .option("url", jdbcUrl)
-        .option("dbtable", tableName)
-        .option("tempdir", tempDir)
-        .load()
-      assert(loadedDf.schema.length === 1)
-      assert(loadedDf.columns === Seq("a"))
-      checkAnswer(loadedDf, Seq(Row(1)))
-    } finally {
-      conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
-      conn.commit()
-    }
+    testRoundtripSaveAndLoad(
+      s"roundtrip_write_and_read_with_uppercase_column_names_$randomSuffix",
+      sqlContext.createDataFrame(sc.parallelize(Seq(Row(1))),
+        StructType(StructField("A", IntegerType) :: Nil)),
+      expectedSchemaAfterLoad = Some(StructType(StructField("a", IntegerType) :: Nil)))
   }
 
   test("save with column names that are reserved words") {
-    val tableName = s"save_with_column_names_that_are_reserved_words_$randomSuffix"
-    val df = sqlContext.createDataFrame(sc.parallelize(Seq(Row(1))),
-      StructType(StructField("table", IntegerType) :: Nil))
-    try {
-      df.write
-        .format("com.databricks.spark.redshift")
-        .option("url", jdbcUrl)
-        .option("dbtable", tableName)
-        .option("tempdir", tempDir)
-        .mode(SaveMode.ErrorIfExists)
-        .save()
-      assert(DefaultJDBCWrapper.tableExists(conn, tableName))
-      val loadedDf = sqlContext.read
-        .format("com.databricks.spark.redshift")
-        .option("url", jdbcUrl)
-        .option("dbtable", tableName)
-        .option("tempdir", tempDir)
-        .load()
-      assert(loadedDf.schema === df.schema)
-      checkAnswer(loadedDf, Seq(Row(1)))
-    } finally {
-      conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
-      conn.commit()
-    }
+    testRoundtripSaveAndLoad(
+      s"save_with_column_names_that_are_reserved_words_$randomSuffix",
+      sqlContext.createDataFrame(sc.parallelize(Seq(Row(1))),
+        StructType(StructField("table", IntegerType) :: Nil)))
   }
 
   test("save with one empty partition (regression test for #96)") {
@@ -448,30 +408,11 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
   }
 
   test("SaveMode.Overwrite with non-existent table") {
-    val tableName = s"overwrite_non_existent_table$randomSuffix"
-    try {
-      assert(!DefaultJDBCWrapper.tableExists(conn, tableName))
-      sqlContext.createDataFrame(sc.parallelize(TestUtils.expectedData), TestUtils.testSchema)
-        .write
-        .format("com.databricks.spark.redshift")
-        .option("url", jdbcUrl)
-        .option("dbtable", tableName)
-        .option("tempdir", tempDir)
-        .mode(SaveMode.Overwrite)
-        .save()
-
-      assert(DefaultJDBCWrapper.tableExists(conn, tableName))
-      val loadedDf = sqlContext.read
-        .format("com.databricks.spark.redshift")
-        .option("url", jdbcUrl)
-        .option("dbtable", tableName)
-        .option("tempdir", tempDir)
-        .load()
-      checkAnswer(loadedDf, TestUtils.expectedData)
-    } finally {
-      conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
-      conn.commit()
-    }
+    testRoundtripSaveAndLoad(
+      s"overwrite_non_existent_table$randomSuffix",
+      sqlContext.createDataFrame(sc.parallelize(Seq(Row(1))),
+        StructType(StructField("a", IntegerType) :: Nil)),
+      saveMode = SaveMode.Overwrite)
   }
 
   test("SaveMode.Overwrite with existing table") {
