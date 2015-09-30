@@ -71,12 +71,13 @@ val df: DataFrame = sqlContext.read
 // Data Source API to write the data back to another table
 
 df.write
-  .format("com.databricks.spark.redshift")
+    .format("com.databricks.spark.redshift")
     .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass")
     .option("dbtable", "my_table_copy")
     .option("tempdir", "s3n://path/for/temp/data")
-  .mode("error")
-  .save()
+    .option("avrocompression", "snappy")
+    .mode("error")
+    .save()
 ```
 
 #### Python
@@ -105,12 +106,13 @@ df = sql_context.read \
 
 # Write back to a table
 df.write \
-  .format("com.databricks.spark.redshift") \
-  .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass") \
-  .option("dbtable", "my_table_copy") \
-  .option("tempdir", "s3n://path/for/temp/data") \
-  .mode("error") \
-  .save()
+    .format("com.databricks.spark.redshift") \
+    .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass") \
+    .option("dbtable", "my_table_copy") \
+    .option("tempdir", "s3n://path/for/temp/data") \
+    .option("avrocompression", "snappy")
+    .mode("error") \
+    .save()
 ```
 
 #### SQL
@@ -120,6 +122,7 @@ CREATE TABLE my_table
 USING com.databricks.spark.redshift
 OPTIONS (dbtable 'my_table',
          tempdir 's3n://my_bucket/tmp',
+         avrocompression 'snappy',
          url 'jdbc:redshift://host:port/db?user=username&password=pass');
 ```
 
@@ -297,6 +300,24 @@ It may be useful to have some <tt>GRANT</tt> commands or similar run here when l
 
 <p>Be warned that if this commands fail, it is treated as an error and you'll get an exception. If using a staging
 table, the changes will be reverted and the backup table restored if post actions fail.</p>
+    </td>
+ </tr>
+ <tr>
+    <td><tt>avrocompression</tt></td>
+    <td>No</td>
+    <td>No compression (unless set in Hadoop config)</td>
+    <td>
+<p>Sets the compression codec to use on the Avro data to be loaded into Redshift. This overwrites the <tt>avro.output.codec</tt>
+key in the Hadoop configuration with the specified value and also sets <tt>mapred.output.compress = true</tt> and
+<tt>mapred.output.compression.type = BLOCK</tt>. If left unset (or set to null or an empty string) it will leave
+the Hadoop configuration unchanged.</p>
+<p>Valid settings are:</p>
+<ul>
+    <li><tt>""</tt> (default): use compression settings from Hadoop config (usually none unless explicitly set).</li>
+    <li><tt>"snappy"</tt>: use snappy compression.</li>
+    <li><tt>"deflate"</tt>: use deflate (zlib) compression (better ratio but more CPU intensive than snappy).</li>
+    <li><tt>"null"</tt>: disable compression.</li>
+</ul>
     </td>
  </tr>
 </table>

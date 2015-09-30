@@ -296,6 +296,49 @@ class RedshiftSourceSuite
     mockRedshift.verifyThatExpectedQueriesWereIssued(expectedCommands)
   }
 
+  test("DefaultSource serializes data as Avro when avrocompression is enabled") {
+
+    val params = defaultParams ++ Map(
+      "postactions" -> "GRANT SELECT ON %s TO jeremy",
+      "diststyle" -> "KEY",
+      "distkey" -> "testInt",
+      "avrocompression" -> "snappy")
+
+    val expectedCommands =
+      Seq("DROP TABLE IF EXISTS test_table_staging_.*".r,
+          "CREATE TABLE IF NOT EXISTS test_table_staging.* DISTSTYLE KEY DISTKEY \\(testInt\\).*".r,
+          "COPY test_table_staging_.*".r,
+          "GRANT SELECT ON test_table_staging.+ TO jeremy".r,
+          "ALTER TABLE test_table RENAME TO test_table_backup_.*".r,
+          "ALTER TABLE test_table_staging_.* RENAME TO test_table".r,
+          "DROP TABLE IF EXISTS test_table_backup.*".r)
+
+    val jdbcWrapper = mockJdbcWrapper(params("url"), expectedCommands)
+
+    (jdbcWrapper.tableExists _)
+      .expects(*, "test_table")
+      .returning(true)
+      .anyNumberOfTimes()
+
+    (jdbcWrapper.schemaString _)
+      .expects(*)
+      .returning("schema")
+      .anyNumberOfTimes()
+
+    val relation = RedshiftRelation(
+      jdbcWrapper, _ => mockS3Client, Parameters.mergeParameters(params), None)(testSqlContext)
+    relation.asInstanceOf[InsertableRelation].insert(expectedDataDF, true)
+
+    // Make sure we wrote the data out ready for Redshift load, in the expected formats
+    // The data should have been written to a random subdirectory of `tempdir`. Since we clear
+    // `tempdir` between every unit test, there should only be one directory here.
+    // Note: this does not actually test that the written files are properly compressed.
+    assert(s3FileSystem.listStatus(new Path(s3TempDir)).length === 1)
+    val dirWithAvroFiles = s3FileSystem.listStatus(new Path(s3TempDir)).head.getPath.toUri.toString
+    val written = testSqlContext.read.format("com.databricks.spark.avro").load(dirWithAvroFiles)
+    checkAnswer(written, TestUtils.expectedDataWithConvertedTimesAndDates)
+  }
+
   test("Cannot write table with column names that become ambiguous under case insensitivity") {
     val mockRedshift =
       new MockRedshift(defaultParams("url"), Map("test_table" -> TestUtils.testSchema))

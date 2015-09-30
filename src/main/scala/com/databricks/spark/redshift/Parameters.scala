@@ -34,7 +34,8 @@ private[redshift] object Parameters {
     "overwrite" -> "false",
     "diststyle" -> "EVEN",
     "usestagingtable" -> "true",
-    "postactions" -> ";"
+    "postactions" -> ";",
+    "avrocompression" -> ""
   )
 
   /**
@@ -187,5 +188,12 @@ private[redshift] object Parameters {
         sessionToken <- parameters.get("temporary_aws_session_token")
       ) yield new BasicSessionCredentials(accessKey, secretAccessKey, sessionToken)
     }
+
+    /**
+     * When nonempty/non-null sets the compression codec to use for writing Avro data.
+     *
+     * Defaults to disabled (i.e. whatever is set in Hadoop config).
+     */
+    def avrocompression: String = parameters("avrocompression")
   }
 }

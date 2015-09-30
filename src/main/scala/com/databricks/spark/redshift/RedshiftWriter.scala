@@ -276,6 +276,14 @@ private[redshift] class RedshiftWriter(
     val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
 
     val tempDir = params.createPerQueryTempDir()
+
+    if (params.avrocompression != null && params.avrocompression.nonEmpty) {
+      val conf = sqlContext.sparkContext.hadoopConfiguration
+      conf.set("mapred.output.compress", "true")
+      conf.set("mapred.output.compression.type", "BLOCK")
+      conf.set("avro.output.codec", params.avrocompression)
+    }
+
     try {
       if (saveMode == SaveMode.Overwrite && params.useStagingTable) {
         withStagingTable(conn, params.table.get, stagingTable => {
