@@ -141,7 +141,8 @@ private[redshift] class RedshiftWriter(
       // See https://docs.aws.amazon.com/redshift/latest/dg/loading-data-files-using-manifest.html
       // for a full description of the manifest format.
       val manifestEntries = filesToLoad.map { filename =>
-        s"""{"url":"${Utils.fixS3Url(filename)}", "mandatory":true}"""
+        val url = Utils.fixS3Url(Utils.removeCredentialsFromURI(URI.create(filename)).toString)
+        s"""{"url":"$url", "mandatory":true}"""
       }
       val manifest = s"""{"entries": [${manifestEntries.mkString(",\n")}]}"""
       val fs = FileSystem.get(URI.create(tempDir), data.sqlContext.sparkContext.hadoopConfiguration)

@@ -60,6 +60,20 @@ private[redshift] object Utils {
   }
 
   /**
+   * Returns a copy of the given URI with the user credentials removed.
+   */
+  def removeCredentialsFromURI(uri: URI): URI = {
+    new URI(
+      uri.getScheme,
+      null, // no user info
+      uri.getHost,
+      uri.getPort,
+      uri.getPath,
+      uri.getQuery,
+      uri.getFragment)
+  }
+
+  /**
    * Creates a randomly named temp directory path for intermediate data
    */
   def makeTempPath(tempRoot: String): String = Utils.joinUrls(tempRoot, UUID.randomUUID().toString)
