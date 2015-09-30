@@ -227,7 +227,7 @@ In this section we will take a peek inside spark-redshift to understand how exac
 #### UNLOAD Redshift to S3 ####
 
 Figure 1 shows the the actions required to perform this step.
-![](/tutorial/images/loadunload.gif)
+![](images/loadunload.gif)
 
 ![](http://i.imgur.com/6sH2Wh4.gif)
 Figure 1 : UNLOAD action
