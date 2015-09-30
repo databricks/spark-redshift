@@ -333,7 +333,7 @@ By default the save operation uses the key distribution [style](http://docs.aws.
 
 The implementation of the Save function is provided in the class `com.databricks.spark.redshift.RedshiftWriter`.   
 
-![](images/save.gif)
+![](images/savetoredshift.gif)
 
 The sequence of steps involved in performing the save function are-
 
