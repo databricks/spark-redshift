@@ -1,3 +1,5 @@
+#Tutorial#
+
 The [Spark Data Sources API](https://databricks.com/blog/2015/01/09/spark-sql-data-sources-api-unified-data-access-for-the-spark-platform.html)introduced in Spark 1.2 supports a pluggable mechanism for integration with structured data-sources. It is a unified API designed to support two major operations:
 
 1. Loading structured data from an external data source into Spark
@@ -7,7 +9,7 @@ The Data Sources API has built in integration for several data sources such as H
 
 Prior to the introduction of spark-redshift, Spark’s JDBC data source was the only way for Spark users to read data from Redshift. While this method is adequate when running queries returning a small number of rows (order of 100’s), it is too slow when handling large scale data. The reason being that JDBC provides a ResultSet based approach where rows are retrieved in a single thread in small batches. Furthermore, the use of JDBC to store large datasets in Redshift is only practical when data needs to be moved between tables inside a Redshift database. The JDBC based INSERT/UPDATE queries are only practical for small updates to Redshift tables. For users hoping to load or store large volumes of data from Redshift, JDBC leaves much to be desired in terms of performance and throughput.
 
-This tutorial will provide a hand-on experience in using the spark-redshift package from your local development environment.
+This tutorial will provide a hand-on experience in using the spark-redshift package from your local development environment. It will also provide a deep dive into the implementation details of spark-redshift which will enable you to gain a deeper understanding of why spark-redshift provides a high performance alternative to plain JDBC based approach to interacting with Redshift from Spark.
 
 ##Prepare the Redshift database##
 
@@ -17,11 +19,11 @@ For the purpose of this article I will use the sample [TICKT](http://docs.aws.am
 
 When you start the Redshift service you will first need to create the TICKT database and load it. Follow the instructions [here](http://docs.aws.amazon.com/redshift/latest/dg/cm-dev-t-load-sample-data.html) to create/load the TICKT database.
 
-For the purpose of this article my Redshift database runs on a 2 node cluster. Each node manages 2 slices for a total of 4 slices. This *usually* (read Redshift [documentation](http://docs.aws.amazon.com/redshift/latest/dg/c_high_level_system_architecture.html) for a more nuanced discussion) means that each table will be stored in 4 separate partitions, one for each slice. 
+I used a Redshift database running on a 2 node cluster. Each node manages 2 slices for a total of 4 slices. This *usually* (read Redshift [documentation](http://docs.aws.amazon.com/redshift/latest/dg/c_high_level_system_architecture.html) for a more nuanced discussion) means that each table will be stored in 4 separate partitions, one for each slice. 
 
 ## Usage##
 
-We are ready to interact with Redshift using the spark-redshift library. The skeleton of the program we will be using is shown in Listing 1. The entire program can be accessed from [here](SparkRedshiftTutorial.scala). You can also use the Spark REPL to run the lines listed in the program below. 
+We are ready to interact with Redshift using the spark-redshift library. The skeleton of the program we will be using is shown in Listing 1. The entire `SparkRedshiftTutorial.scala` program can be accessed from [here](SparkRedshiftTutorial.scala). You can also use the Spark REPL to run the lines listed in the program below. 
 
 ```scala
 package com.databricks.spark.redshift.tutorial
