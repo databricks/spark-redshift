@@ -36,7 +36,30 @@ import org.apache.spark.sql.{DataFrame, Row, SaveMode, SQLContext}
 import org.apache.spark.sql.types._
 
 /**
- * Functions to write data to Redshift with intermediate Avro serialisation into S3.
+ * Functions to write data to Redshift.
+ *
+ * At a high level, writing data back to Redshift involves the following steps:
+ *
+ *   - Use the spark-avro library to save the DataFrame to S3 using Avro serialization. Prior to
+ *     saving the data, certain data type conversions are applied in order to work around
+ *     limitations in Avro's data type support and Redshift's case-insensitive identifier handling.
+ *
+ *     While writing the Avro files, we use accumulators to keep track of which partitions were
+ *     non-empty. After the write operation completes, we use this to construct a list of non-empty
+ *     Avro partition files.
+ *
+ *   - Use JDBC to issue any CREATE TABLE commands, if required.
+ *
+ *   - If there is data to be written (i.e. not all partitions were empty), then use the list of
+ *     non-empty Avro files to construct a JSON manifest file to tell Redshift to load those files.
+ *     This manifest is written to S3 alongside the Avro files themselves. We need to use an
+ *     explicit manifest, as opposed to simply passing the name of the directory containing the
+ *     Avro files, in order to work around a bug related to parsing of empty Avro files (see #96).
+ *
+ *   - Use JDBC to issue a COPY command in order to instruct Redshift to load the Avro data into
+ *     the appropriate table. If the Overwrite SaveMode is being used, then by default the data
+ *     will be loaded into a temporary staging table, which later will atomically replace the
+ *     original table via a transaction.
  */
 private[redshift] class RedshiftWriter(
     jdbcWrapper: JDBCWrapper,
