@@ -93,10 +93,10 @@ private[redshift] class RedshiftWriter(
   private def copySql(
       sqlContext: SQLContext,
       params: MergedParameters,
-      manifestPath: String): String = {
-    val credsString: String = AWSCredentialsUtils.getRedshiftCredentialsString(
-      AWSCredentialsUtils.load(manifestPath, sqlContext.sparkContext.hadoopConfiguration))
-    val fixedUrl = Utils.fixS3Url(manifestPath)
+      creds: AWSCredentials,
+      manifestUrl: String): String = {
+    val credsString: String = AWSCredentialsUtils.getRedshiftCredentialsString(creds)
+    val fixedUrl = Utils.fixS3Url(manifestUrl)
     s"COPY ${params.table.get} FROM '$fixedUrl' CREDENTIALS '$credsString' FORMAT AS " +
       "AVRO 'auto' DATEFORMAT 'YYYY-MM-DD HH:MI:SS' manifest"
   }
@@ -144,8 +144,8 @@ private[redshift] class RedshiftWriter(
       data: DataFrame,
       saveMode: SaveMode,
       params: MergedParameters,
-      tempDir: String,
-      filesToLoad: Seq[String]): Unit = {
+      creds: AWSCredentials,
+      manifestUrl: Option[String]): Unit = {
 
     // Overwrites must drop the table, in case there has been a schema update
     if (saveMode == SaveMode.Overwrite) {
@@ -159,23 +159,9 @@ private[redshift] class RedshiftWriter(
     val createTable = conn.prepareStatement(createStatement)
     createTable.execute()
 
-    if (filesToLoad.nonEmpty) {
-      // Write a manifest specifying the files to be loaded.
-      // See https://docs.aws.amazon.com/redshift/latest/dg/loading-data-files-using-manifest.html
-      // for a full description of the manifest format.
-      val manifestEntries = filesToLoad.map { filename =>
-        val url = Utils.fixS3Url(Utils.removeCredentialsFromURI(URI.create(filename)).toString)
-        s"""{"url":"$url", "mandatory":true}"""
-      }
-      val manifest = s"""{"entries": [${manifestEntries.mkString(",\n")}]}"""
-      val fs = FileSystem.get(URI.create(tempDir), data.sqlContext.sparkContext.hadoopConfiguration)
-      val manifestPath = tempDir.stripSuffix("/") + "/manifest.json"
-      val fsDataOut = fs.create(new Path(manifestPath))
-      fsDataOut.write(manifest.getBytes("utf-8"))
-      fsDataOut.close()
-
+    manifestUrl.map { manifestUrl =>
       // Load the temporary data into the new file
-      val copyStatement = copySql(data.sqlContext, params, manifestPath)
+      val copyStatement = copySql(data.sqlContext, params, creds, manifestUrl)
       val copyData = conn.prepareStatement(copyStatement)
       try {
         copyData.execute()
@@ -231,18 +217,16 @@ private[redshift] class RedshiftWriter(
   }
 
   /**
-   * Serialize temporary data to S3, ready for Redshift COPY.
+   * Serialize temporary data to S3, ready for Redshift COPY, and create a manifest file which can
+   * be used to instruct Redshift to load the non-empty temporary data partitions.
    *
-   * Returns a list of S3 filenames corresponding to the written non-empty partitions.
+   * @return the URL of the manifest file in S3, in `s3://path/to/file/manifest.json` format, if
+   *         at least one record was written, and None otherwise.
    */
   private def unloadData(
       sqlContext: SQLContext,
       data: DataFrame,
-      params: MergedParameters,
-      tempDir: String): Seq[String] = {
-    val creds: AWSCredentials = params.temporaryAWSCredentials.getOrElse(
-      AWSCredentialsUtils.load(params.rootTempDir, sqlContext.sparkContext.hadoopConfiguration))
-    Utils.checkThatBucketHasObjectLifecycleConfiguration(params.rootTempDir, s3ClientFactory(creds))
+      tempDir: String): Option[String] = {
     // spark-avro does not support Date types. In addition, it converts Timestamps into longs
     // (milliseconds since the Unix epoch). Redshift is capable of loading timestamps in
     // 'epochmillisecs' format but there's no equivalent format for dates. To work around this, we
@@ -311,22 +295,45 @@ private[redshift] class RedshiftWriter(
       .format("com.databricks.spark.avro")
       .save(tempDir)
 
-    // The saved filenames are going to be of the form part-r-XXXXX-UUID.avro. There isn't a way to
-    // figure out what this UUID is, besides querying S3:
-    val fs = FileSystem.get(URI.create(tempDir), sqlContext.sparkContext.hadoopConfiguration)
-    val writeJobUUID = fs.listStatus(new Path(tempDir))
-      .iterator
-      .map(_.getPath.getName)
-      .filter(_.startsWith("part"))
-      .take(1)
-      .toSeq
-      .headOption.getOrElse(throw new Exception("No part files were written!"))
-      .drop("part-r-XXXXX-".length)
-      .stripSuffix(".avro")
+    if (nonEmptyPartitions.value.isEmpty) {
+      None
+    } else {
+      // See https://docs.aws.amazon.com/redshift/latest/dg/loading-data-files-using-manifest.html
+      // for a description of the manifest file format. The URLs in this manifest must be absolute
+      // and complete.
 
-    // TODO(josh): Redact credentials out of tempDir, if present.
-    nonEmptyPartitions.value.toSeq.map { partitionId =>
-      s"${tempDir.stripSuffix("/")}/part-r-${"%05d".format(partitionId)}-$writeJobUUID.avro"
+      // The saved filenames are going to be of the form part-r-XXXXX-UUID.avro. There isn't a way
+      // to figure out what this UUID is, besides querying S3. In principle, this file format could
+      // change in a way that breaks this library, but this seems unlikely and we can patch around
+      // it if that happens.
+      val fs = FileSystem.get(URI.create(tempDir), sqlContext.sparkContext.hadoopConfiguration)
+      val writeJobUUID = fs.listStatus(new Path(tempDir))
+        .iterator
+        .map(_.getPath.getName)
+        .filter(_.startsWith("part"))
+        .take(1)
+        .toSeq
+        .headOption.getOrElse(throw new Exception("No part files were written!"))
+        .drop("part-r-XXXXX-".length)
+        .stripSuffix(".avro")
+
+      // It's possible that tempDir contains AWS access keys. We shouldn't save those credentials to
+      // S3, so let's first sanitize `tempdir` and make sure that it uses the s3:// scheme:
+      val sanitizedTempDir = Utils.fixS3Url(
+        Utils.removeCredentialsFromURI(URI.create(tempDir)).toString).stripSuffix("/")
+      val urls = nonEmptyPartitions.value.toSeq.map { partitionId =>
+        s"$sanitizedTempDir/part-r-${"%05d".format(partitionId)}-$writeJobUUID.avro"
+      }
+      val manifestEntries = urls.map { url => s"""{"url":"$url", "mandatory":true}""" }
+      val manifest = s"""{"entries": [${manifestEntries.mkString(",\n")}]}"""
+      val manifestPath = sanitizedTempDir + "/manifest.json"
+      val fsDataOut = fs.create(new Path(manifestPath))
+      try {
+        fsDataOut.write(manifest.getBytes("utf-8"))
+      } finally {
+        fsDataOut.close()
+      }
+      Some(manifestPath)
     }
   }
 
@@ -343,22 +350,26 @@ private[redshift] class RedshiftWriter(
         "For save operations you must specify a Redshift table name with the 'dbtable' parameter")
     }
 
+    val creds: AWSCredentials = params.temporaryAWSCredentials.getOrElse(
+      AWSCredentialsUtils.load(params.rootTempDir, sqlContext.sparkContext.hadoopConfiguration))
+
     Utils.assertThatFileSystemIsNotS3BlockFileSystem(
       new URI(params.rootTempDir), sqlContext.sparkContext.hadoopConfiguration)
 
+    Utils.checkThatBucketHasObjectLifecycleConfiguration(params.rootTempDir, s3ClientFactory(creds))
+
     val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
 
-    val tempDir = params.createPerQueryTempDir()
     try {
+      val tempDir = params.createPerQueryTempDir()
+      val manifestUrl = unloadData(sqlContext, data, tempDir)
       if (saveMode == SaveMode.Overwrite && params.useStagingTable) {
         withStagingTable(conn, params.table.get, stagingTable => {
           val updatedParams = MergedParameters(params.parameters.updated("dbtable", stagingTable))
-          val filesToLoad = unloadData(sqlContext, data, updatedParams, tempDir)
-          doRedshiftLoad(conn, data, saveMode, updatedParams, tempDir, filesToLoad)
+          doRedshiftLoad(conn, data, saveMode, updatedParams, creds, manifestUrl)
         })
       } else {
-        val filesToLoad = unloadData(sqlContext, data, params, tempDir)
-        doRedshiftLoad(conn, data, saveMode, params, tempDir, filesToLoad)
+        doRedshiftLoad(conn, data, saveMode, params, creds, manifestUrl)
       }
     } finally {
       conn.close()
