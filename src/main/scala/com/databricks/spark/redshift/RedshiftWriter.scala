@@ -159,7 +159,7 @@ private[redshift] class RedshiftWriter(
     val createTable = conn.prepareStatement(createStatement)
     createTable.execute()
 
-    manifestUrl.map { manifestUrl =>
+    manifestUrl.foreach { manifestUrl =>
       // Load the temporary data into the new file
       val copyStatement = copySql(data.sqlContext, params, creds, manifestUrl)
       val copyData = conn.prepareStatement(copyStatement)
