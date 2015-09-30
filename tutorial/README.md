@@ -21,7 +21,7 @@ For the purpose of this article my Redshift database runs on a 2 node cluster. E
 
 ## Usage##
 
-We are ready to interact with Redshift using the spark-redshift library. The skeleton of the program we will be using is shown in Listing 1. You can also use the Spark REPL to run the lines listed in the program below.
+We are ready to interact with Redshift using the spark-redshift library. The skeleton of the program we will be using is shown in Listing 1. The entire program can be accessed from [here](tutorial/SparkRedshiftTutorial.scala). You can also use the Spark REPL to run the lines listed in the program below. 
 
 ```scala
 package com.databricks.spark.redshift.tutorial
@@ -231,7 +231,7 @@ The lines in Listing 3 will execute to produce the following output
 only showing top 20 rows
 ```
 
-### Under the hoods - Load Function ###
+### Under the hood - Load Function ###
 
 In this section we will take a peek inside spark-redshift to understand how exactly the LOAD function works. Specifically we will look at how `event` table was read into a DataFrame. The LOAD is a two step process
 
@@ -329,7 +329,7 @@ AS SELECT * FROM myevent;
 
 By default the save operation uses the key distribution [style](http://docs.aws.amazon.com/redshift/latest/dg/c_choosing_dist_sort.html) of `EVEN` in Redshift. This can be changed by the use of option parameter `diststyle` and `distkey`. See spark-redshift [documentation](https://github.com/databricks/spark-redshift) for details.
 
-### Under the hoods - Save Function ###
+### Under the hood - Save Function ###
 
 The implementation of the Save function is provided in the class `com.databricks.spark.redshift.RedshiftWriter`.   
 
@@ -397,7 +397,7 @@ Note how we have specified every column as non-nullable in the custom schema.
 
 In this section we illustrated how Data Sources API provides a unified API to work with multiple datasources. This feature is enabled by the generic `DataFrame` interface. We also looked at how a `DataFrame` can be saved to Redshift with a user-defined schema. None of this is unique to spark-redshift. It is provided by the DataSources API for use with all compatible packages. This is the feature that makes the DataSource API such a powerful tool for ETL usecases.
 
-## Under the Hood - Putting it all together##
+## Under the hood - Putting it all together##
 
 As we discussed earlier Spark SQL will introspect for a class called `DefaultSource` in the Datasources API package `com.databricks.spark.redshift`. The `DefaultSource` class implements the trait `RelationProvider` class which is provides the default load functionality for the library. It consumes the parameters provided by the user and converts it to an instance of `BaseRelation` which is implemented by the class `com.databricks.spark.redshift.RedshiftRelation`. 
 
