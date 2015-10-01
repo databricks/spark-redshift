@@ -29,7 +29,7 @@ import org.apache.spark.sql.types.{StructType,StructField,DecimalType,IntegerTyp
  * 3. Redshift Database Name
  * 4. Redshift UserId
  * 5. Redshift Password
- * 6. Redshift URL (Ex. swredshift.czac2vcs84ci.us-east-1.redshift.amazonaws.com:5439
+ * 6. Redshift URL (Ex. swredshift.czac2vcs84ci.us-east-1.redshift.amazonaws.com:5439)
  */
 object SparkRedshiftTutorial {
   /*
