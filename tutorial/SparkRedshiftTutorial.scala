@@ -15,16 +15,14 @@
  */
 
 package com.databricks.spark.redshift.tutorial
-
-import org.apache.spark.{ SparkConf, SparkContext }
+import org.apache.spark.{SparkConf,SparkContext}
 import org.apache.spark.sql.SaveMode
-import java.io.File
-import org.apache.spark.sql.types.{ StructType, StructField, 
-                                    StringType, IntegerType, 
-                                    LongType, DecimalType }
+import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.types.{StructType,StructField,DecimalType,IntegerType,LongType,StringType}
+  
 
 /**
- * Source code accompanying the spark-redshift tutorial. 
+ * Source code accompanying the spark-redshift tutorial.
  * The following parameters need to be passed
  * 1. AWS Access Key
  * 2. AWS Secret Access Key
@@ -32,7 +30,6 @@ import org.apache.spark.sql.types.{ StructType, StructField,
  * 4. Redshift UserId
  * 5. Redshift Password
  * 6. Redshift URL (Ex. swredshift.czac2vcs84ci.us-east-1.redshift.amazonaws.com:5439
- * 
  */
 object SparkRedshiftTutorial {
   /*
@@ -40,133 +37,126 @@ object SparkRedshiftTutorial {
    * 1. Download contents from link 
    *      https://github.com/srccodes/hadoop-common-2.2.0-bin/archive/master.zip
    * 2. Unzip the file in step 1 into your %HADOOP_HOME%/bin. 
-   *        In the example below  %HADOOP_HOME%=C:/MySoftware/hdphome
-   * 3. After step 2 %HADOOP_HOME/bin should contain winutils.exe
-   * 
-   */   
-	if (System.getProperty("os.name").startsWith("Windows")) {
-		val hdphome: File = new File("C:/MySoftware/hdphome");
-		System.setProperty("hadoop.home.dir", hdphome.getAbsolutePath().toString())
-	}
+   * 3. pass System parameter -Dhadoop.home.dir=%HADOOP_HOME/bin  where %HADOOP_HOME 
+   *    must be an absolute not relative path
+   */
 
-	def main(args: Array[String]): Unit = {
-		val awsAccessKey = args(0)
-		val awsSecretKey = args(1)
-		val rsDbName = args(2)
-		val rsUser = args(3)
-		val rsPassword = args(4)
-    /** Sample Redshift URL is swredshift.czac2vcs84ci.us-east-1.redshift.amazonaws.com:5439 */
-		val rsURL = args(5)  
-		val jdbcURL = s"""jdbc:redshift://$rsURL/$rsDbName?user=$rsUser&password=$rsPassword"""
+  def main(args: Array[String]): Unit = {
+
+    if (args.length < 6) {
+      println("Needs 6 parameters only passed " + args.length)
+      println("parameters needed - $awsAccessKey $awsSecretKey $rsDbName $rsUser $rsPassword $rsURL")
+    }
+    val awsAccessKey = args(0)
+    val awsSecretKey = args(1)
+    val rsDbName = args(2)
+    val rsUser = args(3)
+    val rsPassword = args(4)
+    //Sample Redshift URL is swredshift.czac2vcs84ci.us-east-1.redshift.amazonaws.com:5439
+    val rsURL = args(5)
+    val jdbcURL = s"""jdbc:redshift://$rsURL/$rsDbName?user=$rsUser&password=$rsPassword"""
     println(jdbcURL)
-		val sc = new SparkContext(new SparkConf().setAppName("SparkSQL").setMaster("local"))
+    val sc = new SparkContext(new SparkConf().setAppName("SparkSQL").setMaster("local"))
 
-		val tempS3Dir = "s3n://redshift-spark/temp/"
-		sc.hadoopConfiguration.set("fs.s3n.awsAccessKeyId", awsAccessKey)
-		sc.hadoopConfiguration.set("fs.s3n.awsSecretAccessKey", awsSecretKey)
+    val tempS3Dir = "s3n://redshift-spark/temp/"
+    sc.hadoopConfiguration.set("fs.s3n.awsAccessKeyId", awsAccessKey)
+    sc.hadoopConfiguration.set("fs.s3n.awsSecretAccessKey", awsSecretKey)
 
-		val sqlContext = new org.apache.spark.sql.SQLContext(sc)
+    val sqlContext = new SQLContext(sc)
 
-		import sqlContext.implicits._
-    /** Load from a table */
-		val eventsDF = sqlContext.read
-			.format("com.databricks.spark.redshift")
-			.option("url", jdbcURL) 
-			.option("tempdir", tempS3Dir) 
-			.option("dbtable", "event") 
-			.load()
-		eventsDF.show()
-		eventsDF.printSchema()
-
-    /** Load from a query */
-		val salesQuery = """select salesid,listid,sellerid,buyerid,
-                        eventid,dateid,qtysold,pricepaid,commission 
-                        from sales 
-                        order by saletime desc LIMIT 10000"""
-		val salesDF = sqlContext.read
-			.format("com.databricks.spark.redshift")
-			.option("url", jdbcURL)
-			.option("tempdir", tempS3Dir)
-			.option("query", salesQuery)
-			.load()
-		salesDF.show()
-
-		val eventQuery = "select * from event"
-		val eventDF = sqlContext.read
-			.format("com.databricks.spark.redshift")
-			.option("url", jdbcURL) 
-			.option("tempdir", tempS3Dir)
-			.option("query", eventQuery)
-			.load()
-
-    /** Register 'event' table as 'myevent' in the Spark Environment */
-		eventsDF.registerTempTable("myevent") 
-
-    /** Save to a redshift table from a table registered in spark */
+    import sqlContext.implicits._
     
+    //Load from a table 
+    val eventsDF = sqlContext.read
+      .format("com.databricks.spark.redshift")
+      .option("url", jdbcURL)
+      .option("tempdir", tempS3Dir)
+      .option("dbtable", "event")
+      .load()
+    eventsDF.show()
+    eventsDF.printSchema()
+
+    //Load from a query 
+    val salesQuery = """SELECT salesid, listid, sellerid, buyerid, 
+                               eventid, dateid, qtysold, pricepaid, commission 
+                        FROM sales 
+                        ORDER BY saletime DESC LIMIT 10000"""
+    val salesDF = sqlContext.read
+      .format("com.databricks.spark.redshift")
+      .option("url", jdbcURL)
+      .option("tempdir", tempS3Dir)
+      .option("query", salesQuery)
+      .load()
+    salesDF.show()
+
+    val eventQuery = "SELECT * FROM event"
+    val eventDF = sqlContext.read
+      .format("com.databricks.spark.redshift")
+      .option("url", jdbcURL)
+      .option("tempdir", tempS3Dir)
+      .option("query", eventQuery)
+      .load()
+
+    /*
+     * Register 'event' table as temporary table 'myevent' 
+     * so that it can be queried via sqlContext.sql  
+     */
+    eventsDF.registerTempTable("myevent")
+
+    //Save to a Redshift table from a table registered in Spark
+
     /*
      * Create a new table redshiftevent after dropping any existing redshiftevent table
      * and write event records with event id less than 1000
      */
-		sqlContext.sql("select * from myevent where eventid<=1000").withColumnRenamed("eventid", "id")
-			.write.format("com.databricks.spark.redshift")
-			.option("url", jdbcURL)
-			.option("tempdir", tempS3Dir)
-			.option("dbtable", "redshiftevent")
-			.mode(SaveMode.Overwrite)
-			.save()
-    
+    sqlContext.sql("SELECT * FROM myevent WHERE eventid<=1000").withColumnRenamed("eventid", "id")
+      .write.format("com.databricks.spark.redshift")
+      .option("url", jdbcURL)
+      .option("tempdir", tempS3Dir)
+      .option("dbtable", "redshiftevent")
+      .mode(SaveMode.Overwrite)
+      .save()
+
     /*
      * Append to an existing table redshiftevent if it exists or create a new one if it does not
      * exist and write event records with event id greater than 1000
      */
-		sqlContext.sql("select * from myevent where eventid>1000").withColumnRenamed("eventid", "id")
-			.write.format("com.databricks.spark.redshift")
-			.option("url", jdbcURL) 
-			.option("tempdir", tempS3Dir)
-			.option("dbtable", "redshiftevent")
-			.mode(SaveMode.Append) 
-			.save()
+    sqlContext.sql("SELECT * FROM myevent WHERE eventid>1000").withColumnRenamed("eventid", "id")
+      .write.format("com.databricks.spark.redshift")
+      .option("url", jdbcURL)
+      .option("tempdir", tempS3Dir)
+      .option("dbtable", "redshiftevent")
+      .mode(SaveMode.Append)
+      .save()
 
-		/** Demonstration of Inter-operability */
-		val salesAGGQuery = """select sales.eventid as id,sum(qtysold) as totalqty,sum(pricepaid)  as salesamt
-                           from sales
-                           group by (sales.eventid)
+    /** Demonstration of interoperability */
+    val salesAGGQuery = """SELECT sales.eventid AS id, SUM(qtysold) AS totalqty, SUM(pricepaid) AS salesamt
+                           FROM sales
+                           GROUP BY (sales.eventid)
                            """
-		val salesAGGDF = sqlContext.read
-			.format("com.databricks.spark.redshift")
-			.option("url", jdbcURL) 
-			.option("tempdir", tempS3Dir) 
-			.option("query", salesAGGQuery) 
-			.load()
-		salesAGGDF.registerTempTable("salesagg")
+    val salesAGGDF = sqlContext.read
+      .format("com.databricks.spark.redshift")
+      .option("url", jdbcURL)
+      .option("tempdir", tempS3Dir)
+      .option("query", salesAGGQuery)
+      .load()
+    salesAGGDF.registerTempTable("salesagg")
 
     /*
      * Join two DataFrame instances. Each could be sourced from any 
      * compatible Data Source
      */
-		val salesAGGDF2 = salesAGGDF.join(eventsDF, salesAGGDF("id") === eventsDF("eventid"))
-			.select("id", "eventname", "totalqty", "salesamt")
+    val salesAGGDF2 = salesAGGDF.join(eventsDF, salesAGGDF("id") === eventsDF("eventid"))
+      .select("id", "eventname", "totalqty", "salesamt")
 
-    /** Create a custom schema */
-		val schema = StructType(List(StructField("eventid", IntegerType, false),
-			StructField("eventname", StringType, false),
-			StructField("qtysold", LongType, false),
-			StructField("revenue", DecimalType(38, 2), false)))
-      
-    /** Apply custom schema on existing DataFrame */
-		val salesAGGDFWithSchema = sqlContext.createDataFrame(salesAGGDF2.rdd, schema)
-		salesAGGDFWithSchema.registerTempTable("redshift_sales_agg")
+    salesAGGDF2.registerTempTable("redshift_sales_agg")
 
-    /** Save with custom schema */
-		sqlContext.sql("select * from redshift_sales_agg")
-			.write.format("com.databricks.spark.redshift")
-			.option("url", jdbcURL)
-			.option("tempdir", tempS3Dir)
-			.option("dbtable", "redshift_sales_agg")
-			.mode(SaveMode.Overwrite)
-			.save()
-
-
-	}
+    sqlContext.sql("SELECT * FROM redshift_sales_agg")
+      .write.format("com.databricks.spark.redshift")
+      .option("url", jdbcURL)
+      .option("tempdir", tempS3Dir)
+      .option("dbtable", "redshift_sales_agg")
+      .mode(SaveMode.Overwrite)
+      .save()
+  }
 }
