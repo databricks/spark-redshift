@@ -133,12 +133,13 @@ class RedshiftSourceSuite
       "UNLOAD \\('SELECT \"testbyte\", \"testbool\", \"testdate\", \"testdouble\"," +
       " \"testfloat\", \"testint\", \"testlong\", \"testshort\", \"teststring\", " +
       "\"testtimestamp\" " +
-      "FROM test_table '\\) " +
+      "FROM \"PUBLIC\".\"test_table\" '\\) " +
       "TO '.*' " +
       "WITH CREDENTIALS 'aws_access_key_id=test1;aws_secret_access_key=test2' " +
       "ESCAPE").r
-    val mockRedshift =
-      new MockRedshift(defaultParams("url"), Map("test_table" -> TestUtils.testSchema))
+    val mockRedshift = new MockRedshift(
+      defaultParams("url"),
+      Map(TableName.parseFromEscaped("test_table").toString -> TestUtils.testSchema))
 
     // Assert that we've loaded and converted all data in the test file
     val source = new DefaultSource(mockRedshift.jdbcWrapper, _ => mockS3Client)
@@ -190,7 +191,7 @@ class RedshiftSourceSuite
 
   test("DefaultSource supports simple column filtering") {
     val expectedQuery = (
-      "UNLOAD \\('SELECT \"testbyte\", \"testbool\" FROM test_table '\\) " +
+      "UNLOAD \\('SELECT \"testbyte\", \"testbool\" FROM \"PUBLIC\".\"test_table\" '\\) " +
       "TO '.*' " +
       "WITH CREDENTIALS 'aws_access_key_id=test1;aws_secret_access_key=test2' " +
       "ESCAPE").r
@@ -217,7 +218,7 @@ class RedshiftSourceSuite
     // scalastyle:off
     val expectedQuery = (
       "UNLOAD \\('SELECT \"testbyte\", \"testbool\" " +
-        "FROM test_table " +
+        "FROM \"PUBLIC\".\"test_table\" " +
         "WHERE \"testbool\" = true " +
         "AND \"teststring\" = \\\\'Unicode\\\\'\\\\'s樂趣\\\\' " +
         "AND \"testdouble\" > 1000.0 " +
@@ -228,8 +229,9 @@ class RedshiftSourceSuite
       "WITH CREDENTIALS 'aws_access_key_id=test1;aws_secret_access_key=test2' " +
       "ESCAPE").r
     // scalastyle:on
-    val mockRedshift =
-      new MockRedshift(defaultParams("url"), Map("test_table" -> TestUtils.testSchema))
+    val mockRedshift = new MockRedshift(
+      defaultParams("url"),
+      Map(TableName.parseFromEscaped("test_table").toString -> TestUtils.testSchema))
 
     // Construct the source with a custom schema
     val source = new DefaultSource(mockRedshift.jdbcWrapper, _ => mockS3Client)
@@ -262,21 +264,23 @@ class RedshiftSourceSuite
       "distkey" -> "testint")
 
     val expectedCommands = Seq(
-      "DROP TABLE IF EXISTS test_table_staging_.*".r,
-      "CREATE TABLE IF NOT EXISTS test_table_staging.* DISTSTYLE KEY DISTKEY \\(testint\\).*".r,
-      "COPY test_table_staging_.*".r,
-      "GRANT SELECT ON test_table_staging.+ TO jeremy".r,
+      "DROP TABLE IF EXISTS \"PUBLIC\"\\.\"test_table_staging_.*\"".r,
+      ("CREATE TABLE IF NOT EXISTS \"PUBLIC\"\\.\"test_table_staging.*" +
+        " DISTSTYLE KEY DISTKEY \\(testint\\).*").r,
+      "COPY \"PUBLIC\"\\.\"test_table_staging_.*\"".r,
+      "GRANT SELECT ON \"PUBLIC\"\\.\"test_table_staging.+\" TO jeremy".r,
       """
         | BEGIN;
-        | ALTER TABLE test_table RENAME TO test_table_backup_.*;
-        | ALTER TABLE test_table_staging_.* RENAME TO test_table;
-        | DROP TABLE test_table_backup_.*;
+        | ALTER TABLE "PUBLIC"\."test_table" RENAME TO "test_table_backup_.*";
+        | ALTER TABLE "PUBLIC"\."test_table_staging_.*" RENAME TO "test_table";
+        | DROP TABLE "PUBLIC"\."test_table_backup_.*";
         | END;
       """.stripMargin.trim.r,
-      "DROP TABLE IF EXISTS test_table_staging_.*".r)
+      "DROP TABLE IF EXISTS \"PUBLIC\"\\.\"test_table_staging_.*\"".r)
 
-    val mockRedshift =
-      new MockRedshift(defaultParams("url"), Map("test_table" -> TestUtils.testSchema))
+    val mockRedshift = new MockRedshift(
+      defaultParams("url"),
+      Map(TableName.parseFromEscaped("test_table").toString -> TestUtils.testSchema))
 
     val relation = RedshiftRelation(
       mockRedshift.jdbcWrapper,
@@ -297,8 +301,9 @@ class RedshiftSourceSuite
   }
 
   test("Cannot write table with column names that become ambiguous under case insensitivity") {
-    val mockRedshift =
-      new MockRedshift(defaultParams("url"), Map("test_table" -> TestUtils.testSchema))
+    val mockRedshift = new MockRedshift(
+      defaultParams("url"),
+      Map(TableName.parseFromEscaped("test_table").toString -> TestUtils.testSchema))
 
     val schema = StructType(Seq(StructField("a", IntegerType), StructField("A", IntegerType)))
     val df = testSqlContext.createDataFrame(sc.emptyRDD[Row], schema)
@@ -317,15 +322,15 @@ class RedshiftSourceSuite
 
     val mockRedshift = new MockRedshift(
       defaultParams("url"),
-      Map("test_table" -> TestUtils.testSchema),
-      jdbcQueriesThatShouldFail = Seq("COPY test_table_staging_.*".r))
+      Map(TableName.parseFromEscaped("test_table").toString -> TestUtils.testSchema),
+      jdbcQueriesThatShouldFail = Seq("COPY \"PUBLIC\".\"test_table_staging_.*\"".r))
 
     val expectedCommands = Seq(
-      "DROP TABLE IF EXISTS test_table_staging_.*".r,
-      "CREATE TABLE IF NOT EXISTS test_table_staging.*".r,
-      "COPY test_table_staging_.*".r,
+      "DROP TABLE IF EXISTS \"PUBLIC\".\"test_table_staging_.*\"".r,
+      "CREATE TABLE IF NOT EXISTS \"PUBLIC\".\"test_table_staging_.*\"".r,
+      "COPY \"PUBLIC\".\"test_table_staging_.*\"".r,
       ".*FROM stl_load_errors.*".r,
-      "DROP TABLE IF EXISTS test_table_staging.*".r
+      "DROP TABLE IF EXISTS \"PUBLIC\".\"test_table_staging_.*\"".r
     )
 
     val source = new DefaultSource(mockRedshift.jdbcWrapper, _ => mockS3Client)
@@ -340,10 +345,12 @@ class RedshiftSourceSuite
 
   test("Append SaveMode doesn't destroy existing data") {
     val expectedCommands =
-      Seq("CREATE TABLE IF NOT EXISTS test_table .*".r,
-          "COPY test_table .*".r)
+      Seq("CREATE TABLE IF NOT EXISTS \"PUBLIC\".\"test_table\" .*".r,
+          "COPY \"PUBLIC\".\"test_table\" .*".r)
 
-    val mockRedshift = new MockRedshift(defaultParams("url"), Map(defaultParams("dbtable") -> null))
+    val mockRedshift = new MockRedshift(
+      defaultParams("url"),
+      Map(TableName.parseFromEscaped(defaultParams("dbtable")).toString -> null))
 
     val source = new DefaultSource(mockRedshift.jdbcWrapper, _ => mockS3Client)
     val savedDf =
@@ -373,13 +380,15 @@ class RedshiftSourceSuite
     val createTableCommand =
       DefaultRedshiftWriter.createTableSql(df, MergedParameters.apply(defaultParams)).trim
     val expectedCreateTableCommand =
-      """CREATE TABLE IF NOT EXISTS test_table ("long_str" VARCHAR(512),""" +
+      """CREATE TABLE IF NOT EXISTS "PUBLIC"."test_table" ("long_str" VARCHAR(512),""" +
         """ "short_str" VARCHAR(10), "default_str" TEXT)"""
     assert(createTableCommand === expectedCreateTableCommand)
   }
 
   test("Respect SaveMode.ErrorIfExists when table exists") {
-    val mockRedshift = new MockRedshift(defaultParams("url"), Map(defaultParams("dbtable") -> null))
+    val mockRedshift = new MockRedshift(
+      defaultParams("url"),
+      Map(TableName.parseFromEscaped(defaultParams("dbtable")).toString -> null))
     val errIfExistsSource = new DefaultSource(mockRedshift.jdbcWrapper, _ => mockS3Client)
     intercept[Exception] {
       errIfExistsSource.createRelation(
@@ -390,7 +399,9 @@ class RedshiftSourceSuite
   }
 
   test("Do nothing when table exists if SaveMode = Ignore") {
-    val mockRedshift = new MockRedshift(defaultParams("url"), Map(defaultParams("dbtable") -> null))
+    val mockRedshift = new MockRedshift(
+      defaultParams("url"),
+      Map(TableName.parseFromEscaped(defaultParams("dbtable")).toString -> null))
     val ignoreSource = new DefaultSource(mockRedshift.jdbcWrapper, _ => mockS3Client)
     ignoreSource.createRelation(testSqlContext, SaveMode.Ignore, defaultParams, expectedDataDF)
     mockRedshift.verifyThatConnectionsWereClosed()

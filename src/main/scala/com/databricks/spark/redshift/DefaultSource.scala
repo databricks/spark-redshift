@@ -77,7 +77,7 @@ class DefaultSource(jdbcWrapper: JDBCWrapper, s3ClientFactory: AWSCredentials =>
     def tableExists: Boolean = {
       val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
       try {
-        jdbcWrapper.tableExists(conn, table)
+        jdbcWrapper.tableExists(conn, table.toString)
       } finally {
         conn.close()
       }
