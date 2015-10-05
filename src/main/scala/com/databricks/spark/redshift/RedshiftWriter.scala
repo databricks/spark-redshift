@@ -21,8 +21,11 @@ import java.sql.{Connection, Date, SQLException, Timestamp}
 
 import com.amazonaws.auth.AWSCredentials
 import com.amazonaws.services.s3.AmazonS3Client
+import org.apache.hadoop.fs.{Path, FileSystem}
+import org.apache.spark.TaskContext
 import org.slf4j.LoggerFactory
 
+import scala.collection.mutable
 import scala.util.Random
 import scala.util.control.NonFatal
 
@@ -33,7 +36,30 @@ import org.apache.spark.sql.{DataFrame, Row, SaveMode, SQLContext}
 import org.apache.spark.sql.types._
 
 /**
- * Functions to write data to Redshift with intermediate Avro serialisation into S3.
+ * Functions to write data to Redshift.
+ *
+ * At a high level, writing data back to Redshift involves the following steps:
+ *
+ *   - Use the spark-avro library to save the DataFrame to S3 using Avro serialization. Prior to
+ *     saving the data, certain data type conversions are applied in order to work around
+ *     limitations in Avro's data type support and Redshift's case-insensitive identifier handling.
+ *
+ *     While writing the Avro files, we use accumulators to keep track of which partitions were
+ *     non-empty. After the write operation completes, we use this to construct a list of non-empty
+ *     Avro partition files.
+ *
+ *   - Use JDBC to issue any CREATE TABLE commands, if required.
+ *
+ *   - If there is data to be written (i.e. not all partitions were empty), then use the list of
+ *     non-empty Avro files to construct a JSON manifest file to tell Redshift to load those files.
+ *     This manifest is written to S3 alongside the Avro files themselves. We need to use an
+ *     explicit manifest, as opposed to simply passing the name of the directory containing the
+ *     Avro files, in order to work around a bug related to parsing of empty Avro files (see #96).
+ *
+ *   - Use JDBC to issue a COPY command in order to instruct Redshift to load the Avro data into
+ *     the appropriate table. If the Overwrite SaveMode is being used, then by default the data
+ *     will be loaded into a temporary staging table, which later will atomically replace the
+ *     original table via a transaction.
  */
 private[redshift] class RedshiftWriter(
     jdbcWrapper: JDBCWrapper,
@@ -67,12 +93,12 @@ private[redshift] class RedshiftWriter(
   private def copySql(
       sqlContext: SQLContext,
       params: MergedParameters,
-      tempDir: String): String = {
-    val credsString: String = AWSCredentialsUtils.getRedshiftCredentialsString(
-      AWSCredentialsUtils.load(tempDir, sqlContext.sparkContext.hadoopConfiguration))
-    val fixedUrl = Utils.fixS3Url(tempDir)
+      creds: AWSCredentials,
+      manifestUrl: String): String = {
+    val credsString: String = AWSCredentialsUtils.getRedshiftCredentialsString(creds)
+    val fixedUrl = Utils.fixS3Url(manifestUrl)
     s"COPY ${params.table.get} FROM '$fixedUrl' CREDENTIALS '$credsString' FORMAT AS " +
-      "AVRO 'auto' DATEFORMAT 'YYYY-MM-DD HH:MI:SS'"
+      "AVRO 'auto' DATEFORMAT 'YYYY-MM-DD HH:MI:SS' manifest"
   }
 
   /**
@@ -121,7 +147,8 @@ private[redshift] class RedshiftWriter(
       data: DataFrame,
       saveMode: SaveMode,
       params: MergedParameters,
-      tempDir: String): Unit = {
+      creds: AWSCredentials,
+      manifestUrl: Option[String]): Unit = {
 
     // Overwrites must drop the table, in case there has been a schema update
     if (saveMode == SaveMode.Overwrite) {
@@ -135,51 +162,53 @@ private[redshift] class RedshiftWriter(
     val createTable = conn.prepareStatement(createStatement)
     createTable.execute()
 
-    // Load the temporary data into the new file
-    val copyStatement = copySql(data.sqlContext, params, tempDir)
-    val copyData = conn.prepareStatement(copyStatement)
-    try {
-      copyData.execute()
-    } catch {
-      case e: SQLException =>
-        // Try to query Redshift's STL_LOAD_ERRORS table to figure out why the load failed.
-        // See http://docs.aws.amazon.com/redshift/latest/dg/r_STL_LOAD_ERRORS.html for details.
-        val errorLookupQuery =
-          """
-            | SELECT *
-            | FROM stl_load_errors
-            | WHERE query = pg_last_query_id()
-          """.stripMargin
-        val detailedException: Option[SQLException] = try {
-          val results = conn.prepareStatement(errorLookupQuery).executeQuery()
-          if (results.next()) {
-            val errCode = results.getInt("err_code")
-            val errReason = results.getString("err_reason").trim
-            val columnLength: String =
-              Option(results.getString("col_length"))
-                .map(_.trim)
-                .filter(_.nonEmpty)
-                .map(n => s"($n)")
-                .getOrElse("")
-            val exceptionMessage =
-              s"""
-                 |Error (code $errCode) while loading data into Redshift: "$errReason"
-                 |Table name: ${params.table.get}
-                 |Column name: ${results.getString("colname").trim}
-                 |Column type: ${results.getString("type").trim}$columnLength
-                 |Raw line: ${results.getString("raw_line")}
-                 |Raw field value: ${results.getString("raw_field_value")}
-                """.stripMargin
-            Some(new SQLException(exceptionMessage, e))
-          } else {
-            None
+    manifestUrl.foreach { manifestUrl =>
+      // Load the temporary data into the new file
+      val copyStatement = copySql(data.sqlContext, params, creds, manifestUrl)
+      val copyData = conn.prepareStatement(copyStatement)
+      try {
+        copyData.execute()
+      } catch {
+        case e: SQLException =>
+          // Try to query Redshift's STL_LOAD_ERRORS table to figure out why the load failed.
+          // See http://docs.aws.amazon.com/redshift/latest/dg/r_STL_LOAD_ERRORS.html for details.
+          val errorLookupQuery =
+            """
+              | SELECT *
+              | FROM stl_load_errors
+              | WHERE query = pg_last_query_id()
+            """.stripMargin
+          val detailedException: Option[SQLException] = try {
+            val results = conn.prepareStatement(errorLookupQuery).executeQuery()
+            if (results.next()) {
+              val errCode = results.getInt("err_code")
+              val errReason = results.getString("err_reason").trim
+              val columnLength: String =
+                Option(results.getString("col_length"))
+                  .map(_.trim)
+                  .filter(_.nonEmpty)
+                  .map(n => s"($n)")
+                  .getOrElse("")
+              val exceptionMessage =
+                s"""
+                   |Error (code $errCode) while loading data into Redshift: "$errReason"
+                   |Table name: ${params.table.get}
+                   |Column name: ${results.getString("colname").trim}
+                   |Column type: ${results.getString("type").trim}$columnLength
+                   |Raw line: ${results.getString("raw_line")}
+                   |Raw field value: ${results.getString("raw_field_value")}
+                  """.stripMargin
+              Some(new SQLException(exceptionMessage, e))
+            } else {
+              None
+            }
+          } catch {
+            case NonFatal(e2) =>
+              log.error("Error occurred while querying STL_LOAD_ERRORS", e2)
+              None
           }
-        } catch {
-          case NonFatal(e2) =>
-            log.error("Error occurred while querying STL_LOAD_ERRORS", e2)
-            None
-        }
-      throw detailedException.getOrElse(e)
+          throw detailedException.getOrElse(e)
+      }
     }
 
     // Execute postActions
@@ -191,16 +220,16 @@ private[redshift] class RedshiftWriter(
   }
 
   /**
-   * Serialize temporary data to S3, ready for Redshift COPY
+   * Serialize temporary data to S3, ready for Redshift COPY, and create a manifest file which can
+   * be used to instruct Redshift to load the non-empty temporary data partitions.
+   *
+   * @return the URL of the manifest file in S3, in `s3://path/to/file/manifest.json` format, if
+   *         at least one record was written, and None otherwise.
    */
   private def unloadData(
       sqlContext: SQLContext,
       data: DataFrame,
-      params: MergedParameters,
-      tempDir: String): Unit = {
-    val creds: AWSCredentials = params.temporaryAWSCredentials.getOrElse(
-      AWSCredentialsUtils.load(params.rootTempDir, sqlContext.sparkContext.hadoopConfiguration))
-    Utils.checkThatBucketHasObjectLifecycleConfiguration(params.rootTempDir, s3ClientFactory(creds))
+      tempDir: String): Option[String] = {
     // spark-avro does not support Date types. In addition, it converts Timestamps into longs
     // (milliseconds since the Unix epoch). Redshift is capable of loading timestamps in
     // 'epochmillisecs' format but there's no equivalent format for dates. To work around this, we
@@ -221,14 +250,24 @@ private[redshift] class RedshiftWriter(
         case _ => (v: Any) => v
       }
     }
-    val convertedRows: RDD[Row] = data.map { row =>
-      val convertedValues: Array[Any] = new Array(conversionFunctions.length)
-      var i = 0
-      while (i < conversionFunctions.length) {
-        convertedValues(i) = conversionFunctions(i)(row(i))
-        i += 1
+
+    // Use Spark accumulators to determine which partitions were non-empty.
+    val nonEmptyPartitions =
+      sqlContext.sparkContext.accumulableCollection(mutable.HashSet.empty[Int])
+
+    val convertedRows: RDD[Row] = data.mapPartitions { iter =>
+      if (iter.hasNext) {
+        nonEmptyPartitions += TaskContext.get.partitionId()
       }
-      Row.fromSeq(convertedValues)
+      iter.map { row =>
+        val convertedValues: Array[Any] = new Array(conversionFunctions.length)
+        var i = 0
+        while (i < conversionFunctions.length) {
+          convertedValues(i) = conversionFunctions(i)(row(i))
+          i += 1
+        }
+        Row.fromSeq(convertedValues)
+      }
     }
 
     // Convert all column names to lowercase, which is necessary for Redshift to be able to load
@@ -258,6 +297,47 @@ private[redshift] class RedshiftWriter(
       .write
       .format("com.databricks.spark.avro")
       .save(tempDir)
+
+    if (nonEmptyPartitions.value.isEmpty) {
+      None
+    } else {
+      // See https://docs.aws.amazon.com/redshift/latest/dg/loading-data-files-using-manifest.html
+      // for a description of the manifest file format. The URLs in this manifest must be absolute
+      // and complete.
+
+      // The saved filenames are going to be of the form part-r-XXXXX-UUID.avro. There isn't a way
+      // to figure out what this UUID is, besides querying S3. In principle, this file format could
+      // change in a way that breaks this library, but this seems unlikely and we can patch around
+      // it if that happens.
+      val fs = FileSystem.get(URI.create(tempDir), sqlContext.sparkContext.hadoopConfiguration)
+      val writeJobUUID = fs.listStatus(new Path(tempDir))
+        .iterator
+        .map(_.getPath.getName)
+        .filter(_.startsWith("part"))
+        .take(1)
+        .toSeq
+        .headOption.getOrElse(throw new Exception("No part files were written!"))
+        .drop("part-r-XXXXX-".length)
+        .stripSuffix(".avro")
+
+      // It's possible that tempDir contains AWS access keys. We shouldn't save those credentials to
+      // S3, so let's first sanitize `tempdir` and make sure that it uses the s3:// scheme:
+      val sanitizedTempDir = Utils.fixS3Url(
+        Utils.removeCredentialsFromURI(URI.create(tempDir)).toString).stripSuffix("/")
+      val urls = nonEmptyPartitions.value.toSeq.map { partitionId =>
+        s"$sanitizedTempDir/part-r-${"%05d".format(partitionId)}-$writeJobUUID.avro"
+      }
+      val manifestEntries = urls.map { url => s"""{"url":"$url", "mandatory":true}""" }
+      val manifest = s"""{"entries": [${manifestEntries.mkString(",\n")}]}"""
+      val manifestPath = sanitizedTempDir + "/manifest.json"
+      val fsDataOut = fs.create(new Path(manifestPath))
+      try {
+        fsDataOut.write(manifest.getBytes("utf-8"))
+      } finally {
+        fsDataOut.close()
+      }
+      Some(manifestPath)
+    }
   }
 
   /**
@@ -273,22 +353,26 @@ private[redshift] class RedshiftWriter(
         "For save operations you must specify a Redshift table name with the 'dbtable' parameter")
     }
 
+    val creds: AWSCredentials = params.temporaryAWSCredentials.getOrElse(
+      AWSCredentialsUtils.load(params.rootTempDir, sqlContext.sparkContext.hadoopConfiguration))
+
     Utils.assertThatFileSystemIsNotS3BlockFileSystem(
       new URI(params.rootTempDir), sqlContext.sparkContext.hadoopConfiguration)
 
+    Utils.checkThatBucketHasObjectLifecycleConfiguration(params.rootTempDir, s3ClientFactory(creds))
+
     val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
 
-    val tempDir = params.createPerQueryTempDir()
     try {
+      val tempDir = params.createPerQueryTempDir()
+      val manifestUrl = unloadData(sqlContext, data, tempDir)
       if (saveMode == SaveMode.Overwrite && params.useStagingTable) {
         withStagingTable(conn, params.table.get, stagingTable => {
           val updatedParams = MergedParameters(params.parameters.updated("dbtable", stagingTable))
-          unloadData(sqlContext, data, updatedParams, tempDir)
-          doRedshiftLoad(conn, data, saveMode, updatedParams, tempDir)
+          doRedshiftLoad(conn, data, saveMode, updatedParams, creds, manifestUrl)
         })
       } else {
-        unloadData(sqlContext, data, params, tempDir)
-        doRedshiftLoad(conn, data, saveMode, params, tempDir)
+        doRedshiftLoad(conn, data, saveMode, params, creds, manifestUrl)
       }
     } finally {
       conn.close()

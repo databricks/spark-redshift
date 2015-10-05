@@ -310,6 +310,25 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
         StructType(StructField("table", IntegerType) :: Nil)))
   }
 
+  test("save with one empty partition (regression test for #96)") {
+    val df = sqlContext.createDataFrame(sc.parallelize(Seq(Row(1)), 2),
+      StructType(StructField("foo", IntegerType) :: Nil))
+    assert(df.rdd.glom.collect() === Array(Array.empty[Row], Array(Row(1))))
+    testRoundtripSaveAndLoad(s"save_with_one_empty_partition_$randomSuffix", df)
+  }
+
+  test("save with all empty partitions (regression test for #96)") {
+    val df = sqlContext.createDataFrame(sc.parallelize(Seq.empty[Row], 2),
+      StructType(StructField("foo", IntegerType) :: Nil))
+    assert(df.rdd.glom.collect() === Array(Array.empty[Row], Array.empty[Row]))
+    testRoundtripSaveAndLoad(s"save_with_all_empty_partitions_$randomSuffix", df)
+    // Now try overwriting that table. Although the new table is empty, it should still overwrite
+    // the existing table.
+    val df2 = df.withColumnRenamed("foo", "bar")
+    testRoundtripSaveAndLoad(
+      s"save_with_all_empty_partitions_$randomSuffix", df2, saveMode = SaveMode.Overwrite)
+  }
+
   test("multiple scans on same table") {
     // .rdd() forces the first query to be unloaded from Redshift
     val rdd1 = sqlContext.sql("select testint from test_table").rdd
