@@ -64,9 +64,10 @@ object SparkRedshiftBuild extends Build {
         // There's a trade-off here and we've chosen to err on the side of minimizing dependency
         // conflicts for a majority of users while adding a minor inconvienece (adding one extra
         // depenendecy by hand) for a smaller set of users.
-        "com.amazonaws" % "aws-java-sdk-core" % "1.10.22" % "provided",
-        "com.amazonaws" % "aws-java-sdk-s3" % "1.10.22" % "provided",
-        "com.amazonaws" % "aws-java-sdk-sts" % "1.10.22" % "test",
+        // We exclude jackson-databind to avoid a conflict with Spark's version (see #104).
+        "com.amazonaws" % "aws-java-sdk-core" % "1.10.22" % "provided" exclude("com.fasterxml.jackson.core", "jackson-databind"),
+        "com.amazonaws" % "aws-java-sdk-s3" % "1.10.22" % "provided" exclude("com.fasterxml.jackson.core", "jackson-databind"),
+        "com.amazonaws" % "aws-java-sdk-sts" % "1.10.22" % "test" exclude("com.fasterxml.jackson.core", "jackson-databind"),
         // We require spark-avro, but avro-mapred must be provided to match Hadoop version.
         // In most cases, avro-mapred will be provided as part of the Spark assembly JAR.
         "com.databricks" %% "spark-avro" % "2.0.1",
