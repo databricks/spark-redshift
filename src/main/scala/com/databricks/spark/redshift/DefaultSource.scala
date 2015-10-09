@@ -18,7 +18,7 @@ package com.databricks.spark.redshift
 
 import com.amazonaws.auth.AWSCredentials
 import com.amazonaws.services.s3.AmazonS3Client
-import org.apache.spark.sql.sources.{BaseRelation, CreatableRelationProvider, RelationProvider, SchemaRelationProvider}
+import org.apache.spark.sql.sources.{BaseRelation, CreatableRelationProvider, DataSourceRegister, RelationProvider, SchemaRelationProvider}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SQLContext, SaveMode}
 import org.slf4j.LoggerFactory
@@ -29,9 +29,12 @@ import org.slf4j.LoggerFactory
 class DefaultSource(jdbcWrapper: JDBCWrapper, s3ClientFactory: AWSCredentials => AmazonS3Client)
   extends RelationProvider
   with SchemaRelationProvider
+  with DataSourceRegister
   with CreatableRelationProvider {
 
   private val log = LoggerFactory.getLogger(getClass)
+
+  override def shortName(): String = "redshift"
 
   /**
    * Default constructor required by Data Source API
