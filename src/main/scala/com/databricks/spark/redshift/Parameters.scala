@@ -182,7 +182,7 @@ private[redshift] object Parameters {
      * Extra options to pass to the Redshift COPY command (e.g. "MAXERROR 100").
      *
      */
-    def copyOptions: Option[String] = parameters.get("copyoptions")
+    def copyOptions: String = parameters.get("copyoptions").getOrElse("")
 
     /**
      * List of semi-colon separated SQL statements to run after successful write operations.
