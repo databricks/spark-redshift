@@ -97,12 +97,12 @@ private[redshift] class RedshiftWriter(
       manifestUrl: String): String = {
     val credsString: String = AWSCredentialsUtils.getRedshiftCredentialsString(creds)
     val fixedUrl = Utils.fixS3Url(manifestUrl)
-    val maxErrorString = params.maxErrors match {
-      case Some(maxError) => maxError
-      case None => "0"
+    val copyOptions = params.copyOptions match {
+      case Some(options) => options
+      case None => ""
     }
     s"COPY ${params.table.get} FROM '$fixedUrl' CREDENTIALS '$credsString' FORMAT AS " +
-      "AVRO 'auto' DATEFORMAT 'YYYY-MM-DD HH:MI:SS' MAXERROR maxErrorString manifest"
+      "AVRO 'auto' DATEFORMAT 'YYYY-MM-DD HH:MI:SS' manifest $copyOptions"
   }
 
   /**

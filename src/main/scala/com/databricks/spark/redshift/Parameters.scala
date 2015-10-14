@@ -34,7 +34,6 @@ private[redshift] object Parameters {
     "overwrite" -> "false",
     "diststyle" -> "EVEN",
     "usestagingtable" -> "true",
-    "maxerrors" -> "0",
     "postactions" -> ";"
   )
 
@@ -180,12 +179,10 @@ private[redshift] object Parameters {
     def useStagingTable: Boolean = parameters("usestagingtable").toBoolean
 
     /**
-     * The maximum number of errors that the Redshift COPY will accept before failing the full
-     * import.
+     * Extra options to pass to the Rddshift COPY command (e.g. "MAXERROR 100").
      *
-     * Defaults to 0.
      */
-    def maxErrors: Option[String] = parameters.get("maxerrors")
+    def copyOptions: Option[String] = parameters.get("copyoptions")
 
     /**
      * List of semi-colon separated SQL statements to run after successful write operations.
