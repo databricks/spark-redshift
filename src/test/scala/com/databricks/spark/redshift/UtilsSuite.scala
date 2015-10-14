@@ -16,6 +16,8 @@
 
 package com.databricks.spark.redshift
 
+import java.net.URI
+
 import org.scalatest.{FunSuite, Matchers}
 
 /**
@@ -25,6 +27,10 @@ class UtilsSuite extends FunSuite with Matchers {
 
   test("joinUrls preserves protocol information") {
     Utils.joinUrls("s3n://foo/bar/", "/baz") shouldBe "s3n://foo/bar/baz/"
+    Utils.joinUrls("s3n://foo/bar/", "/baz/") shouldBe "s3n://foo/bar/baz/"
+    Utils.joinUrls("s3n://foo/bar/", "baz/") shouldBe "s3n://foo/bar/baz/"
+    Utils.joinUrls("s3n://foo/bar/", "baz") shouldBe "s3n://foo/bar/baz/"
+    Utils.joinUrls("s3n://foo/bar", "baz") shouldBe "s3n://foo/bar/baz/"
   }
 
   test("fixUrl produces Redshift-compatible equivalents") {
@@ -38,5 +44,15 @@ class UtilsSuite extends FunSuite with Matchers {
 
     Utils.makeTempPath(root) should (startWith (root) and endWith ("/")
       and not equal root and not equal firstTempPath)
+  }
+
+  test("removeCredentialsFromURI removes AWS access keys") {
+    def removeCreds(uri: String): String = {
+      Utils.removeCredentialsFromURI(URI.create(uri)).toString
+    }
+    assert(removeCreds("s3n://bucket/path/to/temp/dir") === "s3n://bucket/path/to/temp/dir")
+    assert(
+      removeCreds("s3n://ACCESSKEY:SECRETKEY@bucket/path/to/temp/dir") ===
+      "s3n://bucket/path/to/temp/dir")
   }
 }

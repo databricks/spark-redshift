@@ -22,7 +22,11 @@ import org.apache.spark.sql.types._
 
 /**
  * A simple parser for Redshift table schemas.
+ *
+ * Note: the only method which uses this class has been deprecated, so this class should be
+ * removed in `spark-redshift` 0.6. We will not accept patches to extend this parser.
  */
+@deprecated("Do not use SchemaParser directly", "0.5.0")
 private[redshift] object SchemaParser extends JavaTokenParsers {
   // redshift data types: http://docs.aws.amazon.com/redshift/latest/dg/c_Supported_data_types.html
   private val SMALLINT: Parser[DataType] = ("smallint" | "int2") ^^^ ShortType
@@ -34,10 +38,12 @@ private[redshift] object SchemaParser extends JavaTokenParsers {
   private val DOUBLE: Parser[DataType] = ("double precision" | "float" | "float8") ^^^ DoubleType
   private val BOOLEAN: Parser[DataType] = "boolean" ^^^ BooleanType
   private val VARCHAR: Parser[DataType] =
-    ("varchar" | "character varying" | "nvarchar" | "text"
-      | "char" | "character" | "nchar" | "bpchar") ~ (("(" ~ decimalNumber ~ ")") | "") ^^^ StringType
+    ("varchar" | "character varying" | "nvarchar"
+      | "text" | "char" | "character"
+      | "nchar" | "bpchar") ~ (("(" ~ decimalNumber ~ ")") | "") ^^^ StringType
   private val DATE: Parser[DataType] = "date" ^^^ DateType
-  private val TIMESTAMP: Parser[DataType] = ("timestamp" | "timestamp without time zone") ^^^ TimestampType
+  private val TIMESTAMP: Parser[DataType] =
+    ("timestamp" | "timestamp without time zone") ^^^ TimestampType
 
   private val sqlType: Parser[DataType] =
     SMALLINT | INTEGER | BIGINT | DECIMAL | VARCHAR | DATE | BOOLEAN | REAL | DOUBLE | TIMESTAMP

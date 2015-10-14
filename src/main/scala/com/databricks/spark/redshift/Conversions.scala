@@ -17,48 +17,40 @@
 package com.databricks.spark.redshift
 
 import java.sql.Timestamp
-import java.text.{DateFormat, FieldPosition, ParsePosition, SimpleDateFormat}
+import java.text.{DecimalFormat, DateFormat, FieldPosition, ParsePosition, SimpleDateFormat}
 import java.util.Date
 
-import scala.util.parsing.combinator.JavaTokenParsers
-
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{DataFrame, Row, SQLContext}
-
-/**
- * Simple parser for Redshift's UNLOAD bool syntax
- */
-private object RedshiftBooleanParser extends JavaTokenParsers {
-  val TRUE: Parser[Boolean] = "t" ^^ Function.const(true)
-  val FALSE: Parser[Boolean] = "f" ^^ Function.const(false)
-
-  def parseRedshiftBoolean(s: String): Boolean = parse(TRUE | FALSE, s).get
-}
+import org.apache.spark.sql.Row
 
 /**
  * Data type conversions for Redshift unloaded data
  */
-private [redshift] object Conversions {
-
-  // Imports and exports with Redshift require that timestamps are represented
-  // as strings, using the following formats
-  val PATTERN_WITH_MILLIS = "yyyy-MM-dd HH:mm:ss.S"
-  val PATTERN_WITHOUT_MILLIS = "yyyy-MM-dd HH:mm:ss"
-
-  val redshiftTimestampFormatWithMillis = new SimpleDateFormat(PATTERN_WITH_MILLIS)
-  val redshiftTimestampFormatWithoutMillis = new SimpleDateFormat(PATTERN_WITHOUT_MILLIS)
+private[redshift] object Conversions {
 
   // Redshift may or may not include the fraction component in the UNLOAD data, and there are
   // apparently not clues about this in the table schema. This format delegates to one of the above
   // formats based on string length.
-  val redshiftTimestampFormat = new DateFormat() {
-    override def format(date: Date, toAppendTo: StringBuffer, fieldPosition: FieldPosition): StringBuffer = {
+  private val redshiftTimestampFormat: DateFormat = new DateFormat() {
+
+    // Imports and exports with Redshift require that timestamps are represented
+    // as strings, using the following formats
+    private val PATTERN_WITH_MILLIS = "yyyy-MM-dd HH:mm:ss.SSS"
+    private val PATTERN_WITHOUT_MILLIS = "yyyy-MM-dd HH:mm:ss"
+
+    private val redshiftTimestampFormatWithMillis = new SimpleDateFormat(PATTERN_WITH_MILLIS)
+    private val redshiftTimestampFormatWithoutMillis = new SimpleDateFormat(PATTERN_WITHOUT_MILLIS)
+
+    override def format(
+        date: Date,
+        toAppendTo: StringBuffer,
+        fieldPosition: FieldPosition): StringBuffer = {
       // Always export with milliseconds, as they can just be zero if not specified
       redshiftTimestampFormatWithMillis.format(date, toAppendTo, fieldPosition)
     }
 
     override def parse(source: String, pos: ParsePosition): Date = {
-      if(source.length < PATTERN_WITH_MILLIS.length) {
+      if (source.length < PATTERN_WITH_MILLIS.length) {
         redshiftTimestampFormatWithoutMillis.parse(source, pos)
       } else {
         redshiftTimestampFormatWithMillis.parse(source, pos)
@@ -66,36 +58,63 @@ private [redshift] object Conversions {
     }
   }
 
-  val redshiftDateFormat = new SimpleDateFormat("yyyy-MM-dd")
+  private val redshiftDateFormat = new SimpleDateFormat("yyyy-MM-dd")
 
   /**
    * Parse a string exported from a Redshift TIMESTAMP column
    */
-  def parseTimestamp(s: String): Timestamp = {
+  private def parseTimestamp(s: String): Timestamp = {
     new Timestamp(redshiftTimestampFormat.parse(s).getTime)
   }
 
   /**
    * Parse a string exported from a Redshift DATE column
    */
-  def parseDate(s: String): Timestamp = {
-    new Timestamp(redshiftDateFormat.parse(s).getTime)
+  private def parseDate(s: String): java.sql.Date = {
+    new java.sql.Date(redshiftDateFormat.parse(s).getTime)
   }
 
+  def formatDate(d: Date): String = {
+    redshiftTimestampFormat.format(d)
+  }
+
+  def formatTimestamp(t: Timestamp): String = {
+    redshiftTimestampFormat.format(t)
+  }
+
+  /**
+   * Parse a boolean using Redshift's UNLOAD bool syntax
+   */
+  private def parseBoolean(s: String): Boolean = {
+    if (s == "t") true
+    else if (s == "f") false
+    else throw new IllegalArgumentException(s"Expected 't' or 'f' but got '$s'")
+  }
+
+  private[this] val redshiftDecimalFormat: DecimalFormat = new DecimalFormat()
+  redshiftDecimalFormat.setParseBigDecimal(true)
+
+  /**
+   * Parse a decimal using Redshift's UNLOAD decimal syntax
+   */
+  def parseDecimal(s: String): java.math.BigDecimal = {
+    redshiftDecimalFormat.parse(s).asInstanceOf[java.math.BigDecimal]
+  }
   /**
    * Construct a Row from the given array of strings, retrieved from Redshift UNLOAD.
    * The schema will be used for type mappings.
    */
-  def convertRow(schema: StructType, fields: Array[String]): Row = {
-    val converted = fields zip schema map {
+  private def convertRow(schema: StructType, fields: Array[String]): Row = {
+    val converted = fields.zip(schema).map {
       case (data, field) =>
         if (data == null || data.isEmpty) null
         else field.dataType match {
           case ByteType => data.toByte
-          case BooleanType => RedshiftBooleanParser.parseRedshiftBoolean(data)
+          case BooleanType => parseBoolean(data)
           case DateType => parseDate(data)
           case DoubleType => data.toDouble
           case FloatType => data.toFloat
+          case dt: DecimalType => parseDecimal(data)
           case IntegerType => data.toInt
           case LongType => data.toLong
           case ShortType => data.toShort
@@ -105,26 +124,14 @@ private [redshift] object Conversions {
         }
     }
 
-    Row(converted: _*)
+    Row.fromSeq(converted)
   }
 
   /**
    * Return a function that will convert arrays of strings conforming to
    * the given schema to Row instances
    */
-  def rowConverter(schema: StructType) = convertRow(schema, _: Array[String])
-
-
-  /**
-   * Convert schema representation of Dates to Timestamps, as spark-avro only works with Timestamps
-   */
-  def datesToTimestamps(sqlContext: SQLContext, df: DataFrame): DataFrame = {
-    val schema = StructType(
-      df.schema map {
-        case StructField(name, DateType, nullable, meta) => StructField(name, TimestampType, nullable, meta)
-        case other => other
-      })
-
-    sqlContext.createDataFrame(df.rdd, schema)
+  def createRowConverter(schema: StructType): (Array[String]) => Row = {
+    convertRow(schema, _: Array[String])
   }
 }

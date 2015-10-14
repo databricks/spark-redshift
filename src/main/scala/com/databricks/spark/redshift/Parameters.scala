@@ -16,25 +16,21 @@
 
 package com.databricks.spark.redshift
 
-import java.net.URI
-
-import com.amazonaws.auth.DefaultAWSCredentialsProviderChain
-import org.apache.hadoop.conf.Configuration
-
-import org.apache.spark.Logging
+import com.amazonaws.auth.{AWSCredentials, BasicSessionCredentials}
 
 /**
- * All user-specifiable parameters for spark-redshift, along with their validation rules and defaults
+ * All user-specifiable parameters for spark-redshift, along with their validation rules and
+ * defaults.
  */
-private [redshift] object Parameters extends Logging {
+private[redshift] object Parameters {
 
-  val DEFAULT_PARAMETERS = Map(
+  val DEFAULT_PARAMETERS: Map[String, String] = Map(
     // Notes:
     // * tempdir, dbtable and url have no default and they *must* be provided
     // * sortkeyspec has no default, but is optional
     // * distkey has no default, but is optional unless using diststyle KEY
+    // * jdbcdriver has no default, but is optional
 
-    "jdbcdriver" -> "org.postgresql.Driver",
     "overwrite" -> "false",
     "diststyle" -> "EVEN",
     "usestagingtable" -> "true",
@@ -45,15 +41,21 @@ private [redshift] object Parameters extends Logging {
   /**
    * Merge user parameters with the defaults, preferring user parameters if specified
    */
-  def mergeParameters(userParameters: Map[String, String]) : MergedParameters = {
-    if(! userParameters.contains("tempdir")) {
-      sys.error("'tempdir' is required for all Redshift loads and saves")
+  def mergeParameters(userParameters: Map[String, String]): MergedParameters = {
+    if (!userParameters.contains("tempdir")) {
+      throw new IllegalArgumentException("'tempdir' is required for all Redshift loads and saves")
     }
-    if(! userParameters.contains("dbtable")) {
-      sys.error("You must specify a Redshift table name with 'dbtable' parameter")
+    if (!userParameters.contains("url")) {
+      throw new IllegalArgumentException("A JDBC URL must be provided with 'url' parameter")
     }
-    if(! userParameters.contains("url")) {
-      sys.error("A JDBC URL must be provided with 'url' parameter")
+    if (!userParameters.contains("dbtable") && !userParameters.contains("query")) {
+      throw new IllegalArgumentException(
+        "You must specify a Redshift table name with the 'dbtable' parameter or a query with the " +
+        "'query' parameter.")
+    }
+    if (userParameters.contains("dbtable") && userParameters.contains("query")) {
+      throw new IllegalArgumentException(
+        "You cannot specify both the 'dbtable' and 'query' parameters at the same time.")
     }
 
     MergedParameters(DEFAULT_PARAMETERS ++ userParameters)
@@ -65,67 +67,89 @@ private [redshift] object Parameters extends Logging {
   case class MergedParameters(parameters: Map[String, String]) {
 
     /**
-     * A root directory to be used for intermediate data exchange, expected to be on S3, or somewhere
-     * that can be written to and read from by Redshift. Make sure that AWS credentials are available
-     * for S3.
+     * A root directory to be used for intermediate data exchange, expected to be on S3, or
+     * somewhere that can be written to and read from by Redshift. Make sure that AWS credentials
+     * are available for S3.
      */
-    private def tempDir = {
-      parameters("tempdir")
-    }
+    def rootTempDir: String = parameters("tempdir")
 
     /**
-     * Each instance will create its own subdirectory in the tempDir, with a random UUID.
+     * Creates a per-query subdirectory in the [[rootTempDir]], with a random UUID.
      */
-    val tempPath = Utils.makeTempPath(tempDir)
+    def createPerQueryTempDir(): String = Utils.makeTempPath(rootTempDir)
 
     /**
      * The Redshift table to be used as the target when loading or writing data.
      */
-    def table = {
-      parameters("dbtable")
+    def table: Option[TableName] = parameters.get("dbtable").map(_.trim).flatMap { dbtable =>
+      // We technically allow queries to be passed using `dbtable` as long as they are wrapped
+      // in parentheses. Valid SQL identifiers may contain parentheses but cannot begin with them,
+      // so there is no ambiguity in ignoring subqeries here and leaving their handling up to
+      // the `query` function defined below.
+      if (dbtable.startsWith("(") && dbtable.endsWith(")")) {
+        None
+      } else {
+        Some(TableName.parseFromEscaped(dbtable))
+      }
     }
 
     /**
-     * A JDBC URL, of the format, jdbc:subprotocol://host:port/database?user=username&password=password
+     * The Redshift query to be used as the target when loading data.
+     */
+    def query: Option[String] = parameters.get("query").orElse {
+      parameters.get("dbtable")
+        .map(_.trim)
+        .filter(t => t.startsWith("(") && t.endsWith(")"))
+        .map(t => t.drop(1).dropRight(1))
+    }
+
+    /**
+     * A JDBC URL, of the format:
+     *
+     *    jdbc:subprotocol://host:port/database?user=username&password=password
      *
      * Where:
-     *  - subprotocol can be postgresql or redshift, depending on which JDBC driver you have loaded. Note
-     *    however that one Redshift-compatible driver must be on the classpath and match this URL.
-     *  - host and port should point to the Redshift master node, so security groups and/or VPC will need to be
-     *    configured to allow access from the Spark driver
+     *  - subprotocol can be postgresql or redshift, depending on which JDBC driver you have loaded.
+     *    Note however that one Redshift-compatible driver must be on the classpath and match this
+     *    URL.
+     *  - host and port should point to the Redshift master node, so security groups and/or VPC will
+     *    need to be configured to allow access from the Spark driver
      *  - database identifies a Redshift database name
-     *  - user and password are credentials to access the database, which must be embedded in this URL for JDBC
+     *  - user and password are credentials to access the database, which must be embedded in this
+     *    URL for JDBC
      */
-    def jdbcUrl = {
-      parameters("url")
-    }
+    def jdbcUrl: String = parameters("url")
 
     /**
-     * The JDBC driver class name. This is used to make sure the driver is registered before connecting over
-     * JDBC. Default is "org.postgresql.Driver"
+     * The JDBC driver class name. This is used to make sure the driver is registered before
+     * connecting over JDBC.
      */
-    def jdbcDriver = parameters("jdbcdriver")
+    def jdbcDriver: Option[String] = parameters.get("jdbcdriver")
 
     /**
-     * If true, when writing, replace any existing data. When false, append to the table instead. Note that
-     * the table schema will need to be compatible with whatever you have in the DataFrame you're writing.
-     * spark-redshift makes no attempt to enforce that - you'll just see Redshift errors if they don't match.
+     * If true, when writing, replace any existing data. When false, append to the table instead.
+     * Note that the table schema will need to be compatible with whatever you have in the DataFrame
+     * you're writing. spark-redshift makes no attempt to enforce that - you'll just see Redshift
+     * errors if they don't match.
      *
      * Defaults to false.
      */
-    def overwrite = parameters("overwrite").toBoolean
+    @deprecated("Use SaveMode instead", "0.5.0")
+    def overwrite: Boolean = parameters("overwrite").toBoolean
 
     /**
-     * Set the Redshift table distribution style, which can be one of: EVEN, KEY or ALL. If you set it to KEY,
-     * you'll also need to use the distkey parameter to set the distribution key. Default is EVEN.
+     * Set the Redshift table distribution style, which can be one of: EVEN, KEY or ALL. If you set
+     * it to KEY, you'll also need to use the distkey parameter to set the distribution key.
+     *
+     * Default is EVEN.
      */
-    def distStyle = parameters.get("diststyle")
+    def distStyle: Option[String] = parameters.get("diststyle")
 
     /**
      * The name of a column in the table to use as the distribution key when using DISTSTYLE KEY.
      * Not set by default, as default DISTSTYLE is EVEN.
      */
-    def distKey = parameters.get("distkey")
+    def distKey: Option[String] = parameters.get("distkey")
 
     /**
      * A full Redshift SORTKEY specification. For full information, see latest Redshift docs:
@@ -138,20 +162,22 @@ private [redshift] object Parameters extends Logging {
      *
      * Not set by default - table will be unsorted.
      *
-     * Note: appending data to a table with a sort key only makes sense if you know that the data being added
-     * will be after the data already in the table according to the sort order. Redshift does not support random
-     * inserts according to sort order, so performance will degrade if you try this.
+     * Note: appending data to a table with a sort key only makes sense if you know that the data
+     * being added will be after the data already in the table according to the sort order. Redshift
+     * does not support random inserts according to sort order, so performance will degrade if you
+     * try this.
      */
-    def sortKeySpec = parameters.get("sortkeyspec")
+    def sortKeySpec: Option[String] = parameters.get("sortkeyspec")
 
     /**
      * When true, data is always loaded into a new temporary table when performing an overwrite.
-     * This is to ensure that the whole load process succeeds before dropping any data from Redshift,
-     * which can be useful if, in the event of failures, stale data is better than no data for your systems.
+     * This is to ensure that the whole load process succeeds before dropping any data from
+     * Redshift, which can be useful if, in the event of failures, stale data is better than no data
+     * for your systems.
      *
      * Defaults to true.
      */
-    def useStagingTable = parameters("usestagingtable").toBoolean
+    def useStagingTable: Boolean = parameters("usestagingtable").toBoolean
 
     /**
      * The maximum number of errors that the Redshift COPY will accept before failing the full import.
@@ -162,45 +188,27 @@ private [redshift] object Parameters extends Logging {
 
     /**
      * List of semi-colon separated SQL statements to run after successful write operations.
-     * This can be useful for running GRANT operations to make your new tables readable to other users and groups.
+     * This can be useful for running GRANT operations to make your new tables readable to other
+     * users and groups.
      *
-     * If the action string contains %s, the table name will be substituted in, in case a staging table is being used.
+     * If the action string contains %s, the table name will be substituted in, in case a staging
+     * table is being used.
      *
      * Defaults to empty.
      */
-    def postActions = parameters("postactions").split(";")
+    def postActions: Array[String] = parameters("postactions").split(";")
 
     /**
-     * Looks up "aws_access_key_id" and "aws_secret_access_key" in the parameter map
-     * and generates a credentials string for Redshift. If no credentials have been provided,
-     * this function will instead try using the Hadoop Configuration fs.* settings for the provided tempDir
-     * scheme, and if that also fails, it finally tries AWS DefaultCredentialsProviderChain, which makes
-     * use of standard system properties, environment variables, or IAM role configuration if available.
+     * Temporary AWS credentials which are passed to Redshift. These only need to be supplied by
+     * the user when Hadoop is configured to authenticate to S3 via IAM roles assigned to EC2
+     * instances.
      */
-    def credentialsString(configuration: Configuration) = {
-
-      val scheme = new URI(tempDir).getScheme
-      val hadoopConfPrefix = s"fs.$scheme}"
-
-      val (accessKeyId, secretAccessKey) =
-        if(parameters.contains("aws_access_key_id")) {
-          log.info("Using credentials provided in parameter map.")
-          (parameters("aws_access_key_id"), parameters("aws_secret_access_key"))
-        } else if (configuration.get(s"$hadoopConfPrefix.awsAccessKeyId") != null) {
-          log.info(s"Using hadoopConfiguration credentials for scheme $scheme}")
-          (configuration.get(s"$hadoopConfPrefix.awsAccessKeyId"),
-            configuration.get(s"$hadoopConfPrefix.awsSecretAccessKey"))
-        } else {
-          try {
-            log.info(s"Using default provider chain for AWS credentials, as none provided explicitly.")
-            val awsCredentials = (new DefaultAWSCredentialsProviderChain).getCredentials
-            (awsCredentials.getAWSAccessKeyId, awsCredentials.getAWSSecretKey)
-          } catch {
-            case e: Exception => throw new Exception("No credentials provided and unable to detect automatically.", e)
-          }
-        }
-
-      s"aws_access_key_id=$accessKeyId;aws_secret_access_key=$secretAccessKey"
+    def temporaryAWSCredentials: Option[AWSCredentials] = {
+      for (
+        accessKey <- parameters.get("temporary_aws_access_key_id");
+        secretAccessKey <- parameters.get("temporary_aws_secret_access_key");
+        sessionToken <- parameters.get("temporary_aws_session_token")
+      ) yield new BasicSessionCredentials(accessKey, secretAccessKey, sessionToken)
     }
   }
 }

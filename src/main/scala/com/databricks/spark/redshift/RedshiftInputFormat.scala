@@ -100,7 +100,12 @@ private[redshift] class RedshiftRecordReader extends RecordReader[JavaLong, Arra
   override def initialize(inputSplit: InputSplit, context: TaskAttemptContext): Unit = {
     val split = inputSplit.asInstanceOf[FileSplit]
     val file = split.getPath
-    val conf = context.getConfiguration
+    val conf: Configuration = {
+      // Use reflection to get the Configuration. This is necessary because TaskAttemptContext is
+      // a class in Hadoop 1.x and an interface in Hadoop 2.x.
+      val method = context.getClass.getMethod("getConfiguration")
+      method.invoke(context).asInstanceOf[Configuration]
+    }
     delimiter = RedshiftInputFormat.getDelimiterOrDefault(conf).asInstanceOf[Byte]
     require(delimiter != escapeChar,
       s"The delimiter and the escape char cannot be the same but found $delimiter.")
@@ -166,10 +171,11 @@ private[redshift] class RedshiftRecordReader extends RecordReader[JavaLong, Arra
    * @return the start position of the next record
    */
   private def findNext(fs: FileSystem, file: Path, size: Long, offset: Long): Long = {
-    if (offset == 0L)
+    if (offset == 0L) {
       return 0L
-    else if (offset >= size)
+    } else if (offset >= size) {
       return size
+    }
     val in = fs.open(file)
     var pos = offset
     in.seek(pos)

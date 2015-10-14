@@ -16,80 +16,95 @@
 
 package com.databricks.spark.redshift
 
-import java.util.Properties
-
-import org.apache.spark.Logging
-import org.apache.spark.sql.jdbc.{DefaultJDBCWrapper, JDBCWrapper}
+import com.amazonaws.auth.AWSCredentials
+import com.amazonaws.services.s3.AmazonS3Client
 import org.apache.spark.sql.sources.{BaseRelation, CreatableRelationProvider, RelationProvider, SchemaRelationProvider}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SQLContext, SaveMode}
+import org.slf4j.LoggerFactory
 
 /**
  * Redshift Source implementation for Spark SQL
  */
-class DefaultSource(jdbcWrapper: JDBCWrapper)
+class DefaultSource(jdbcWrapper: JDBCWrapper, s3ClientFactory: AWSCredentials => AmazonS3Client)
   extends RelationProvider
   with SchemaRelationProvider
-  with CreatableRelationProvider
-  with Logging {
+  with CreatableRelationProvider {
+
+  private val log = LoggerFactory.getLogger(getClass)
 
   /**
    * Default constructor required by Data Source API
    */
-  def this() = this(DefaultJDBCWrapper)
+  def this() = this(DefaultJDBCWrapper, awsCredentials => new AmazonS3Client(awsCredentials))
 
   /**
-   * Create a new RedshiftRelation instance using parameters from Spark SQL DDL. Resolves the schema using
-   * JDBC connection over provided URL, which must contain credentials.
+   * Create a new RedshiftRelation instance using parameters from Spark SQL DDL. Resolves the schema
+   * using JDBC connection over provided URL, which must contain credentials.
    */
-  override def createRelation(sqlContext: SQLContext, parameters: Map[String, String]): BaseRelation = {
+  override def createRelation(
+      sqlContext: SQLContext,
+      parameters: Map[String, String]): BaseRelation = {
     val params = Parameters.mergeParameters(parameters)
-    RedshiftRelation(jdbcWrapper, params, None)(sqlContext)
+    RedshiftRelation(jdbcWrapper, s3ClientFactory, params, None)(sqlContext)
   }
 
   /**
    * Load a RedshiftRelation using user-provided schema, so no inference over JDBC will be used.
    */
-  override def createRelation(sqlContext: SQLContext, parameters: Map[String, String], schema: StructType): BaseRelation = {
+  override def createRelation(
+      sqlContext: SQLContext,
+      parameters: Map[String, String],
+      schema: StructType): BaseRelation = {
     val params = Parameters.mergeParameters(parameters)
-    RedshiftRelation(jdbcWrapper, params, Some(schema))(sqlContext)
+    RedshiftRelation(jdbcWrapper, s3ClientFactory, params, Some(schema))(sqlContext)
   }
 
   /**
    * Creates a Relation instance by first writing the contents of the given DataFrame to Redshift
    */
-  override def createRelation(sqlContext: SQLContext, mode: SaveMode, parameters: Map[String, String],
-    data: DataFrame): BaseRelation = {
+  override def createRelation(
+      sqlContext: SQLContext,
+      saveMode: SaveMode,
+      parameters: Map[String, String],
+      data: DataFrame): BaseRelation = {
     val params = Parameters.mergeParameters(parameters)
-
-    def tableExists: Boolean = {
-      val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, new Properties()).apply()
-      val exists = jdbcWrapper.tableExists(conn, params.table)
-      conn.close()
-      exists
+    val table = params.table.getOrElse {
+      throw new IllegalArgumentException(
+        "For save operations you must specify a Redshift table name with the 'dbtable' parameter")
     }
 
-    val (doSave, dropExisting) = mode match {
+    def tableExists: Boolean = {
+      val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
+      try {
+        jdbcWrapper.tableExists(conn, table.toString)
+      } finally {
+        conn.close()
+      }
+    }
+
+    val (doSave, dropExisting) = saveMode match {
       case SaveMode.Append => (true, false)
       case SaveMode.Overwrite => (true, true)
       case SaveMode.ErrorIfExists =>
-        if(tableExists) {
-          sys.error(s"Table ${params.table} already exists! (SaveMode is set to ErrorIfExists)")
+        if (tableExists) {
+          sys.error(s"Table $table already exists! (SaveMode is set to ErrorIfExists)")
         } else {
           (true, false)
         }
       case SaveMode.Ignore =>
-        if(tableExists) {
-          log.info(s"Table ${params.table} already exists -- ignoring save request.")
+        if (tableExists) {
+          log.info(s"Table $table already exists -- ignoring save request.")
           (false, false)
         } else {
           (true, false)
         }
     }
 
-    if(doSave) {
-      val updatedParams = parameters updated ("overwrite", dropExisting.toString)
-      new RedshiftWriter(jdbcWrapper).saveToRedshift(sqlContext, data, Parameters.mergeParameters(updatedParams))
+    if (doSave) {
+      val updatedParams = parameters.updated("overwrite", dropExisting.toString)
+      new RedshiftWriter(jdbcWrapper, s3ClientFactory).saveToRedshift(
+        sqlContext, data, saveMode, Parameters.mergeParameters(updatedParams))
     }
 
     createRelation(sqlContext, parameters)

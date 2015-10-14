@@ -24,17 +24,17 @@ import org.scalatest.{FunSuite, Matchers}
 class ParametersSuite extends FunSuite with Matchers {
 
   test("Minimal valid parameter map is accepted") {
-    val params =
-      Map(
-        "tempdir" -> "s3://foo/bar",
-        "dbtable" -> "test_table",
-        "url" -> "jdbc:postgresql://foo/bar")
+    val params = Map(
+      "tempdir" -> "s3://foo/bar",
+      "dbtable" -> "test_schema.test_table",
+      "url" -> "jdbc:redshift://foo/bar")
 
     val mergedParams = Parameters.mergeParameters(params)
 
-    mergedParams.tempPath should startWith (params("tempdir"))
+    mergedParams.rootTempDir should startWith (params("tempdir"))
+    mergedParams.createPerQueryTempDir() should startWith (params("tempdir"))
     mergedParams.jdbcUrl shouldBe params("url")
-    mergedParams.table shouldBe params("dbtable")
+    mergedParams.table shouldBe Some(TableName("test_schema", "test_table"))
 
     // Check that the defaults have been added
     Parameters.DEFAULT_PARAMETERS foreach {
@@ -42,29 +42,47 @@ class ParametersSuite extends FunSuite with Matchers {
     }
   }
 
-  test("New instances have distinct temp paths") {
-    val params =
-      Map(
-        "tempdir" -> "s3://foo/bar",
-        "dbtable" -> "test_table",
-        "url" -> "jdbc:postgresql://foo/bar")
+  test("createPerQueryTempDir() returns distinct temp paths") {
+    val params = Map(
+      "tempdir" -> "s3://foo/bar",
+      "dbtable" -> "test_table",
+      "url" -> "jdbc:redshift://foo/bar")
 
-    val mergedParams1 = Parameters.mergeParameters(params)
-    val mergedParams2 = Parameters.mergeParameters(params)
+    val mergedParams = Parameters.mergeParameters(params)
 
-    mergedParams1.tempPath should not equal mergedParams2.tempPath
+    mergedParams.createPerQueryTempDir() should not equal mergedParams.createPerQueryTempDir()
   }
 
   test("Errors are thrown when mandatory parameters are not provided") {
-
     def checkMerge(params: Map[String, String]): Unit = {
-      intercept[Exception] {
+      intercept[IllegalArgumentException] {
         Parameters.mergeParameters(params)
       }
     }
 
-    checkMerge(Map("dbtable" -> "test_table", "url" -> "jdbc:postgresql://foo/bar"))
-    checkMerge(Map("tempdir" -> "s3://foo/bar", "url" -> "jdbc:postgresql://foo/bar"))
+    checkMerge(Map("dbtable" -> "test_table", "url" -> "jdbc:redshift://foo/bar"))
+    checkMerge(Map("tempdir" -> "s3://foo/bar", "url" -> "jdbc:redshift://foo/bar"))
     checkMerge(Map("dbtable" -> "test_table", "tempdir" -> "s3://foo/bar"))
+  }
+
+  test("Must specify either 'dbtable' or 'query' parameter, but not both") {
+    intercept[IllegalArgumentException] {
+      Parameters.mergeParameters(Map(
+        "tempdir" -> "s3://foo/bar",
+        "url" -> "jdbc:redshift://foo/bar"))
+    }.getMessage should (include ("dbtable") and include ("query"))
+
+    intercept[IllegalArgumentException] {
+      Parameters.mergeParameters(Map(
+        "tempdir" -> "s3://foo/bar",
+        "dbtable" -> "test_table",
+        "query" -> "select * from test_table",
+        "url" -> "jdbc:redshift://foo/bar"))
+    }.getMessage should (include ("dbtable") and include ("query") and include("both"))
+
+    Parameters.mergeParameters(Map(
+      "tempdir" -> "s3://foo/bar",
+      "query" -> "select * from test_table",
+      "url" -> "jdbc:redshift://foo/bar"))
   }
 }
