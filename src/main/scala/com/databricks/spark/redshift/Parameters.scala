@@ -179,7 +179,7 @@ private[redshift] object Parameters {
     def useStagingTable: Boolean = parameters("usestagingtable").toBoolean
 
     /**
-     * Extra options to pass to the Rddshift COPY command (e.g. "MAXERROR 100").
+     * Extra options to pass to the Redshift COPY command (e.g. "MAXERROR 100").
      *
      */
     def copyOptions: Option[String] = parameters.get("copyoptions")
