@@ -180,11 +180,12 @@ private[redshift] object Parameters {
     def useStagingTable: Boolean = parameters("usestagingtable").toBoolean
 
     /**
-     * The maximum number of errors that the Redshift COPY will accept before failing the full import.
+     * The maximum number of errors that the Redshift COPY will accept before failing the full
+     * import.
      *
      * Defaults to 0.
      */
-    def maxErrors = parameters("maxerrors")
+    def maxErrors: Option[String] = parameters.get("maxerrors")
 
     /**
      * List of semi-colon separated SQL statements to run after successful write operations.
