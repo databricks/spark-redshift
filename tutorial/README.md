@@ -5,11 +5,11 @@ The [Spark Data Sources API](https://databricks.com/blog/2015/01/09/spark-sql-da
 1. Loading structured data from an external data source into Spark
 2. Storing structured data from Spark into an external data source.
 
-The Data Sources API has built in integration for several data sources such as Hive, Avro, JSON, JDBC and Parquet. Third party integration is added through spark-packages. One such integration is for Amazon Redshift which is provided by the `spark-redshift` package. 
+Spark ships with built-in integration for several data sources such as Hive, Avro, JSON, JDBC and Parquet, all implemented using the Data Sources API. Many [third-party data sources](http://spark-packages.org/?q=tags%3A%22Data%20Sources%22) are available. The `spark-redshift` library is a data source for [Amazon Redshift](https://aws.amazon.com/redshift/).
 
-Prior to the introduction of `spark-redshift`, JDBC was the only way for Spark users to read data from Redshift. While this method is adequate when running queries returning a small number of rows (order of 100’s), it is too slow when handling large scale data. This is because, JDBC provides a ResultSet based approach where rows are retrieved in a single thread in small batches. Furthermore, the use of JDBC to store large datasets in Redshift is only practical when data needs to be moved between tables inside a Redshift database. The JDBC based INSERT/UPDATE queries are only practical for small updates to Redshift tables. For users hoping to load or store large volumes of data from/to Redshift, JDBC leaves much to be desired in terms of performance and throughput.
+Prior to `spark-redshift`, JDBC was the only way for Spark users to easily read data from Redshift. While this method is adequate when running queries that return small numbers of rows (order of thousands), it is too slow when handling large-scale data. This is because JDBC provides a ResultSet-based approach where rows are retrieved in by single thread in small batches. Furthermore, the use of JDBC to store large datasets in Redshift is only practical when data needs to be moved between tables inside a Redshift database. The JDBC based INSERT/UPDATE queries are only practical for small updates to Redshift tables. For users hoping to load or store huge volumes of data from/to Redshift, JDBC leaves much to be desired in terms of performance and throughput.
 
-This tutorial will provide a hand-on experience in using the `spark-redshift` package from your local development environment. It will also provide a deep dive into the implementation details of `spark-redshift` which will enable you to gain a deeper understanding of why `spark-redshift` provides a high performance alternative to a plain JDBC based approach to interacting with Redshift from Spark.
+This tutorial provides a hand-on guide to using the `spark-redshift` package from your local development environment. It also provides a deep dive into the implementation details of `spark-redshift` which will enable you to gain a deeper understanding of why `spark-redshift` provides a high performance alternative to a plain JDBC-based approach for interacting with Redshift from Spark.
 
 ## Prepare the Redshift database ##
 
@@ -224,41 +224,40 @@ only showing top 20 rows
 
 ### Under the hood - Load Function ###
 
-In this section we will take a peek inside `spark-redshift` to understand how exactly the LOAD function works. Specifically we will look at how `event` table was read into a `DataFrame`. The LOAD is a two step process
+In this section we will take a peek inside `spark-redshift` to understand how the LOAD function is implemented. Specifically, we will look at how the `event` table was read into a `DataFrame`. The LOAD is a two-step process:
 
-1. [UNLOAD](http://docs.aws.amazon.com/redshift/latest/dg/r_UNLOAD.html) data from the Redshift table to S3
-2. Consume the unloaded files in S3 via a custom InputFormat into an RDD which is then wrapped as a `DataFrame` using the schema obtained from Redshift.
-
+1. [UNLOAD](http://docs.aws.amazon.com/redshift/latest/dg/r_UNLOAD.html) data from the Redshift table to S3.
+2. Using a custom InputFormat, read the unloaded files from S3 into an RDD, then use the schema obtained from Redshift to convert the RDD into a `DataFrame`.
 #### UNLOAD Redshift to S3 ####
 
-The following diagram shows the steps that are performed when Spark Redshift UNLOADs data from Redshift to S3.
+The following diagram shows the steps that are performed when Spark Redshift UNLOADs data from Redshift to S3:
 
 ![](images/loadunloadstep.png)
 
+First, the Spark Driver communicates with the Redshift leader node to obtain the schema of the table (or query) requested. This is done by issuing a `DESCRIBE TABLE` query over a JDBC connection, then parsing its output and mapping its types back to Spark SQL types.
 
-First, the Spark Driver communicates with the Redshift Leader node to obtain the schema of the table (or query) requested. The attribute, `override lazy val schema: StructType` in the class, `com.databricks.spark.redshift.RedshiftRelation` obtains the schema on demand by invoking the method, `resolveTable` of the class, `com.databricks.spark.redshift.JDBCWrapper` which is responsible for fetching the schema from the Redshift Leader.
-
-Next a Redshift [UNLOAD](http://docs.aws.amazon.com/redshift/latest/dg/r_UNLOAD.html) query is created using the schema information obtained. The UNLOAD command unloads each slice into a S3 folder (`22c365b4-13cb-40fd-b4d6-d0ac5d426551`) created in the temporary S3 location (`s3n://spark-redshift/temp/`) provided by the user. Each file contains a row per line and each column of the row is pipe (`|`) delimited. This process occurs in parallel for each slice. The `spark-redshift` library achieves its high performance through this mechanism.
+Next, a Redshift [UNLOAD](http://docs.aws.amazon.com/redshift/latest/dg/r_UNLOAD.html) query is created using the schema information obtained. The UNLOAD command unloads each slice into a S3 folder (`22c365b4-13cb-40fd-b4d6-d0ac5d426551`) created in the temporary S3 location provided by the user (`s3n://spark-redshift/temp/`). Each file contains one row per line and each column of the row is pipe (`|`) delimited. This process occurs in parallel for each slice. The `spark-redshift` library achieves its high performance through this mechanism.
 
 #### Read UNLOAD'ed S3 files into a DataFrame instance ####
 
-The diagram below shows how the files unloaded in S3 are consumed to form a `DataFrame`.
+The diagram below shows how the files unloaded in S3 are consumed to form a `DataFrame`:
 
 ![](images/loadreadstep.png)
 
-Once the files are written to S3, a custom InputFormat implemented in the class, `com.databricks.spark.redshift.RedshiftInputFormat` is used to consume the files in parallel. This class is similar to the standard and well known Hadoop class, `TextInputFormat` where the key is the byte offset of the start of each line in the file. The value class however, is of type `Array[String]` (unlike, `TextInputFormat`where its type is `Text`). The value instance is created by splitting the lines using the default delimiter `|`. The `RedshiftInputFormat` consumes the S3 files line by line to produce an `RDD`. The schema obtained earlier is applied on this `RDD` to generate a `DataFrame`.
+Once the files are written to S3, a custom InputFormat (`com.databricks.spark.redshift.RedshiftInputFormat`) is used to consume the files in parallel. This class is similar to Hadoop's standard `TextInputFormat` class, where the key is the byte offset of the start of each line in the file. The value class, however, is of type `Array[String]` (unlike, `TextInputFormat`, whose type is `Text`). The values are created by splitting the lines using the default delimiter (`|`). The `RedshiftInputFormat` processes the S3 files line-by-line to produce an `RDD`. The schema obtained earlier is then applied on this `RDD` to convert the strings to the proper data types and to generate a `DataFrame`.
 
 ### Save Function - Writing to a Redshift table ###
 
-`spark-redshift` allows you to write data back to Redshift. The source data is of type, `DataFrame`. We will need to assume that we have a source table available in Spark. This table can be sourced from a variety of sources such as, a Hive table, CSV file, parquet file, or even, a delimited text file. We will source a `DataFrame` from Redshift table as a temporary table in Spark and write it back to Redshift to illustrate this feature. In practice the source would not be a Redshift table or query since, in such a case it is easiest to perform a "CREATE TABLE AS" query on Redshift without going through Spark.
+`spark-redshift` also allows you to write data back to Redshift. The data being saved can originate from a variety of sources, such a Hive tables, CSV, Parquet, or delimited text files. In order to illustrate this feature, the example below will create a `DataFrame` from a Redshift table, register it as a temporary table in Spark, then write it back to Redshift. Of course, we could have also saved a DataFrame created from a different source.
 
-Recall, we have registered the `Dataframe` `eventDF` representing the `event` table  as a temporary table `myevent` in Spark.
+In the previous section, we registered the `Dataframe` `eventDF`, which represents the `event` Redshift table in Spark as a temporary table named `myevent`:
 
 ```scala
 eventsDF.registerTempTable("myevent")
 ```
 
-Let us write the contents of the temporary table `myevent` to a Redshift table `redshiftevent`.
+Let
+s write the contents of this `myevent` temporary table to a Redshift table named `redshiftevent`:
 
 ```scala
 // Create a new table, `redshiftevent`, after dropping any existing redshiftevent table,
@@ -282,15 +281,14 @@ sqlContext.sql("SELECT * FROM myevent WHERE eventid > 1000").withColumnRenamed("
     .save()
 ```
 
-`spark-redshift` automatically creates a Redshift table with the appropriate schema determined from the table/DataFrame being written. The default behavior is to create a new table and to throw an error message if a table with the same name already exists (corresponding to `SaveMode.ErrorIfExists`)
+`spark-redshift` automatically creates a Redshift table with the appropriate schema determined from the table or DataFrame being written. The default behavior is to create a new table and throw an error message if a table with the same name already exists (this corresponds to `SaveMode.ErrorIfExists`)
 
 There are two key points to note:
 
-1. Note the `.withColumnRenamed("eventid", "id")`. This feature if necessary if any of the source table columns names are key words in Redshift (ex. table) then `spark-redshift` will throw and error. This will be [fixed](https://github.com/databricks/spark-redshift/issues/80) in the release 0.5.1.
+1. Note the `.withColumnRenamed("eventid", "id")`; this allows us to rename columns prior to saving the data.
+2. Note how we use the modes. The first write uses the mode `SaveMode.Overwrite`, which means that the table will be dropped and recreated it exists. The second query uses `SaveMode.Append`, which will create the table if it does not exist but will append to the table if it already exists. The default mode is `SaveMode.ErrorIfExists`, which creates the table if it does not exist and throws an error if it does. The last mode is `SaveMode.Ignore`, which is same as `SaveMode.Overwrite` if the table does not exist but does nothing if the table exists.
 
-2. Note how we use the modes. The first write uses the mode `SaveMode.Overwrite` which means that the table will be dropped and recreated it exists. The second query uses the `SaveMode.Append` which will create the table if it does not exist but will append to the table if it already exists. The default mode is `SaveMode.ErrorIfExists` which creates the table if it does not exist and throws an error if it does. The last mode is `SaveMode.Ignore` which is same as `SaveMode.Overwrite` if the table does not exist but does nothing if the table exists.
-
-We could have achieve similar results using SQL. The only thing to be aware of when using the SQL CLI is, all the SaveMode's are not available and only the default mode (`SaveMode.ErrorIfExists`) is applicable.
+We could have achieved similar results using SQL. The only thing to be aware of when using the SQL API is that all the of the SaveModes are not available, so only the default mode (`SaveMode.ErrorIfExists`) is applicable.
 
 ```sql
 CREATE TABLE redshiftevent
@@ -303,25 +301,25 @@ OPTIONS (
 AS SELECT * FROM myevent;
 ```
 
-By default the save operation uses the [key distribution style](http://docs.aws.amazon.com/redshift/latest/dg/c_choosing_dist_sort.html) of `EVEN` in Redshift. This can be changed by using option parameter `diststyle` and `distkey`. See [spark-redshift documentation](https://github.com/databricks/spark-redshift) for details.
+By default, the save operation uses the `EVEN` [key distribution style](http://docs.aws.amazon.com/redshift/latest/dg/c_choosing_dist_sort.html) in Redshift. This can be changed by using the optional parameters `diststyle` and `distkey`. See the full [spark-redshift documentation](https://github.com/databricks/spark-redshift) for details.
 
 ### Under the hood - Save Function ###
 
-The implementation of the Save function is provided in the class, `com.databricks.spark.redshift.RedshiftWriter`. The following diagram shows how the `save` function is works.
+`spark-redshift`'s save functionality is implemented in the class, `com.databricks.spark.redshift.RedshiftWriter`. The following diagram shows how the `save` function works:
 
 ![](images/savetoredshift.png)
 
 The save function performs the following steps:
 
-1. The partitions of the `DataFrame` are written out in parallel to the temporary S3 folder specified by the user. `spark-avro` is used to write the schema compliant data.
-2. Next a Redshift [COPY](http://docs.aws.amazon.com/redshift/latest/dg/r_COPY.html) command is created and invoked to load the files stored in the temporary S3 folder in the prior step, into the Redshift table.
+1. The partitions of the `DataFrame` are written out in parallel to the temporary S3 folder specified by the user. `spark-avro` is used to write the schema-compliant data.
+2. A Redshift [COPY](http://docs.aws.amazon.com/redshift/latest/dg/r_COPY.html) command is created and invoked to load the Avro files from S3 folder into the Redshift table.
 
 
 ## Integration with other Data Sources ##
 
-Data read via `spark-redshift` is automatically converted to `DataFrame`'s, Spark’s primary abstraction for large datasets. This promotes interoperability between data sources, since types are automatically converted to Spark’s standard representations(for example `StringType`, `DecimalType`). A Redshift user can, for instance, join Redshift tables with data stored in S3, Hive tables, CSV or Parquet files stored on HDFS. This flexibility is important to users with complex data pipelines involving multiple sources.
+Data read via `spark-redshift` is automatically converted to `DataFrame`s, Spark’s primary abstraction for large structured datasets. This promotes interoperability between data sources, since types are automatically converted to Spark’s standard representations (for example `StringType`, `DecimalType`). A Redshift user can, for instance, join Redshift tables with data stored in S3, Hive tables, CSV or Parquet files stored on HDFS. This flexibility is important to users with complex data pipelines involving multiple sources.
 
-The following code snippet illustrates these concepts-
+The following code snippet illustrates these concepts:
 
 ```scala
 
@@ -344,9 +342,9 @@ val salesAGGDF2 = salesAGGDF.join(eventsDF, salesAGGDF("id") === eventsDF("event
     .select("id", "eventname","totalqty","salesamt")
 ```
 
-While both `eventDF` and `salesAGGDF` table are sourced from Redshift, assume for the sake of illustration that they are sourced from a non-Redshift data sources. This should not be too far-fetched since the DataFrame class is part of the Data Sources API and not the `spark-redshift` library. A `DataFrame` can be created from any data source compatible with the Data Sources API.
+While both the `eventDF` and `salesAGGDF` tables are sourced from Redshift, assume for the sake of illustration that they are sourced from a non-Redshift data sources. A `DataFrame` can be created from any data source compatible with the Data Sources API.
 
-`salesAGGDF2` `DataFrame` is created by joining `eventsDF` and `salesAGGDF2`. We register it as a temporary table `redshift_sales_agg` before saving it to Redshift with the same name  `redshift_sales_agg`
+The `salesAGGDF2` `DataFrame` is created by joining `eventsDF` and `salesAGGDF2`. We register it as a temporary table `redshift_sales_agg` before saving it to Redshift with the same name, `redshift_sales_agg`.
 
 
 ```scala
@@ -364,7 +362,7 @@ sqlContext.sql("SELECT * FROM redshift_sales_agg")
 
 ## Under the hood - Putting it all together ##
 
-As we discussed earlier Spark SQL will introspect for a class called `DefaultSource` in the Data Sources API package, `com.databricks.spark.redshift`. The `DefaultSource` class implements the trait, `RelationProvider` which provides the default load functionality for the library. The interface provided by the `RelationProvider` trait consumes the parameters provided by the user and converts it to an instance of `BaseRelation` which is implemented by the class, `com.databricks.spark.redshift.RedshiftRelation`.
+As we discussed earlier Spark SQL will search for a class named `DefaultSource` in the data source's package, `com.databricks.spark.redshift`. The `DefaultSource` class implements the `RelationProvider` trait, which provides the default load functionality for the library. The `RelationProvider` trait provides methods which consume the user-provided configuration parameters and return instances of `BaseRelation`, which `spark-redshift` implements using class `com.databricks.spark.redshift.RedshiftRelation`.
 
 The `com.databricks.spark.redshift.RedshiftRelation` class is responsible for providing an `RDD` of `org.apache.spark.sql.Row` which backs the `org.apache.spark.sql.DataFrame` instance. This represents the underlying implementation for the load functionality for the `spark-redshift` package where the schema is inferred from the underlying Redshift table. The load function which supports the a user-defined schema is supported by the trait `org.apache.spark.sql.sources.SchemaRelationProvider` and implemented in the class `RedshiftRelation`.
 
@@ -373,4 +371,4 @@ The store functionality of the `spark-redshift` package is supported by the trai
 
 ## Conclusion ###
 
-The Data Sources API introduced in Spark 1.2 provides a unified interface for handling structured data. It unifies structured data sources under a common interface which is richer than the original RDD-based approach which used Hadoop's InputFormat API. In this article we explored how the `spark-redshift` package expands the Data Sources API to support Amazon Redshift which is becoming an increasingly popular choice in the Enterprise IT infrastructure.
+The Data Sources API provides a unified interface for handling structured data. It unifies structured data sources under a common interface which is richer than the original RDD/InputFormat-based approach. In this tutorial we explored how the `spark-redshift` package uses the Data Sources API to provide support for Amazon Redshift, which is becoming an increasingly popular choice in enterprise IT infrastructure.
