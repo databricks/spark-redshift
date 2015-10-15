@@ -174,7 +174,7 @@ Note, we have registered a temporary table `myevent` in Spark and executed a que
 
 ### Load Function - Reading from a Redshift query ###
 
-We can also read from a Redshift query. If we need to read the most recent 10000 records from the `sales` table we will execute the following lines
+We can also create DataFrames from the results of Redshift queries. The following code block demonstrates how to create a DataFrame from a Redshift query which selects the most recent 10000 records from the `sales` table:
 
 ```scala
 val salesQuery = """
@@ -192,7 +192,7 @@ val salesDF = sqlContext.read
 salesDF.show()
 ```
 
-Notice that the line `.option("dbtable", "event")` is replaced with the line `.option("query", salesQuery)`. This will result in the following output
+Notice that the line `.option("dbtable", "event")` is replaced with the line `.option("query", salesQuery)`. This will result in the following output:
 
 ```{r, engine='bash'}
 +-------+------+--------+-------+-------+------+-------+---------+----------+
