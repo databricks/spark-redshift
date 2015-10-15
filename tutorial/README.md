@@ -90,7 +90,7 @@ val sqlContext = new SQLContext(sc)
 
 ### Load Function - Reading from a Redshift table ###
 
-Let us fetch data from the Redshift table `event`. Add the following lines of code to the skeleton listed above:
+Let's fetch data from the Redshift `event` table. Add the following lines of code to the skeleton listed above:
 
 ```scala
 import sqlContext.implicits._
@@ -104,9 +104,9 @@ eventsDF.show()
 ```
 
 
-`.format("com.databricks.spark.redshift")` line tells the Data Sources API that we are using the `spark-redshift` package. It uses this information to identify the class `DefaultSource` in the package specified by the `format` invocation. This class contains the entry points for the functionality provided by the Data Sources API implementation.
+The `.format("com.databricks.spark.redshift")` line tells the Data Sources API that we are using the `spark-redshift` package. It uses this information to load the proper `DefaultSource` class from the specified package. This class contains the entry points for the data source implementation.
 
-Next we provide the parameters necessary to read the `event` table from Redshift. We provide the JDBC URL, the temporary S3 folder where the table data will be copied to, and the name of the table we want to read. A comprehensive list of parameters is listed on the `spark-redshift` documentation [page](https://github.com/databricks/spark-redshift).
+Next we provide the parameters necessary to read the `event` table from Redshift. We provide the JDBC URL, the temporary S3 folder where the table data will be copied to, and the name of the table we want to read. A comprehensive list of parameters is listed on the `spark-redshift` [README](https://github.com/databricks/spark-redshift).
 
 Executing the above lines will produce the following output:
 
@@ -150,14 +150,14 @@ root
  |-- starttime: timestamp (nullable = true)
 ```
 
-We can even register the `DataFrame` as a temporary table in Spark and execute queries against it as follows:
+We can register the `DataFrame` as a temporary table in Spark and execute queries against it using the SQL APIs:
 
 ```scala
 eventsDF.registerTempTable("myevent")
 val myEventDF = sqlContext.sql("SELECT * FROM myevent")
 ```
 
-While the above examples used Scala we could have also used SQL as follows:
+While the above examples used Scala, we could have also used SQL as follows:
 
 ```sql
 CREATE TEMPORARY TABLE myevent
@@ -170,7 +170,7 @@ OPTIONS (
 SELECT * FROM myevent;
 ```
 
-Note, we have registered a temporary table `myevent` in Spark and executed a query against it (`select * from myevent`) just like we did in our Scala example.
+Note, we have registered a temporary table `myevent` in Spark and executed a query against it (`SELECT * FROM myevent`) just like we did in our Scala example.
 
 ### Load Function - Reading from a Redshift query ###
 
