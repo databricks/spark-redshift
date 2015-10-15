@@ -15,11 +15,11 @@ This tutorial will provide a hand-on experience in using the `spark-redshift` pa
 
 Before we delve into specific examples of how `spark-redshift` works, let us configure the Redshift database which we will be using.
 
-For the purpose of this article I will use the sample [TICKT](http://docs.aws.amazon.com/redshift/latest/dg/c_sampledb.html) database on Redshift. This database enables the tracking of  sales activity for the fictional TICKIT web site, where users buy and sell tickets online for various types of events. The database allows analysis of sales over time, performance of sellers, venues and correlation of sales with seasons. This information can be used to drive advertising and promotions campaigns.
+In this tutorial, we will use the sample [TICKT](http://docs.aws.amazon.com/redshift/latest/dg/c_sampledb.html) database on Redshift. This database enables the tracking of  sales activity for the fictional TICKIT web site, where users buy and sell tickets online for various types of events. The database allows analysis of sales over time, performance of sellers, venues and correlation of sales with seasons. This information can be used to drive advertising and promotions campaigns.
 
 When you start the Redshift service you will first need to create the TICKT database and load it. Follow the instructions [here](http://docs.aws.amazon.com/redshift/latest/dg/cm-dev-t-load-sample-data.html) to create/load the TICKT database.
 
-I used a Redshift database running on a 2 node cluster. Each node manages 2 slices for a total of 4 slices. This *usually* (read Redshift [documentation](http://docs.aws.amazon.com/redshift/latest/dg/c_high_level_system_architecture.html) for a more nuanced discussion) means that each table will be stored in 4 separate partitions, one for each slice.
+In the examples below, we used a Redshift database running on a 2 node cluster. Each node manages 2 slices for a total of 4 slices. This *usually* (read Redshift [documentation](http://docs.aws.amazon.com/redshift/latest/dg/c_high_level_system_architecture.html) for a more nuanced discussion) means that each table will be stored in 4 separate partitions, one for each slice.
 
 ## Usage ##
 
@@ -53,7 +53,7 @@ object SparkRedshiftTutorial {
 We need the following set of user provided parameters to communicate with AWS in general and Redshift in particular -
 
 - **AWS Access Key and AWS Secret Access Key** - This key pair will be used to communicate with AWS services. This information is passed by the AWS Client libraries in every interaction with AWS.
-- **Redshift Database Name** - When you provision the Redshift service you have to provide a name for your database. This is similar to a schema in Oracle. The name of my Redshift database was `sparkredshift`
+- **Redshift Database Name** - When you provision the Redshift service you have to provide a name for your database. This is similar to a schema in Oracle. The name of our Redshift database was `sparkredshift`
 - **Redshift UserId/Password combination** - You will need to provide this information when the Redshift service is provisioned.
 - **Redshift URL** - You will need to obtain this from your Redshift Console. A sample Redshift URL is `swredshift.czac2vcs84ci.us-east-1.redshift.amazonaws.com:5439`
 
