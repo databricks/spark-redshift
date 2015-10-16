@@ -298,8 +298,8 @@ It may be useful to have some <tt>GRANT</tt> commands or similar run here when l
 <p>Be warned that if this commands fail, it is treated as an error and you'll get an exception. If using a staging
 table, the changes will be reverted and the backup table restored if post actions fail.</p>
     </td>
-  </tr>
-  <tr>
+ </tr>
+ <tr>
     <td><tt>extracopyoptions</tt></td>
     <td>No</td>
     <td>No default</td>
@@ -311,7 +311,7 @@ for other options).</p>
 <p>Note that since these options are appended to the end of the <tt>COPY</tt> command, only options that make sense
 at the end of the command can be used, but that should cover most possible use cases.</p>
     </td>
-  </tr>
+ </tr>
 </table>
 
 ## Additional configuration options
