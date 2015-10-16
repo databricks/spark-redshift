@@ -179,6 +179,11 @@ private[redshift] object Parameters {
     def useStagingTable: Boolean = parameters("usestagingtable").toBoolean
 
     /**
+     * Extra options to append to the Redshift COPY command (e.g. "MAXERROR 100").
+     */
+    def extraCopyOptions: String = parameters.get("extracopyoptions").getOrElse("")
+
+    /**
      * List of semi-colon separated SQL statements to run after successful write operations.
      * This can be useful for running GRANT operations to make your new tables readable to other
      * users and groups.
