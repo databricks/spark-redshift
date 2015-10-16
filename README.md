@@ -299,6 +299,19 @@ It may be useful to have some <tt>GRANT</tt> commands or similar run here when l
 table, the changes will be reverted and the backup table restored if post actions fail.</p>
     </td>
  </tr>
+ <tr>
+    <td><tt>extracopyoptions</tt></td>
+    <td>No</td>
+    <td>No default</td>
+    <td>
+<p>A list extra options to append to the Redshift <tt>COPY</tt> command when loading data, e.g. <tt>TRUNCATECOLUMNS</tt>
+or <TT>MAXERROR n</tt> (see the <a href="http://docs.aws.amazon.com/redshift/latest/dg/r_COPY.html#r_COPY-syntax-overview-optional-parameters">Redshift docs</a>
+for other options).</p>
+
+<p>Note that since these options are appended to the end of the <tt>COPY</tt> command, only options that make sense
+at the end of the command can be used, but that should cover most possible use cases.</p>
+    </td>
+ </tr>
 </table>
 
 ## Additional configuration options
