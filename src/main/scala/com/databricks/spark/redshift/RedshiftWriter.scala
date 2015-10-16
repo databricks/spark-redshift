@@ -98,7 +98,7 @@ private[redshift] class RedshiftWriter(
     val credsString: String = AWSCredentialsUtils.getRedshiftCredentialsString(creds)
     val fixedUrl = Utils.fixS3Url(manifestUrl)
     s"COPY ${params.table.get} FROM '$fixedUrl' CREDENTIALS '$credsString' FORMAT AS " +
-      "AVRO 'auto' DATEFORMAT 'YYYY-MM-DD HH:MI:SS' manifest ${params.extraCopyOptions}"
+      s"AVRO 'auto' DATEFORMAT 'YYYY-MM-DD HH:MI:SS' manifest ${params.extraCopyOptions}"
   }
 
   /**
