@@ -146,27 +146,27 @@ val records = sc.newAPIHadoopFile(
 
 There are three ways of configuring AWS credentials for use by this library:
 
-1. **Set keys in Hadoop conf (best option for most users):** You can specify AWS keys via [Hadoop configuration properties](https://github.com/apache/hadoop/blob/trunk/hadoop-tools/hadoop-aws/src/site/markdown/tools/hadoop-aws/index.md). For example, if your `tempdir` configuration points to a `s3n://` filesystem then you can set the `fs.s3n.awsAccessKeyId` and `fs.s3n.awsSecretAccessKey` properties in a Hadoop XML configuration file or call `sc.hadoopConfig.set()` to mutate Spark's global Hadoop configuration.
+1. **Set keys in Hadoop conf (best option for most users):** You can specify AWS keys via [Hadoop configuration properties](https://github.com/apache/hadoop/blob/trunk/hadoop-tools/hadoop-aws/src/site/markdown/tools/hadoop-aws/index.md). For example, if your `tempdir` configuration points to a `s3n://` filesystem then you can set the `fs.s3n.awsAccessKeyId` and `fs.s3n.awsSecretAccessKey` properties in a Hadoop XML configuration file or call `sc.hadoopConfiguration.set()` to mutate Spark's global Hadoop configuration.
 
  For example, if you are using the `s3n` filesystem then add
 
  ```scala
- sc.hadoopConfig.set("fs.s3n.awsAccessKeyId", "YOUR_KEY_ID")
- sc.hadoopConfig.set("fs.s3n.awsSecretAccessKey", "YOUR_SECRET_ACCESS_KEY")
+ sc.hadoopConfiguration.set("fs.s3n.awsAccessKeyId", "YOUR_KEY_ID")
+ sc.hadoopConfiguration.set("fs.s3n.awsSecretAccessKey", "YOUR_SECRET_ACCESS_KEY")
  ```
 
  and for the `s3a` filesystem add
 
  ```scala
- sc.hadoopConfig.set("fs.s3a.access.key", "YOUR_KEY_ID")
- sc.hadoopConfig.set("fs.s3a.secret.key", "YOUR_SECRET_ACCESS_KEY")
+ sc.hadoopConfiguration.set("fs.s3a.access.key", "YOUR_KEY_ID")
+ sc.hadoopConfiguration.set("fs.s3a.secret.key", "YOUR_SECRET_ACCESS_KEY")
  ```
 
- Python users will have to use a slightly different method to modify the `hadoopConfig`, since this field is not exposed in all versions of PySpark. Although the following command relies on some Spark internals, it should work with all PySpark versions and is unlikely to break or change in the future:
+ Python users will have to use a slightly different method to modify the `hadoopConfiguration`, since this field is not exposed in all versions of PySpark. Although the following command relies on some Spark internals, it should work with all PySpark versions and is unlikely to break or change in the future:
 
  ```python
- sc._jsc.hadoopConfig().set("fs.s3n.awsAccessKeyId", "YOUR_KEY_ID")
- sc._jsc.hadoopConfig().set("fs.s3n.awsSecretAccessKey", "YOUR_SECRET_ACCESS_KEY")
+ sc._jsc.hadoopConfiguration().set("fs.s3n.awsAccessKeyId", "YOUR_KEY_ID")
+ sc._jsc.hadoopConfiguration().set("fs.s3n.awsSecretAccessKey", "YOUR_SECRET_ACCESS_KEY")
  ```
 
 2. **Encode keys in `tempdir` URI**: For example, the URI `s3n://ACCESSKEY:SECRETKEY@bucket/path/to/temp/dir` encodes the key pair (`ACCESSKEY`, `SECRETKEY`). Due to [Hadoop limitations](https://issues.apache.org/jira/browse/HADOOP-3733), this approach will not work for secret keys which contain forward slash (`/`) characters.
