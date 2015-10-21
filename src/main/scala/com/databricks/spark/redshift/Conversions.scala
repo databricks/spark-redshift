@@ -53,7 +53,7 @@ private[redshift] object Conversions {
    * This formatter should not be used when saving dates back to Redshift; instead, use
    * [[RedshiftTimestampFormat]].
    */
-  def createRedshiftDateFormat() = new SimpleDateFormat("yyyy-MM-dd")
+  def createRedshiftDateFormat(): SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd")
 
   /**
    * Return a function that will convert arrays of strings conforming to the given schema to Rows.
