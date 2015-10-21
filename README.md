@@ -115,13 +115,32 @@ df.write \
 
 #### SQL
 
+Reading data using SQL:
+
 ```sql
 CREATE TABLE my_table
 USING com.databricks.spark.redshift
-OPTIONS (dbtable 'my_table',
-         tempdir 's3n://my_bucket/tmp',
-         url 'jdbc:redshift://host:port/db?user=username&password=pass');
+OPTIONS (
+  dbtable 'my_table',
+  tempdir 's3n://my_bucket/tmp',
+  url 'jdbc:redshift://host:port/db?user=username&password=pass'
+);
 ```
+
+Writing data using SQL:
+
+```sql
+CREATE TABLE my_table
+USING com.databricks.spark.redshift
+OPTIONS (
+  dbtable 'my_table',
+  tempdir 's3n://my_bucket/tmp'
+  url 'jdbc:redshift://host:port/db?user=username&password=pass'
+)
+AS SELECT * FROM tabletosave;
+```
+
+Note that the SQL API only supports the creation of new tables and not overwriting or appending; this corresponds to the default save mode of the other language APIs.
 
 ### Hadoop InputFormat
 
