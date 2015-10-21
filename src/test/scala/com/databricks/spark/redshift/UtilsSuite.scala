@@ -33,6 +33,12 @@ class UtilsSuite extends FunSuite with Matchers {
     Utils.joinUrls("s3n://foo/bar", "baz") shouldBe "s3n://foo/bar/baz/"
   }
 
+  test("joinUrls preserves credentials") {
+    assert(
+      Utils.joinUrls("s3n://ACCESSKEY:SECRETKEY@bucket/tempdir", "subdir") ===
+      "s3n://ACCESSKEY:SECRETKEY@bucket/tempdir/subdir/")
+  }
+
   test("fixUrl produces Redshift-compatible equivalents") {
     Utils.fixS3Url("s3a://foo/bar/12345") shouldBe "s3://foo/bar/12345"
     Utils.fixS3Url("s3n://foo/bar/baz") shouldBe "s3://foo/bar/baz"
