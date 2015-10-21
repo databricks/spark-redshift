@@ -41,6 +41,9 @@ private[redshift] object Conversions {
 
   /**
    * Formatter for writing decimals unloaded from Redshift.
+   *
+   * Note that Java Formatters are NOT thread-safe, so you should not re-use instances of this
+   * DecimalFormat across threads.
    */
   def createRedshiftDecimalFormat(): DecimalFormat = {
     val format = new DecimalFormat()
@@ -52,6 +55,9 @@ private[redshift] object Conversions {
    * Formatter for parsing strings exported from Redshift DATE columns.
    * This formatter should not be used when saving dates back to Redshift; instead, use
    * [[RedshiftTimestampFormat]].
+   *
+   * Note that Java Formatters are NOT thread-safe, so you should not re-use instances of this
+   * SimpleDateFormat across threads.
    */
   def createRedshiftDateFormat(): SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd")
 
