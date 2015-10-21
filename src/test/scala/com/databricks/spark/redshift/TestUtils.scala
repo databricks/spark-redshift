@@ -68,8 +68,8 @@ object TestUtils {
    */
   val expectedDataWithConvertedTimesAndDates: Seq[Row] = expectedData.map { row =>
     Row.fromSeq(row.toSeq.map {
-      case t: Timestamp => Conversions.formatTimestamp(t)
-      case d: Date => Conversions.formatDate(d)
+      case t: Timestamp => new RedshiftTimestampFormat().format(t)
+      case d: Date => new RedshiftTimestampFormat().format(d)
       case other => other
     })
   }
