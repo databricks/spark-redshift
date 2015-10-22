@@ -122,20 +122,21 @@ CREATE TABLE my_table
 USING com.databricks.spark.redshift
 OPTIONS (
   dbtable 'my_table',
-  tempdir 's3n://my_bucket/tmp',
-  url 'jdbc:redshift://host:port/db?user=username&password=pass'
+  tempdir 's3n://path/for/temp/data',
+  url 'jdbc:redshift://redshifthost:5439/database?user=username&password=pass'
 );
 ```
 
 Writing data using SQL:
 
 ```sql
+-- Create a new table, throwing an error of a table with the same name already exists:
 CREATE TABLE my_table
 USING com.databricks.spark.redshift
 OPTIONS (
   dbtable 'my_table',
-  tempdir 's3n://my_bucket/tmp'
-  url 'jdbc:redshift://host:port/db?user=username&password=pass'
+  tempdir 's3n://path/for/temp/data'
+  url 'jdbc:redshift://redshifthost:5439/database?user=username&password=pass'
 )
 AS SELECT * FROM tabletosave;
 ```
