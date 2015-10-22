@@ -46,6 +46,7 @@ class CredentialsInUriIntegrationSuite extends IntegrationSuiteBase {
     sc = new SparkContext("local", getClass.getSimpleName)
     conn = DefaultJDBCWrapper.getConnector(None, jdbcUrl)
     assert(tempDir.contains("AKIA"), "tempdir did not contain AWS credentials")
+    assert(!AWS_SECRET_ACCESS_KEY.contains("/"), "AWS secret key should not contain slash")
   }
 
   test("roundtrip save and load") {
