@@ -130,7 +130,7 @@ OPTIONS (
 Writing data using SQL:
 
 ```sql
--- Create a new table, throwing an error of a table with the same name already exists:
+-- Create a new table, throwing an error if a table with the same name already exists:
 CREATE TABLE my_table
 USING com.databricks.spark.redshift
 OPTIONS (
