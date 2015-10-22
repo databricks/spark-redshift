@@ -49,6 +49,9 @@ private[redshift] case class RedshiftRelation(
       new URI(params.rootTempDir), sqlContext.sparkContext.hadoopConfiguration)
   }
 
+  private val tableNameOrSubquery =
+    params.query.map(q => s"($q)").orElse(params.table.map(_.toString)).get
+
   override lazy val schema: StructType = {
     userSchema.getOrElse {
       val tableNameOrSubquery =
@@ -61,6 +64,8 @@ private[redshift] case class RedshiftRelation(
       }
     }
   }
+
+  override def toString: String = s"RedshiftRelation($tableNameOrSubquery)"
 
   override def insert(data: DataFrame, overwrite: Boolean): Unit = {
     val saveMode = if (overwrite) {
@@ -80,7 +85,6 @@ private[redshift] case class RedshiftRelation(
       // In the special case where no columns were requested, issue a `count(*)` against Redshift
       // rather than unloading data.
       val whereClause = FilterPushdown.buildWhereClause(schema, filters)
-      val tableNameOrSubquery = params.query.map(q => s"($q)").orElse(params.table).get
       val countQuery = s"SELECT count(*) FROM $tableNameOrSubquery $whereClause"
       log.info(countQuery)
       val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
@@ -136,13 +140,12 @@ private[redshift] case class RedshiftRelation(
     val query = {
       // Since the query passed to UNLOAD will be enclosed in single quotes, we need to escape
       // any single quotes that appear in the query itself
-      val tableNameOrSubquery: String = {
-        val unescaped = params.query.map(q => s"($q)").orElse(params.table.map(_.toString)).get
-        unescaped.replace("'", "\\'")
-      }
-      s"SELECT $columnList FROM $tableNameOrSubquery $whereClause"
+      val escapedTableNameOrSubqury = tableNameOrSubquery.replace("'", "\\'")
+      s"SELECT $columnList FROM $escapedTableNameOrSubqury $whereClause"
     }
-    val fixedUrl = Utils.fixS3Url(tempDir)
+    // We need to remove S3 credentials from the unload path URI because they will conflict with
+    // the credentials passed via `credsString`.
+    val fixedUrl = Utils.fixS3Url(Utils.removeCredentialsFromURI(new URI(tempDir)).toString)
 
     s"UNLOAD ('$query') TO '$fixedUrl' WITH CREDENTIALS '$credsString' ESCAPE"
   }
