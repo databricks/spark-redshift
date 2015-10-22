@@ -236,17 +236,23 @@ private[redshift] class RedshiftWriter(
     // choose to write out both dates and timestamps as strings using the same timestamp format.
     // For additional background and discussion, see #39.
 
-    // Convert the rows so that timestamps and dates become formatted strings:
+    // Convert the rows so that timestamps and dates become formatted strings.
+    // Formatters are not thread-safe, and thus these functions are not thread-safe.
+    // However, each task gets its own deserialized copy, making this safe.
     val conversionFunctions: Array[Any => Any] = data.schema.fields.map { field =>
       field.dataType match {
-        case DateType => (v: Any) => v match {
-          case null => null
-          case t: Timestamp => Conversions.formatTimestamp(t)
-          case d: Date => Conversions.formatDate(d)
-        }
-        case TimestampType => (v: Any) => {
-          if (v == null) null else Conversions.formatTimestamp(v.asInstanceOf[Timestamp])
-        }
+        case DateType =>
+          val timestampFormat = new RedshiftTimestampFormat()
+          (v: Any) => v match {
+            case null => null
+            case t: Timestamp => timestampFormat.format(t)
+            case d: Date => timestampFormat.format(d)
+          }
+        case TimestampType =>
+          val timestampFormat = new RedshiftTimestampFormat()
+          (v: Any) => {
+            if (v == null) null else timestampFormat.format(v.asInstanceOf[Timestamp])
+          }
         case _ => (v: Any) => v
       }
     }

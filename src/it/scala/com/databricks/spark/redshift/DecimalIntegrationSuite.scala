@@ -27,8 +27,13 @@ class DecimalIntegrationSuite extends IntegrationSuiteBase {
   private def testReadingDecimals(precision: Int, scale: Int, decimalStrings: Seq[String]): Unit = {
     test(s"reading DECIMAL($precision, $scale)") {
       val tableName = s"reading_decimal_${precision}_${scale}_$randomSuffix"
-      val expectedRows =
-        decimalStrings.map(d => Row(if (d == null) null else Conversions.parseDecimal(d)))
+      val expectedRows = decimalStrings.map { d =>
+        if (d == null) {
+          Row(null)
+        } else {
+          Row(Conversions.createRedshiftDecimalFormat().parse(d).asInstanceOf[java.math.BigDecimal])
+        }
+      }
       try {
         conn.createStatement().executeUpdate(
           s"CREATE TABLE $tableName (x DECIMAL($precision, $scale))")
