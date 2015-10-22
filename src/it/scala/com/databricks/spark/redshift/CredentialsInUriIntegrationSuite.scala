@@ -45,6 +45,7 @@ class CredentialsInUriIntegrationSuite extends IntegrationSuiteBase {
   override def beforeAll(): Unit = {
     sc = new SparkContext("local", getClass.getSimpleName)
     conn = DefaultJDBCWrapper.getConnector(None, jdbcUrl)
+    assert(tempDir.contains("AKIA"), "tempdir did not contain AWS credentials")
   }
 
   test("roundtrip save and load") {
