@@ -26,6 +26,7 @@ import bintray.BintrayPlugin.autoImport._
 
 object SparkRedshiftBuild extends Build {
   val testSparkVersion = settingKey[String]("Spark version to test against")
+  val testSparkAvroVersion = settingKey[String]("spark-avro version to test against")
   val testHadoopVersion = settingKey[String]("Hadoop version to test against")
 
   // Define a custom test configuration so that unit test helper classes can be re-used under
@@ -45,6 +46,7 @@ object SparkRedshiftBuild extends Build {
       crossScalaVersions := Seq("2.10.5", "2.11.7"),
       sparkVersion := "1.4.1",
       testSparkVersion := sys.props.get("spark.testVersion").getOrElse(sparkVersion.value),
+      testSparkAvroVersion := sys.props.get("sparkAvro.testVersion").getOrElse("2.0.1"),
       testHadoopVersion := sys.props.get("hadoop.testVersion").getOrElse("2.2.0"),
       spName := "databricks/spark-redshift",
       sparkComponents ++= Seq("sql", "hive"),
@@ -99,7 +101,8 @@ object SparkRedshiftBuild extends Build {
       libraryDependencies ++= Seq(
         "org.apache.spark" %% "spark-core" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force(),
         "org.apache.spark" %% "spark-sql" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force(),
-        "org.apache.spark" %% "spark-hive" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force()
+        "org.apache.spark" %% "spark-hive" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force(),
+        "com.databricks" %% "spark-avro" % testSparkAvroVersion.value % "test" force()
       ),
       // Although spark-avro declares its avro-mapred dependency as `provided`, its version of the
       // dependency can still end up on the classpath during tests, which breaks the tests for
