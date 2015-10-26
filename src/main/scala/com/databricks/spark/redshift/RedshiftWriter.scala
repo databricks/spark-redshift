@@ -311,29 +311,27 @@ private[redshift] class RedshiftWriter(
       // for a description of the manifest file format. The URLs in this manifest must be absolute
       // and complete.
 
-      // The saved filenames are going to be of the form part-r-XXXXX-UUID.avro. There isn't a way
-      // to figure out what this UUID is, besides querying S3. In principle, this file format could
-      // change in a way that breaks this library, but this seems unlikely and we can patch around
-      // it if that happens.
+      // The saved filenames depend on the spark-avro version. In spark-avro 1.0.0, the write
+      // path uses SparkContext.saveAsHadoopFile(), which produces filenames of the form
+      // part-XXXXX.avro. In spark-avro 2.0.0+, the partition filenames are of the form
+      // part-r-XXXXX-UUID.avro.
       val fs = FileSystem.get(URI.create(tempDir), sqlContext.sparkContext.hadoopConfiguration)
-      val writeJobUUID = fs.listStatus(new Path(tempDir))
-        .iterator
-        .map(_.getPath.getName)
-        .filter(_.startsWith("part"))
-        .take(1)
-        .toSeq
-        .headOption.getOrElse(throw new Exception("No part files were written!"))
-        .drop("part-r-XXXXX-".length)
-        .stripSuffix(".avro")
-
+      val partitionIdRegex = "part-(?:r-)?(\\d{5})".r
+      val filesToLoad: Seq[String] = {
+        val nonEmptyPartitionIds = nonEmptyPartitions.value.toSet
+        fs.listStatus(new Path(tempDir)).map(_.getPath.toString).collect {
+          case path @ partitionIdRegex(id) if nonEmptyPartitionIds.contains(id.toInt) =>
+            // It's possible that tempDir contains AWS access keys. We shouldn't save those
+            // credentials to S3, so sanitize the URL and make sure it it uses the s3:// scheme
+            // that Redshift expects.
+            Utils.fixS3Url(Utils.removeCredentialsFromURI(URI.create(path)).toString)
+        }
+      }
       // It's possible that tempDir contains AWS access keys. We shouldn't save those credentials to
       // S3, so let's first sanitize `tempdir` and make sure that it uses the s3:// scheme:
       val sanitizedTempDir = Utils.fixS3Url(
         Utils.removeCredentialsFromURI(URI.create(tempDir)).toString).stripSuffix("/")
-      val urls = nonEmptyPartitions.value.toSeq.map { partitionId =>
-        s"$sanitizedTempDir/part-r-${"%05d".format(partitionId)}-$writeJobUUID.avro"
-      }
-      val manifestEntries = urls.map { url => s"""{"url":"$url", "mandatory":true}""" }
+      val manifestEntries = filesToLoad.map { url => s"""{"url":"$url", "mandatory":true}""" }
       val manifest = s"""{"entries": [${manifestEntries.mkString(",\n")}]}"""
       val manifestPath = sanitizedTempDir + "/manifest.json"
       val fsDataOut = fs.create(new Path(manifestPath))
