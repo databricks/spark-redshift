@@ -49,6 +49,6 @@ env:
     - secure: "LvndQIW6dHs6nyaMHtblGI/oL+s460lOezFs2BoD0Isenb/O/IM+nY5K9HepTXjJIcq8qvUYnojZX1FCrxxOXX2/+/Iihiq7GzJYdmdMC6hLg9bJYeAFk0dWYT88/AwadrJCBOa3ockRLhiO3dkai7Ki5+M1erfaFiAHHMpJxYQ="
 
 script:
-  - dev/run-tests-travis.sh
+  - ./dev/run-tests-travis.sh
 after_success:
   - bash <(curl -s https://codecov.io/bash)
