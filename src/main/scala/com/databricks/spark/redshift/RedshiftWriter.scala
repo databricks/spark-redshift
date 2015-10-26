@@ -319,19 +319,17 @@ private[redshift] class RedshiftWriter(
       val partitionIdRegex = "part-(?:r-)?(\\d{5})".r
       val filesToLoad: Seq[String] = {
         val nonEmptyPartitionIds = nonEmptyPartitions.value.toSet
-        fs.listStatus(new Path(tempDir)).map(_.getPath.toString).collect {
-          case path @ partitionIdRegex(id) if nonEmptyPartitionIds.contains(id.toInt) =>
-            // It's possible that tempDir contains AWS access keys. We shouldn't save those
-            // credentials to S3, so sanitize the URL and make sure it it uses the s3:// scheme
-            // that Redshift expects.
-            Utils.fixS3Url(Utils.removeCredentialsFromURI(URI.create(path)).toString)
+        fs.listStatus(new Path(tempDir)).map(_.getPath.getName).collect {
+          case file @ partitionIdRegex(id) if nonEmptyPartitionIds.contains(id.toInt) => file
         }
       }
       // It's possible that tempDir contains AWS access keys. We shouldn't save those credentials to
       // S3, so let's first sanitize `tempdir` and make sure that it uses the s3:// scheme:
       val sanitizedTempDir = Utils.fixS3Url(
         Utils.removeCredentialsFromURI(URI.create(tempDir)).toString).stripSuffix("/")
-      val manifestEntries = filesToLoad.map { url => s"""{"url":"$url", "mandatory":true}""" }
+      val manifestEntries = filesToLoad.map { file =>
+        s"""{"url":"$sanitizedTempDir/$file", "mandatory":true}"""
+      }
       val manifest = s"""{"entries": [${manifestEntries.mkString(",\n")}]}"""
       val manifestPath = sanitizedTempDir + "/manifest.json"
       val fsDataOut = fs.create(new Path(manifestPath))
