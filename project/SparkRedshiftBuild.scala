@@ -102,7 +102,7 @@ object SparkRedshiftBuild extends Build {
         "org.apache.spark" %% "spark-core" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force(),
         "org.apache.spark" %% "spark-sql" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force(),
         "org.apache.spark" %% "spark-hive" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force(),
-        "com.databricks" %% "spark-avro" % testSparkAvroVersion.value % "test" intransitive() force()
+        "com.databricks" %% "spark-avro" % testSparkAvroVersion.value % "test" exclude("org.apache.avro", "avro-mapred") force()
       ),
       // Although spark-avro declares its avro-mapred dependency as `provided`, its version of the
       // dependency can still end up on the classpath during tests, which breaks the tests for
