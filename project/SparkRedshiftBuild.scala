@@ -113,6 +113,7 @@ object SparkRedshiftBuild extends Build {
           x => x.data.getName.contains("hadoop1") && x.data.getName.contains("avro")
         }
       }),
+      fullClasspath in IntegrationTest := (fullClasspath in Test).value,
       ScoverageSbtPlugin.ScoverageKeys.coverageHighlighting := {
         if (scalaBinaryVersion.value == "2.10") false
         else true
