@@ -53,6 +53,8 @@ object SparkRedshiftBuild extends Build {
       credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"),
       resolvers +=
         "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
+      scalacOptions ++= Seq("-target:jvm-1.6"),
+      javacOptions ++= Seq("-source", "1.6", "-target", "1.6"),
       libraryDependencies ++= Seq(
         "org.slf4j" % "slf4j-api" % "1.7.5",
         // These Amazon SDK depdencies are marked as 'provided' in order to reduce the risk of
