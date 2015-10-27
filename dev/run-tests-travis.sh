@@ -17,6 +17,6 @@ if [ "$TRAVIS_SECURE_ENV_VARS" == "true" ]; then
     -Dhadoop.testVersion=$HADOOP_VERSION \
     -Dspark.testVersion=$SPARK_VERSION \
     ++$TRAVIS_SCALA_VERSION \
-    coverage "it:testOnly *RedshiftIntegration* -- -z \"roundtrip save and load\"" 2> /dev/null;
+    coverage "it:testOnly *RedshiftIntegration* -- -z \"roundtrip save and load\""
     # coverage it:test 2> /dev/null;
 fi

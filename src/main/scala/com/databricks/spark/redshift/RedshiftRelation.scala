@@ -105,7 +105,7 @@ private[redshift] case class RedshiftRelation(
       // Unload data from Redshift into a temporary directory in S3:
       val tempDir = params.createPerQueryTempDir()
       val unloadSql = buildUnloadStmt(requiredColumns, filters, tempDir)
-      log.info(unloadSql)
+      // log.info(unloadSql)
       val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
       try {
         conn.prepareStatement(unloadSql).execute()
