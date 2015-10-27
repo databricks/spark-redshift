@@ -23,6 +23,7 @@ import scala.util.Random
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{Path, FileSystem}
+import org.apache.hadoop.fs.s3native.NativeS3FileSystem
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.{DataFrame, SaveMode, SQLContext}
 import org.apache.spark.sql.hive.test.TestHiveContext
@@ -98,6 +99,8 @@ trait IntegrationSuiteBase
       // Bypass Hadoop's FileSystem caching mechanism so that we don't cache the credentials:
       conf.setBoolean("fs.s3.impl.disable.cache", true)
       conf.setBoolean("fs.s3n.impl.disable.cache", true)
+      conf.set("fs.s3.impl", classOf[NativeS3FileSystem].getCanonicalName)
+      conf.set("fs.s3n.impl", classOf[NativeS3FileSystem].getCanonicalName)
       val fs = FileSystem.get(URI.create(tempDir), conf)
       fs.delete(new Path(tempDir), true)
       fs.close()
