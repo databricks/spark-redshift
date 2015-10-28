@@ -316,7 +316,7 @@ private[redshift] class RedshiftWriter(
       // part-XXXXX.avro. In spark-avro 2.0.0+, the partition filenames are of the form
       // part-r-XXXXX-UUID.avro.
       val fs = FileSystem.get(URI.create(tempDir), sqlContext.sparkContext.hadoopConfiguration)
-      val partitionIdRegex = "^part-(?:r-)?(\\d{5}).*$".r
+      val partitionIdRegex = "^part-(?:r-)?(\\d+)[^\\d+].*$".r
       val filesToLoad: Seq[String] = {
         val nonEmptyPartitionIds = nonEmptyPartitions.value.toSet
         fs.listStatus(new Path(tempDir)).map(_.getPath.getName).collect {
