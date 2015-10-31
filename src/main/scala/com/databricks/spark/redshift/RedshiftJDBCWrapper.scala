@@ -20,7 +20,8 @@ package com.databricks.spark.redshift
 import java.net.URI
 import java.sql.{ResultSet, PreparedStatement, Connection, Driver, DriverManager, ResultSetMetaData, SQLException}
 import java.util.Properties
-import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.{ThreadFactory, Executors}
 
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration.Duration
@@ -38,8 +39,17 @@ private[redshift] class JDBCWrapper {
 
   private val log = LoggerFactory.getLogger(getClass)
 
-  private val ec: ExecutionContext =
-    ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
+  private val ec: ExecutionContext = {
+    val threadFactory = new ThreadFactory {
+      private val count = new AtomicInteger()
+      override def newThread(r: Runnable) = {
+        val thread = new Thread(r)
+        thread.setName(s"spark-redshift-JDBCWrapper-${count.incrementAndGet}")
+        thread.setDaemon(true)
+        thread
+      }
+      ExecutionContext.fromExecutorService(Executors.newCachedThreadPool(threadFactory))
+    }
 
   /**
    * Given a JDBC subprotocol, returns the appropriate driver class so that it can be registered
