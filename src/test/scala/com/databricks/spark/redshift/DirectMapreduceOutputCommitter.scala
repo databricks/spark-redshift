@@ -21,7 +21,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.hadoop.mapreduce._
 import org.apache.hadoop.mapreduce.lib.output.{FileOutputCommitter, FileOutputFormat}
 
-class DirectOutputCommitter extends OutputCommitter {
+class DirectMapreduceOutputCommitter extends OutputCommitter {
   override def setupJob(jobContext: JobContext): Unit = { }
 
   override def setupTask(taskContext: TaskAttemptContext): Unit = { }

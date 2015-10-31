@@ -94,7 +94,9 @@ class RedshiftSourceSuite
     // We need to use a DirectOutputCommitter to work around an issue which occurs with renames
     // while using the mocked S3 filesystem.
     sc.hadoopConfiguration.set("spark.sql.sources.outputCommitterClass",
-      classOf[DirectOutputCommitter].getName)
+      classOf[DirectMapreduceOutputCommitter].getName)
+    sc.hadoopConfiguration.set("mapred.output.committer.class",
+      classOf[DirectMapredOutputCommitter].getName)
     sc.hadoopConfiguration.set("fs.s3.awsAccessKeyId", "test1")
     sc.hadoopConfiguration.set("fs.s3.awsSecretAccessKey", "test2")
     sc.hadoopConfiguration.set("fs.s3n.awsAccessKeyId", "test1")
