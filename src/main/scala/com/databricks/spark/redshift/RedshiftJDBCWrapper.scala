@@ -41,15 +41,16 @@ private[redshift] class JDBCWrapper {
 
   private val ec: ExecutionContext = {
     val threadFactory = new ThreadFactory {
-      private val count = new AtomicInteger()
+      private[this] val count = new AtomicInteger()
       override def newThread(r: Runnable) = {
         val thread = new Thread(r)
         thread.setName(s"spark-redshift-JDBCWrapper-${count.incrementAndGet}")
         thread.setDaemon(true)
         thread
       }
-      ExecutionContext.fromExecutorService(Executors.newCachedThreadPool(threadFactory))
     }
+    ExecutionContext.fromExecutorService(Executors.newCachedThreadPool(threadFactory))
+  }
 
   /**
    * Given a JDBC subprotocol, returns the appropriate driver class so that it can be registered
