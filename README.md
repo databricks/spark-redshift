@@ -350,33 +350,33 @@ When creating Redshift tables, `spark-redshift`'s default behavior is to create 
 
 To support larger columns, you can use the `maxlength` column metadata field to specify the maximum length of individual string columns. This can also be done as a space-savings performance optimization in order to declare columns with a smaller maximum length than the default.
 
-Here is an example of updating a column's metadata field in Scala:
+Here is an example of updating multiple columns' metadata fields:
 
 ```scala
 import org.apache.spark.sql.types.MetadataBuilder
 
 // Specify the custom width of each column
-val columnWidthMap = Map(
-  "column1" -> 10,
-  "column2" -> 11,
-  "column3" -> 12,
-  "column4" -> 13,
-  "column5" -> 14,
+val columnLengthMap = Map(
+  "language_code" -> 2,
+  "country_code" -> 2,
+  "url" -> 2083
 )
 
-var df // the dataframe you'll want to write to redshift
+var df = ... // the dataframe you'll want to write to Redshift
 
 // Apply each column metadata customization
-columnWidthMap.foreach(m => {
-  df = df.withColumn(m._1, df(m._1).as(m._1, new MetadataBuilder().putLong("maxlength", m._2).build()))
-})
+columnLengthMap.foreach(
+  case (colName, length) => {
+    val metadata = new MetadataBuilder().putLong("maxlength", length).build())
+    df = df.withColumn(colName, df(colName).as(colName, metadata))
+  }
+)
 
 df.write
   .format("com.databricks.spark.redshift")
   .option("url", jdbcURL)
   .option("tempdir", s3TempDirectory)
   .option("dbtable", sessionTable)
-  .mode(SaveMode.Overwrite)
   .save()
 ```
 
