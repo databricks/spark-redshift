@@ -294,9 +294,9 @@ must also set a distribution key with the <tt>distkey</tt> option.
 
 <p>Examples include:</p>
 <ul>
-    <li><tt>SORTKEY my_sort_column</tt></li>
-    <li><tt>COMPOUND SORTKEY sort_col_1, sort_col_2</tt></li>
-    <li><tt>INTERLEAVED SORTKEY sort_col_1, sort_col_2</tt></li>
+    <li><tt>SORTKEY(my_sort_column)</tt></li>
+    <li><tt>COMPOUND SORTKEY(sort_col_1, sort_col_2)</tt></li>
+    <li><tt>INTERLEAVED SORTKEY(sort_col_1, sort_col_2)</tt></li>
 </ul>
     </td>
  </tr>
