@@ -352,11 +352,32 @@ To support larger columns, you can use the `maxlength` column metadata field to 
 
 Here is an example of updating a column's metadata field in Scala:
 
-```
+```scala
 import org.apache.spark.sql.types.MetadataBuilder
-val metadata = new MetadataBuilder().putLong("maxlength", 10).build()
-df.withColumn("colName", col("colName").as("colName", metadata)
-```
+
+    // Specify the custom width of each column
+    val columnWidthMap = Map(
+      "column1" -> 10,
+      "column2" -> 11,
+      "column3" -> 12,
+      "column4" -> 13,
+      "column5" -> 14,
+    )
+
+    var df // the dataframe you'll want to write to redshift
+
+    // Apply each column metadata customization
+    columnWidthMap.foreach(m => {
+      df = df.withColumn(m._1, df(m._1).as(m._1, new MetadataBuilder().putLong("maxlength", m._2).build()))
+    })
+
+    df.write
+      .format("com.databricks.spark.redshift")
+      .option("url", jdbcURL)
+      .option("tempdir", s3TempDirectory)
+      .option("dbtable", sessionTable)
+      .mode(SaveMode.Overwrite)
+      .save()```
 
 Column metadata modification is unsupported in the Python, SQL, and R language APIs.
 
