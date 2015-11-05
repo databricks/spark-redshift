@@ -355,29 +355,30 @@ Here is an example of updating a column's metadata field in Scala:
 ```scala
 import org.apache.spark.sql.types.MetadataBuilder
 
-    // Specify the custom width of each column
-    val columnWidthMap = Map(
-      "column1" -> 10,
-      "column2" -> 11,
-      "column3" -> 12,
-      "column4" -> 13,
-      "column5" -> 14,
-    )
+// Specify the custom width of each column
+val columnWidthMap = Map(
+  "column1" -> 10,
+  "column2" -> 11,
+  "column3" -> 12,
+  "column4" -> 13,
+  "column5" -> 14,
+)
 
-    var df // the dataframe you'll want to write to redshift
+var df // the dataframe you'll want to write to redshift
 
-    // Apply each column metadata customization
-    columnWidthMap.foreach(m => {
-      df = df.withColumn(m._1, df(m._1).as(m._1, new MetadataBuilder().putLong("maxlength", m._2).build()))
-    })
+// Apply each column metadata customization
+columnWidthMap.foreach(m => {
+  df = df.withColumn(m._1, df(m._1).as(m._1, new MetadataBuilder().putLong("maxlength", m._2).build()))
+})
 
-    df.write
-      .format("com.databricks.spark.redshift")
-      .option("url", jdbcURL)
-      .option("tempdir", s3TempDirectory)
-      .option("dbtable", sessionTable)
-      .mode(SaveMode.Overwrite)
-      .save()```
+df.write
+  .format("com.databricks.spark.redshift")
+  .option("url", jdbcURL)
+  .option("tempdir", s3TempDirectory)
+  .option("dbtable", sessionTable)
+  .mode(SaveMode.Overwrite)
+  .save()
+```
 
 Column metadata modification is unsupported in the Python, SQL, and R language APIs.
 
