@@ -294,9 +294,9 @@ must also set a distribution key with the <tt>distkey</tt> option.
 
 <p>Examples include:</p>
 <ul>
-    <li><tt>SORTKEY my_sort_column</tt></li>
-    <li><tt>COMPOUND SORTKEY sort_col_1, sort_col_2</tt></li>
-    <li><tt>INTERLEAVED SORTKEY sort_col_1, sort_col_2</tt></li>
+    <li><tt>SORTKEY(my_sort_column)</tt></li>
+    <li><tt>COMPOUND SORTKEY(sort_col_1, sort_col_2)</tt></li>
+    <li><tt>INTERLEAVED SORTKEY(sort_col_1, sort_col_2)</tt></li>
 </ul>
     </td>
  </tr>
@@ -350,12 +350,32 @@ When creating Redshift tables, `spark-redshift`'s default behavior is to create 
 
 To support larger columns, you can use the `maxlength` column metadata field to specify the maximum length of individual string columns. This can also be done as a space-savings performance optimization in order to declare columns with a smaller maximum length than the default.
 
-Here is an example of updating a column's metadata field in Scala:
+Here is an example of updating multiple columns' metadata fields:
 
-```
+```scala
 import org.apache.spark.sql.types.MetadataBuilder
-val metadata = new MetadataBuilder().putLong("maxlength", 10).build()
-df.withColumn("colName", col("colName").as("colName", metadata)
+
+// Specify the custom width of each column
+val columnLengthMap = Map(
+  "language_code" -> 2,
+  "country_code" -> 2,
+  "url" -> 2083
+)
+
+var df = ... // the dataframe you'll want to write to Redshift
+
+// Apply each column metadata customization
+columnLengthMap.foreach { case (colName, length) =>
+  val metadata = new MetadataBuilder().putLong("maxlength", length).build()
+  df = df.withColumn(colName, df(colName).as(colName, metadata))
+}
+
+df.write
+  .format("com.databricks.spark.redshift")
+  .option("url", jdbcURL)
+  .option("tempdir", s3TempDirectory)
+  .option("dbtable", sessionTable)
+  .save()
 ```
 
 Column metadata modification is unsupported in the Python, SQL, and R language APIs.
