@@ -20,7 +20,7 @@ import java.io.File
 import java.net.URI
 
 import com.amazonaws.services.s3.AmazonS3Client
-import com.amazonaws.services.s3.model.BucketLifecycleConfiguration
+import com.amazonaws.services.s3.model.{BucketLifecycleConfiguration, ObjectListing}
 import com.amazonaws.services.s3.model.BucketLifecycleConfiguration.Rule
 import org.mockito.Matchers._
 import org.mockito.Mockito
@@ -101,12 +101,6 @@ class RedshiftSourceSuite
     sc.hadoopConfiguration.set("fs.s3.awsSecretAccessKey", "test2")
     sc.hadoopConfiguration.set("fs.s3n.awsAccessKeyId", "test1")
     sc.hadoopConfiguration.set("fs.s3n.awsSecretAccessKey", "test2")
-    // Configure a mock S3 client so that we don't hit errors when trying to access AWS in tests.
-    mockS3Client = Mockito.mock(classOf[AmazonS3Client], Mockito.RETURNS_SMART_NULLS)
-    when(mockS3Client.getBucketLifecycleConfiguration(anyString())).thenReturn(
-      new BucketLifecycleConfiguration().withRules(
-        new Rule().withPrefix("").withStatus(BucketLifecycleConfiguration.ENABLED)
-      ))
   }
 
   override def beforeEach(): Unit = {
@@ -115,6 +109,15 @@ class RedshiftSourceSuite
     testSqlContext = new SQLContext(sc)
     expectedDataDF =
       testSqlContext.createDataFrame(sc.parallelize(TestUtils.expectedData), TestUtils.testSchema)
+    // Configure a mock S3 client so that we don't hit errors when trying to access AWS in tests.
+    mockS3Client = Mockito.mock(classOf[AmazonS3Client], Mockito.RETURNS_SMART_NULLS)
+    when(mockS3Client.getBucketLifecycleConfiguration(anyString())).thenReturn(
+      new BucketLifecycleConfiguration().withRules(
+        new Rule().withPrefix("").withStatus(BucketLifecycleConfiguration.ENABLED)
+      ))
+    // This is sufficient for our existing unit tests, but may need to be updated in the future:
+    when(mockS3Client.listObjects(any(), any())).thenReturn(
+      Mockito.mock(classOf[ObjectListing], Mockito.RETURNS_SMART_NULLS))
   }
 
   override def afterEach(): Unit = {

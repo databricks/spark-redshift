@@ -16,11 +16,13 @@
 
 package com.databricks.spark.redshift
 
+import java.io.ByteArrayInputStream
 import java.net.URI
 import java.sql.{Connection, Date, SQLException, Timestamp}
 
 import com.amazonaws.auth.AWSCredentials
-import com.amazonaws.services.s3.AmazonS3Client
+import com.amazonaws.services.s3.{AmazonS3URI, AmazonS3Client}
+import com.amazonaws.services.s3.model.{DeleteObjectsRequest, ObjectMetadata}
 import org.apache.hadoop.fs.{Path, FileSystem}
 import org.apache.spark.TaskContext
 import org.slf4j.LoggerFactory
@@ -223,13 +225,16 @@ private[redshift] class RedshiftWriter(
    * Serialize temporary data to S3, ready for Redshift COPY, and create a manifest file which can
    * be used to instruct Redshift to load the non-empty temporary data partitions.
    *
-   * @return the URL of the manifest file in S3, in `s3://path/to/file/manifest.json` format, if
-   *         at least one record was written, and None otherwise.
+   * @return a (listOfKey, optionalManifest) pair, where listOfKeys lists of keys created in the S3
+   *         bucket and optionalManifest is the URL of the manifest file in S3, in
+   *         `s3://path/to/file/manifest.json` format, if at least one record was written, or
+   *         None otherwise.
    */
   private def unloadData(
       sqlContext: SQLContext,
       data: DataFrame,
-      tempDir: String): Option[String] = {
+      tempDir: String,
+      s3Client: AmazonS3Client): (Seq[String], Option[String]) = {
     // spark-avro does not support Date types. In addition, it converts Timestamps into longs
     // (milliseconds since the Unix epoch). Redshift is capable of loading timestamps in
     // 'epochmillisecs' format but there's no equivalent format for dates. To work around this, we
@@ -304,8 +309,12 @@ private[redshift] class RedshiftWriter(
       .format("com.databricks.spark.avro")
       .save(tempDir)
 
+    val s3Uri = S3Utils.toS3URI(tempDir)
+    val keysCreated: Seq[String] =
+      S3Utils.listS3Objects(s3Client, s3Uri.getBucket, s3Uri.getKey).map(_.getKey).toSeq
+
     if (nonEmptyPartitions.value.isEmpty) {
-      None
+      (keysCreated, None)
     } else {
       // See https://docs.aws.amazon.com/redshift/latest/dg/loading-data-files-using-manifest.html
       // for a description of the manifest file format. The URLs in this manifest must be absolute
@@ -315,13 +324,14 @@ private[redshift] class RedshiftWriter(
       // path uses SparkContext.saveAsHadoopFile(), which produces filenames of the form
       // part-XXXXX.avro. In spark-avro 2.0.0+, the partition filenames are of the form
       // part-r-XXXXX-UUID.avro.
-      val fs = FileSystem.get(URI.create(tempDir), sqlContext.sparkContext.hadoopConfiguration)
-      val partitionIdRegex = "^part-(?:r-)?(\\d+)[^\\d+].*$".r
       val filesToLoad: Seq[String] = {
+        val partitionIdRegex = "^part-(?:r-)?(\\d+)[^\\d+].*$".r
         val nonEmptyPartitionIds = nonEmptyPartitions.value.toSet
-        fs.listStatus(new Path(tempDir)).map(_.getPath.getName).collect {
-          case file @ partitionIdRegex(id) if nonEmptyPartitionIds.contains(id.toInt) => file
-        }
+        keysCreated
+          .map(new Path(_).getName)
+          .collect {
+            case file @ partitionIdRegex(id) if nonEmptyPartitionIds.contains(id.toInt) => file
+          }
       }
       // It's possible that tempDir contains AWS access keys. We shouldn't save those credentials to
       // S3, so let's first sanitize `tempdir` and make sure that it uses the s3:// scheme:
@@ -331,14 +341,13 @@ private[redshift] class RedshiftWriter(
         s"""{"url":"$sanitizedTempDir/$file", "mandatory":true}"""
       }
       val manifest = s"""{"entries": [${manifestEntries.mkString(",\n")}]}"""
-      val manifestPath = sanitizedTempDir + "/manifest.json"
-      val fsDataOut = fs.create(new Path(manifestPath))
-      try {
-        fsDataOut.write(manifest.getBytes("utf-8"))
-      } finally {
-        fsDataOut.close()
-      }
-      Some(manifestPath)
+      s3Client.putObject(
+        s3Uri.getBucket,
+        s3Uri.getKey + "/manifest.json",
+        new ByteArrayInputStream(manifest.getBytes("utf-8")),
+        new ObjectMetadata()
+      )
+      (keysCreated, Some(sanitizedTempDir + "/manifest.json"))
     }
   }
 
@@ -355,29 +364,44 @@ private[redshift] class RedshiftWriter(
         "For save operations you must specify a Redshift table name with the 'dbtable' parameter")
     }
 
+    // Obtain credentials and perform some configuration validation:
     val creds: AWSCredentials = params.temporaryAWSCredentials.getOrElse(
       AWSCredentialsUtils.load(params.rootTempDir, sqlContext.sparkContext.hadoopConfiguration))
+    val s3Client = s3ClientFactory(creds)
 
     Utils.assertThatFileSystemIsNotS3BlockFileSystem(
       new URI(params.rootTempDir), sqlContext.sparkContext.hadoopConfiguration)
 
-    Utils.checkThatBucketHasObjectLifecycleConfiguration(params.rootTempDir, s3ClientFactory(creds))
+    Utils.checkThatBucketHasObjectLifecycleConfiguration(params.rootTempDir, s3Client)
 
-    val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
+    // Write the data to S3 in Avro format:
+    val tempDir = params.createPerQueryTempDir()
+    val (keysCreated, manifestUrl) = unloadData(sqlContext, data, tempDir, s3Client)
 
+    // Issue a query to load the data into Redshift:
     try {
-      val tempDir = params.createPerQueryTempDir()
-      val manifestUrl = unloadData(sqlContext, data, tempDir)
-      if (saveMode == SaveMode.Overwrite && params.useStagingTable) {
-        withStagingTable(conn, params.table.get, stagingTable => {
-          val updatedParams = MergedParameters(params.parameters.updated("dbtable", stagingTable))
-          doRedshiftLoad(conn, data, saveMode, updatedParams, creds, manifestUrl)
-        })
-      } else {
-        doRedshiftLoad(conn, data, saveMode, params, creds, manifestUrl)
+      val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
+      try {
+        if (saveMode == SaveMode.Overwrite && params.useStagingTable) {
+          withStagingTable(conn, params.table.get, stagingTable => {
+            val updatedParams = MergedParameters(params.parameters.updated("dbtable", stagingTable))
+            doRedshiftLoad(conn, data, saveMode, updatedParams, creds, manifestUrl)
+          })
+        } else {
+          doRedshiftLoad(conn, data, saveMode, params, creds, manifestUrl)
+        }
+      } finally {
+        conn.close()
       }
     } finally {
-      conn.close()
+      // Clean up the temporary files, since we no longer need them now that the write has finished:
+      try {
+        S3Utils.deleteS3Objects(s3Client, S3Utils.toS3URI(tempDir).getBucket, keysCreated)
+      } catch {
+        case NonFatal(e) =>
+          val sanitizedTempDir = Utils.removeCredentialsFromURI(URI.create(tempDir))
+          log.error(s"Error while deleting temporary files from $sanitizedTempDir")
+      }
     }
   }
 }
