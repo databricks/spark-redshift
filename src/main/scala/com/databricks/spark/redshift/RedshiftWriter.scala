@@ -121,20 +121,20 @@ private[redshift] class RedshiftWriter(
       action(tempTable.toString)
 
       if (jdbcWrapper.tableExists(conn, table.toString)) {
-        conn.prepareStatement(
+        jdbcWrapper.executeInterruptibly(conn.prepareStatement(
           s"""
              | BEGIN;
              | ALTER TABLE $table RENAME TO ${backupTable.escapedTableName};
              | ALTER TABLE $tempTable RENAME TO ${table.escapedTableName};
              | DROP TABLE $backupTable;
              | END;
-           """.stripMargin.trim).execute()
+           """.stripMargin.trim))
       } else {
-        conn.prepareStatement(
-          s"ALTER TABLE $tempTable RENAME TO ${table.escapedTableName}").execute()
+        jdbcWrapper.executeInterruptibly(conn.prepareStatement(
+          s"ALTER TABLE $tempTable RENAME TO ${table.escapedTableName}"))
       }
     } finally {
-      conn.prepareStatement(s"DROP TABLE IF EXISTS $tempTable").execute()
+      jdbcWrapper.executeInterruptibly(conn.prepareStatement(s"DROP TABLE IF EXISTS $tempTable"))
     }
   }
 
@@ -152,22 +152,20 @@ private[redshift] class RedshiftWriter(
 
     // Overwrites must drop the table, in case there has been a schema update
     if (saveMode == SaveMode.Overwrite) {
-      val deleteExisting = conn.prepareStatement(s"DROP TABLE IF EXISTS ${params.table.get}")
-      deleteExisting.execute()
+      jdbcWrapper.executeInterruptibly(
+        conn.prepareStatement(s"DROP TABLE IF EXISTS ${params.table.get}"))
     }
 
     // If the table doesn't exist, we need to create it first, using JDBC to infer column types
     val createStatement = createTableSql(data, params)
     log.info(createStatement)
-    val createTable = conn.prepareStatement(createStatement)
-    createTable.execute()
+    jdbcWrapper.executeInterruptibly(conn.prepareStatement(createStatement))
 
     manifestUrl.foreach { manifestUrl =>
       // Load the temporary data into the new file
       val copyStatement = copySql(data.sqlContext, params, creds, manifestUrl)
-      val copyData = conn.prepareStatement(copyStatement)
       try {
-        copyData.execute()
+        jdbcWrapper.executeInterruptibly(conn.prepareStatement(copyStatement))
       } catch {
         case e: SQLException =>
           // Try to query Redshift's STL_LOAD_ERRORS table to figure out why the load failed.
@@ -179,7 +177,8 @@ private[redshift] class RedshiftWriter(
               | WHERE query = pg_last_query_id()
             """.stripMargin
           val detailedException: Option[SQLException] = try {
-            val results = conn.prepareStatement(errorLookupQuery).executeQuery()
+            val results =
+              jdbcWrapper.executeQueryInterruptibly(conn.prepareStatement(errorLookupQuery))
             if (results.next()) {
               val errCode = results.getInt("err_code")
               val errReason = results.getString("err_reason").trim
@@ -215,7 +214,7 @@ private[redshift] class RedshiftWriter(
     params.postActions.foreach { action =>
       val actionSql = if (action.contains("%s")) action.format(params.table.get) else action
       log.info("Executing postAction: " + actionSql)
-      conn.prepareStatement(actionSql).execute()
+      jdbcWrapper.executeInterruptibly(conn.prepareStatement(actionSql))
     }
   }
 

@@ -89,7 +89,7 @@ private[redshift] case class RedshiftRelation(
       log.info(countQuery)
       val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
       try {
-        val results = conn.prepareStatement(countQuery).executeQuery()
+        val results = jdbcWrapper.executeQueryInterruptibly(conn.prepareStatement(countQuery))
         if (results.next()) {
           val numRows = results.getLong(1)
           val parallelism = sqlContext.getConf("spark.sql.shuffle.partitions", "200").toInt
@@ -108,7 +108,7 @@ private[redshift] case class RedshiftRelation(
       log.info(unloadSql)
       val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
       try {
-        conn.prepareStatement(unloadSql).execute()
+        jdbcWrapper.executeInterruptibly(conn.prepareStatement(unloadSql))
       } finally {
         conn.close()
       }

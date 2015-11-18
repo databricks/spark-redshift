@@ -42,7 +42,7 @@ class MockRedshift(
 
   private[this] val jdbcConnections: mutable.Buffer[Connection] = mutable.Buffer.empty
 
-  val jdbcWrapper: JDBCWrapper = mock(classOf[JDBCWrapper], RETURNS_SMART_NULLS)
+  val jdbcWrapper: JDBCWrapper = spy(new JDBCWrapper)
 
   private def createMockConnection(): Connection = {
     val conn = mock(classOf[Connection], RETURNS_SMART_NULLS)
@@ -63,22 +63,21 @@ class MockRedshift(
     conn
   }
 
-  when(jdbcWrapper.getConnector(any[Option[String]](), same(jdbcUrl))).thenAnswer(
-    new Answer[Connection] {
+  doAnswer(new Answer[Connection] {
       override def answer(invocation: InvocationOnMock): Connection = createMockConnection()
-    })
+    }).when(jdbcWrapper).getConnector(any[Option[String]](), same(jdbcUrl))
 
-  when(jdbcWrapper.tableExists(any[Connection], anyString())).thenAnswer(new Answer[Boolean] {
+  doAnswer(new Answer[Boolean] {
     override def answer(invocation: InvocationOnMock): Boolean = {
       existingTablesAndSchemas.contains(invocation.getArguments()(1).asInstanceOf[String])
     }
-  })
+  }).when(jdbcWrapper).tableExists(any[Connection], anyString())
 
-  when(jdbcWrapper.resolveTable(any[Connection], anyString())).thenAnswer(new Answer[StructType] {
+  doAnswer(new Answer[StructType] {
     override def answer(invocation: InvocationOnMock): StructType = {
       existingTablesAndSchemas(invocation.getArguments()(1).asInstanceOf[String])
     }
-  })
+  }).when(jdbcWrapper).resolveTable(any[Connection], anyString())
 
   def verifyThatConnectionsWereClosed(): Unit = {
     jdbcConnections.foreach { conn =>

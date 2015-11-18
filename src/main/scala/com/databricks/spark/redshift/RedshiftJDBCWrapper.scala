@@ -18,9 +18,13 @@
 package com.databricks.spark.redshift
 
 import java.net.URI
-import java.sql.{Connection, Driver, DriverManager, ResultSetMetaData, SQLException}
+import java.sql.{ResultSet, PreparedStatement, Connection, Driver, DriverManager, ResultSetMetaData, SQLException}
 import java.util.Properties
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.{ThreadFactory, Executors}
 
+import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.duration.Duration
 import scala.util.Try
 
 import org.apache.spark.SPARK_VERSION
@@ -34,6 +38,19 @@ import org.slf4j.LoggerFactory
 private[redshift] class JDBCWrapper {
 
   private val log = LoggerFactory.getLogger(getClass)
+
+  private val ec: ExecutionContext = {
+    val threadFactory = new ThreadFactory {
+      private[this] val count = new AtomicInteger()
+      override def newThread(r: Runnable) = {
+        val thread = new Thread(r)
+        thread.setName(s"spark-redshift-JDBCWrapper-${count.incrementAndGet}")
+        thread.setDaemon(true)
+        thread
+      }
+    }
+    ExecutionContext.fromExecutorService(Executors.newCachedThreadPool(threadFactory))
+  }
 
   /**
    * Given a JDBC subprotocol, returns the appropriate driver class so that it can be registered
@@ -89,6 +106,48 @@ private[redshift] class JDBCWrapper {
   }
 
   /**
+   * Execute the given SQL statement while supporting interruption.
+   * If InterruptedException is caught, then the statement will be cancelled if it is running.
+   *
+   * @return <code>true</code> if the first result is a <code>ResultSet</code>
+   *         object; <code>false</code> if the first result is an update
+   *         count or there is no result
+   */
+  def executeInterruptibly(statement: PreparedStatement): Boolean = {
+    executeInterruptibly(statement, _.execute())
+  }
+
+  /**
+   * Execute the given SQL statement while supporting interruption.
+   * If InterruptedException is caught, then the statement will be cancelled if it is running.
+   *
+   * @return a <code>ResultSet</code> object that contains the data produced by the
+   *         query; never <code>null</code>
+   */
+  def executeQueryInterruptibly(statement: PreparedStatement): ResultSet = {
+    executeInterruptibly(statement, _.executeQuery())
+  }
+
+  private def executeInterruptibly[T](
+      statement: PreparedStatement,
+      op: PreparedStatement => T): T = {
+    try {
+      val future = Future[T](op(statement))(ec)
+      Await.result(future, Duration.Inf)
+    } catch {
+      case e: InterruptedException =>
+        try {
+          statement.cancel()
+          throw e
+        } catch {
+          case s: SQLException =>
+            log.error("Exception occurred while cancelling query", s)
+            throw e
+        }
+    }
+  }
+
+  /**
    * Takes a (schema, table) specification and returns the table's Catalyst
    * schema.
    *
@@ -101,7 +160,7 @@ private[redshift] class JDBCWrapper {
    * @throws SQLException if the table contains an unsupported type.
    */
   def resolveTable(conn: Connection, table: String): StructType = {
-    val rs = conn.prepareStatement(s"SELECT * FROM $table WHERE 1=0").executeQuery()
+    val rs = executeQueryInterruptibly(conn.prepareStatement(s"SELECT * FROM $table WHERE 1=0"))
     try {
       val rsmd = rs.getMetaData
       val ncols = rsmd.getColumnCount
@@ -179,7 +238,9 @@ private[redshift] class JDBCWrapper {
   def tableExists(conn: Connection, table: String): Boolean = {
     // Somewhat hacky, but there isn't a good way to identify whether a table exists for all
     // SQL database systems, considering "table" could also include the database name.
-    Try(conn.prepareStatement(s"SELECT 1 FROM $table LIMIT 1").executeQuery().next()).isSuccess
+    Try {
+      executeQueryInterruptibly(conn.prepareStatement(s"SELECT 1 FROM $table LIMIT 1")).next()
+    }.isSuccess
   }
 
   /**
