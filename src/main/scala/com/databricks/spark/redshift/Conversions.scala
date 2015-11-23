@@ -22,7 +22,7 @@ import java.util.Date
 
 import scala.collection.mutable
 
-import org.apache.spark.sql.catalyst.expressions.GenericMutableRow
+import org.apache.spark.sql.catalyst.expressions.GenericRow
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.Row
 
@@ -90,7 +90,9 @@ private[redshift] object Conversions {
     }
     // As a performance optimization, re-use a single row that is backed by a mutable Seq:
     val converted: Array[Any] = Array.fill(schema.length)(null)
-    val row = new GenericMutableRow(converted)
+    val row = new GenericRow(converted) {
+      override def copy(): Row = new GenericRow(values.clone())
+    }
     (fields: Array[String]) => {
       var i = 0
       while (i < schema.length) {
