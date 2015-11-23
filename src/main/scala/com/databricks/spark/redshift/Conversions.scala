@@ -87,8 +87,9 @@ private[redshift] object Conversions {
         case _ => (data: String) => data
       }
     }
-    // As a performance optimization, re-use the same mutable Seq:
+    // As a performance optimization, re-use the same row, which is backed by a mutable Seq:
     val converted: mutable.IndexedSeq[Any] = mutable.IndexedSeq.fill(schema.length)(null)
+    val row = Row.fromSeq(converted)
     (fields: Array[String]) => {
       var i = 0
       while (i < schema.length) {
@@ -96,7 +97,7 @@ private[redshift] object Conversions {
         converted(i) = if (data == null || data.isEmpty) null else conversionFunctions(i)(data)
         i += 1
       }
-      Row.fromSeq(converted)
+      row
     }
   }
 }
