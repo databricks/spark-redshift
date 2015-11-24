@@ -77,6 +77,13 @@ private[redshift] case class RedshiftRelation(
     writer.saveToRedshift(sqlContext, data, saveMode, params)
   }
 
+  // In Spark 1.6+, this method allows a data source to declare which filters it handles, allowing
+  // Spark to skip its own defensive filtering. See SPARK-10978 for more details. As long as we
+  // compile against Spark 1.4, we cannot use the `override` modifier here.
+  def unhandledFilters(filters: Array[Filter]): Array[Filter] = {
+    filters.filterNot(filter => FilterPushdown.buildFilterExpression(schema, filter).isDefined)
+  }
+
   override def buildScan(requiredColumns: Array[String], filters: Array[Filter]): RDD[Row] = {
     val creds =
       AWSCredentialsUtils.load(params.rootTempDir, sqlContext.sparkContext.hadoopConfiguration)
