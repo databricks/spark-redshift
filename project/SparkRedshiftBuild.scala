@@ -53,8 +53,10 @@ object SparkRedshiftBuild extends Build {
       spIgnoreProvided := true,
       licenses += "Apache-2.0" -> url("http://opensource.org/licenses/Apache-2.0"),
       credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"),
-      resolvers +=
+      resolvers ++= Seq(
         "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
+        "ASF Snapshots" at "http://repository.apache.org/snapshots/"
+      ),
       scalacOptions ++= Seq("-target:jvm-1.6"),
       javacOptions ++= Seq("-source", "1.6", "-target", "1.6"),
       libraryDependencies ++= Seq(

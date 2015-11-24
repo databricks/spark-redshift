@@ -18,7 +18,7 @@ package com.databricks.spark.redshift
 
 import java.sql.SQLException
 
-import org.apache.spark.sql.{AnalysisException, Row, SQLContext, SaveMode}
+import org.apache.spark.sql.{execution, AnalysisException, Row, SaveMode}
 import org.apache.spark.sql.types._
 
 /**
@@ -266,6 +266,15 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
         """.stripMargin),
       Seq(Row(1, true)))
     // scalastyle:on
+  }
+
+  test("RedshiftRelation implements Spark 1.6+'s unhandledFilters API") {
+    assume(org.apache.spark.SPARK_VERSION.take(3) >= "1.6")
+    val df = sqlContext.sql("select testbool from test_table where testbool = true")
+    val physicalPlan = df.queryExecution.sparkPlan
+    physicalPlan.collectFirst { case f: execution.Filter => f }.foreach { filter =>
+      fail(s"Filter should have been eliminated; plan is:\n$physicalPlan")
+    }
   }
 
   test("roundtrip save and load") {
