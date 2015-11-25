@@ -148,9 +148,9 @@ private[redshift] class RedshiftDateFormat extends DateFormat {
   private val redshiftDateFormat = new SimpleDateFormat(PATTERN)
 
   override def format(
-                       date: Date,
-                       toAppendTo: StringBuffer,
-                       fieldPosition: FieldPosition): StringBuffer = {
+     date: Date,
+     toAppendTo: StringBuffer,
+     fieldPosition: FieldPosition): StringBuffer = {
     redshiftDateFormat.format(date, toAppendTo, fieldPosition)
   }
 
