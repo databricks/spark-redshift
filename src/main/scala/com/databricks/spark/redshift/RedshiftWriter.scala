@@ -98,7 +98,7 @@ private[redshift] class RedshiftWriter(
     val credsString: String = AWSCredentialsUtils.getRedshiftCredentialsString(creds)
     val fixedUrl = Utils.fixS3Url(manifestUrl)
     s"COPY ${params.table.get} FROM '$fixedUrl' CREDENTIALS '$credsString' FORMAT AS " +
-      s"AVRO 'auto' DATEFORMAT 'YYYY-MM-DD HH:MI:SS' manifest ${params.extraCopyOptions}"
+      s"AVRO 'auto' manifest ${params.extraCopyOptions}"
   }
 
   /**
@@ -241,11 +241,9 @@ private[redshift] class RedshiftWriter(
     val conversionFunctions: Array[Any => Any] = data.schema.fields.map { field =>
       field.dataType match {
         case DateType =>
-          val timestampFormat = new RedshiftTimestampFormat()
-          (v: Any) => v match {
-            case null => null
-            case t: Timestamp => timestampFormat.format(t)
-            case d: Date => timestampFormat.format(d)
+          val dateFormat = new RedshiftDateFormat()
+          (v: Any) => {
+            if (v == null) null else dateFormat.format(v.asInstanceOf[Date])
           }
         case TimestampType =>
           val timestampFormat = new RedshiftTimestampFormat()

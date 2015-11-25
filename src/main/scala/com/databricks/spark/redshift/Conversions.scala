@@ -138,3 +138,23 @@ private[redshift] class RedshiftTimestampFormat extends DateFormat {
     }
   }
 }
+
+private[redshift] class RedshiftDateFormat extends DateFormat {
+
+  // Imports and exports with Redshift require that dates are represented
+  // as strings, using the following format
+  private val PATTERN = "yyyy-MM-dd"
+
+  private val redshiftDateFormat = new SimpleDateFormat(PATTERN)
+
+  override def format(
+       date: Date,
+       toAppendTo: StringBuffer,
+       fieldPosition: FieldPosition): StringBuffer = {
+    redshiftDateFormat.format(date, toAppendTo, fieldPosition)
+  }
+
+  override def parse(source: String, pos: ParsePosition): Date = {
+    redshiftDateFormat.parse(source, pos)
+  }
+}
