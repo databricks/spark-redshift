@@ -69,7 +69,7 @@ object TestUtils {
   val expectedDataWithConvertedTimesAndDates: Seq[Row] = expectedData.map { row =>
     Row.fromSeq(row.toSeq.map {
       case t: Timestamp => new RedshiftTimestampFormat().format(t)
-      case d: Date => new RedshiftTimestampFormat().format(d)
+      case d: Date => new RedshiftDateFormat().format(d)
       case other => other
     })
   }
