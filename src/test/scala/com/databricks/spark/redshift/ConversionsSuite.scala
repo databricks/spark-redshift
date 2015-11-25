@@ -17,8 +17,6 @@
 package com.databricks.spark.redshift
 
 import java.sql.Timestamp
-import java.sql.Date
-import java.text.SimpleDateFormat
 
 import org.scalatest.FunSuite
 
@@ -39,7 +37,6 @@ class ConversionsSuite extends FunSuite {
     // scalastyle:on
 
     val timestampWithMillis = "2014-03-01 00:00:01.123"
-    val dateFormat = new SimpleDateFormat("yyyy-DD-mm")
 
     val expectedDateMillis = TestUtils.toMillis(2015, 6, 1, 0, 0, 0)
     val expectedTimestampMillis = TestUtils.toMillis(2014, 2, 1, 0, 0, 1, 123)
@@ -48,7 +45,7 @@ class ConversionsSuite extends FunSuite {
       Array("1", "t", "2015-07-01", doubleMin, "1.0", "42",
         longMax, "23", unicodeString, timestampWithMillis))
 
-    val expectedRow = Row(1.asInstanceOf[Byte], true, new Date(expectedDateMillis),
+    val expectedRow = Row(1.asInstanceOf[Byte], true, new Timestamp(expectedDateMillis),
       Double.MinValue, 1.0f, 42, Long.MaxValue, 23.toShort, unicodeString,
       new Timestamp(expectedTimestampMillis))
 
