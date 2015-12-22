@@ -192,7 +192,7 @@ There are three ways of configuring AWS credentials for use by this library:
 2. **Encode keys in `tempdir` URI**: For example, the URI `s3n://ACCESSKEY:SECRETKEY@bucket/path/to/temp/dir` encodes the key pair (`ACCESSKEY`, `SECRETKEY`). Due to [Hadoop limitations](https://issues.apache.org/jira/browse/HADOOP-3733), this approach will not work for secret keys which contain forward slash (`/`) characters.
 3. **IAM instance profiles:** If you are running on EC2 and authenticate to S3 using IAM and [instance profiles](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html), then you must must configure the `temporary_aws_access_key_id`, `temporary_aws_secret_access_key`, and `temporary_aws_session_token` configuration properties to point to temporary keys created via the AWS [Security Token Service](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp.html). These temporary keys will then be passed to Redshift via `LOAD` and `UNLOAD` commands.
 
-**:warning: Note**: `spark-redshift` does not clean up the temporary files that it creates in S3. As a result, we recommend that you use a dedicated temporary S3 bucket with an [object lifecycle configuration](http://docs.aws.amazon.com/AmazonS3/latest/dev/object-lifecycle-mgmt.html) to ensure that temporary files are automatically deleted after a specified expiration period.
+> **:warning: Note**: `spark-redshift` does not clean up the temporary files that it creates in S3. As a result, we recommend that you use a dedicated temporary S3 bucket with an [object lifecycle configuration](http://docs.aws.amazon.com/AmazonS3/latest/dev/object-lifecycle-mgmt.html) to ensure that temporary files are automatically deleted after a specified expiration period.
 
 ### Parameters
 
@@ -350,7 +350,9 @@ When creating Redshift tables, `spark-redshift`'s default behavior is to create 
 
 To support larger columns, you can use the `maxlength` column metadata field to specify the maximum length of individual string columns. This can also be done as a space-savings performance optimization in order to declare columns with a smaller maximum length than the default.
 
-Here is an example of updating multiple columns' metadata fields:
+> **:warning: Note**: Due to limitations in Spark, metadata modification is unsupported in the Python, SQL, and R language APIs.
+
+Here is an example of updating multiple columns' metadata fields using Spark's Scala API:
 
 ```scala
 import org.apache.spark.sql.types.MetadataBuilder
@@ -377,8 +379,6 @@ df.write
   .option("dbtable", sessionTable)
   .save()
 ```
-
-Column metadata modification is unsupported in the Python, SQL, and R language APIs.
 
 ## Migration Guide
 
