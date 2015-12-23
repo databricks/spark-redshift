@@ -204,7 +204,7 @@ class RedshiftSourceSuite
     val relation = source.createRelation(testSqlContext, defaultParams, TestUtils.testSchema)
 
     val rdd = relation.asInstanceOf[PrunedFilteredScan]
-      .buildScan(Array("testbyte", "testbool"), Array.empty[Filter])
+      .buildScan(Array("testbyte", "testbool"), Array.empty[Filter]).map(_.copy())
     val prunedExpectedValues = Array(
       Row(1.toByte, true),
       Row(1.toByte, false),
@@ -250,7 +250,7 @@ class RedshiftSourceSuite
       GreaterThanOrEqual("testfloat", 1.0f),
       LessThanOrEqual("testint", 43))
     val rdd = relation.asInstanceOf[PrunedFilteredScan]
-      .buildScan(Array("testbyte", "testbool"), filters)
+      .buildScan(Array("testbyte", "testbool"), filters).map(_.copy())
 
     // Technically this assertion should check that the RDD only returns a single row, but
     // since we've mocked out Redshift our WHERE clause won't have had any effect.
