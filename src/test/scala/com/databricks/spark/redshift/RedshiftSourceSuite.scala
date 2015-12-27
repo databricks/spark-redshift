@@ -101,12 +101,6 @@ class RedshiftSourceSuite
     sc.hadoopConfiguration.set("fs.s3.awsSecretAccessKey", "test2")
     sc.hadoopConfiguration.set("fs.s3n.awsAccessKeyId", "test1")
     sc.hadoopConfiguration.set("fs.s3n.awsSecretAccessKey", "test2")
-    // Configure a mock S3 client so that we don't hit errors when trying to access AWS in tests.
-    mockS3Client = Mockito.mock(classOf[AmazonS3Client], Mockito.RETURNS_SMART_NULLS)
-    when(mockS3Client.getBucketLifecycleConfiguration(anyString())).thenReturn(
-      new BucketLifecycleConfiguration().withRules(
-        new Rule().withPrefix("").withStatus(BucketLifecycleConfiguration.ENABLED)
-      ))
   }
 
   override def beforeEach(): Unit = {
@@ -115,6 +109,12 @@ class RedshiftSourceSuite
     testSqlContext = new SQLContext(sc)
     expectedDataDF =
       testSqlContext.createDataFrame(sc.parallelize(TestUtils.expectedData), TestUtils.testSchema)
+    // Configure a mock S3 client so that we don't hit errors when trying to access AWS in tests.
+    mockS3Client = Mockito.mock(classOf[AmazonS3Client], Mockito.RETURNS_SMART_NULLS)
+    when(mockS3Client.getBucketLifecycleConfiguration(anyString())).thenReturn(
+      new BucketLifecycleConfiguration().withRules(
+        new Rule().withPrefix("").withStatus(BucketLifecycleConfiguration.ENABLED)
+      ))
   }
 
   override def afterEach(): Unit = {
