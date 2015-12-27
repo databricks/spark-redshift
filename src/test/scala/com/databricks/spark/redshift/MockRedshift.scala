@@ -16,7 +16,7 @@
 
 package com.databricks.spark.redshift
 
-import java.sql.{SQLException, PreparedStatement, Connection}
+import java.sql.{Connection, PreparedStatement, ResultSet, SQLException}
 
 import scala.collection.mutable
 import scala.util.matching.Regex
@@ -54,8 +54,11 @@ class MockRedshift(
         val mockStatement = mock(classOf[PreparedStatement], RETURNS_SMART_NULLS)
         if (jdbcQueriesThatShouldFail.forall(_.findFirstMatchIn(query).isEmpty)) {
           when(mockStatement.execute()).thenReturn(true)
+          when(mockStatement.executeQuery()).thenReturn(
+            mock(classOf[ResultSet], RETURNS_SMART_NULLS))
         } else {
           when(mockStatement.execute()).thenThrow(new SQLException(s"Error executing $query"))
+          when(mockStatement.executeQuery()).thenThrow(new SQLException(s"Error executing $query"))
         }
         mockStatement
       }
