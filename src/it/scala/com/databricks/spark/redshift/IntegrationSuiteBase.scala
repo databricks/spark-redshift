@@ -60,7 +60,7 @@ trait IntegrationSuiteBase
   protected val AWS_S3_SCRATCH_SPACE: String = loadConfigFromEnv("AWS_S3_SCRATCH_SPACE")
   require(AWS_S3_SCRATCH_SPACE.contains("s3n"), "must use s3n:// URL")
 
-  protected val jdbcUrl: String = {
+  protected def jdbcUrl: String = {
     s"$AWS_REDSHIFT_JDBC_URL?user=$AWS_REDSHIFT_USER&password=$AWS_REDSHIFT_PASSWORD"
   }
 
