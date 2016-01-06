@@ -201,12 +201,23 @@ private[redshift] class JDBCWrapper {
     val subprotocol = url.stripPrefix("jdbc:").split(":")(0)
     val driverClass: String = getDriverClass(subprotocol, userProvidedDriverClass)
     registerDriver(driverClass)
+    val driverWrapperClass: Class[_] = if (SPARK_VERSION.startsWith("1.4")) {
+      Utils.classForName("org.apache.spark.sql.jdbc.package$DriverWrapper")
+    } else { // Spark 1.5.0+
+      Utils.classForName("org.apache.spark.sql.execution.datasources.jdbc.DriverWrapper")
+    }
+    def getWrapped(d: Driver): Driver = {
+      require(driverWrapperClass.isAssignableFrom(d.getClass))
+      driverWrapperClass.getDeclaredMethod("wrapped").invoke(d).asInstanceOf[Driver]
+    }
     // Note that we purposely don't call DriverManager.getConnection() here: we want to ensure
     // that an explicitly-specified user-provided driver class can take precedence over the default
     // class, but DriverManager.getConnection() might return a according to a different precedence.
     // At the same time, we don't want to create a driver-per-connection, so we use the
     // DriverManager's driver instances to handle that singleton logic for us.
     val driver: Driver = DriverManager.getDrivers.asScala.collectFirst {
+      case d if driverWrapperClass.isAssignableFrom(d.getClass)
+        && getWrapped(d).getClass.getCanonicalName == driverClass => d
       case d if d.getClass.getCanonicalName == driverClass => d
     }.getOrElse {
       throw new IllegalArgumentException(s"Did not find registered driver with class $driverClass")
