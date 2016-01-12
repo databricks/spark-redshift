@@ -387,7 +387,7 @@ This section describes `spark-redshift`'s transactional guarantees. For general 
 
 **Appending to an existing table**: Writes use Redshift's [`COPY`](https://docs.aws.amazon.com/redshift/latest/dg/r_COPY.html) command, which is [atomic and transactional](https://docs.aws.amazon.com/redshift/latest/dg/copy-usage_notes-multiple-files.html). When loading data into Redshift, `spark-redshift` uses [manifests](https://docs.aws.amazon.com/redshift/latest/dg/loading-data-files-using-manifest.html) to guard against S3 eventual-consistency. Thus, `spark-redshift` appends to existing tables have the same atomic and transactional properties as regular Redshift `COPY` commands.
 
-**Overwriting an existing table**: By default, `spark-redshift` uses transactions to perform overwrites. Outside of a transaction, it will create an empty temporary table and append the new rows using a `COPY` statement. If the `COPY` suceeeds, it will use a transaction to atomically delete the overwritten table and rename the temporay table to destination table.
+**Overwriting an existing table**: By default, `spark-redshift` uses transactions to perform overwrites. Outside of a transaction, it will create an empty temporary table and append the new rows using a `COPY` statement. If the `COPY` succeeds, it will use a transaction to atomically delete the overwritten table and rename the temporary table to destination table.
 
 This behavior can be disabled by setting `usestagingtable` to `false`, in which case the destination table will be deleted before the `COPY`.
 
