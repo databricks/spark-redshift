@@ -17,6 +17,7 @@ This library is more suited to ETL than interactive queries, since large amounts
   - [AWS Credentials](#aws-credentials)
   - [Parameters](#parameters)
   - [Configuring the maximum size of string columns](#configuring-the-maximum-size-of-string-columns)
+- [Transactional Guarantees](#transactional-guarantees)
 - [Migration Guide](#migration-guide)
 
 ## Installation
