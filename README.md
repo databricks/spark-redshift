@@ -380,6 +380,20 @@ df.write
   .save()
 ```
 
+## Transactional Guarantees
+
+This section describes `spark-redshift`'s transactional guarantees. For general information on Redshift's transactional guarantees, see the [Managing Concurrent Write Operations](https://docs.aws.amazon.com/redshift/latest/dg/c_Concurrent_writes.html) chapter in the Redshift documentation.
+
+**Appending to an existing table**: Writes use Redshift's [`COPY`](https://docs.aws.amazon.com/redshift/latest/dg/r_COPY.html) command, which is [atomic and transactional](https://docs.aws.amazon.com/redshift/latest/dg/copy-usage_notes-multiple-files.html). When loading data into Redshift, `spark-redshift` uses [manifests](https://docs.aws.amazon.com/redshift/latest/dg/loading-data-files-using-manifest.html) to guard against S3 eventual-consistency. Thus, `spark-redshift` appends to existing tables have the same atomic and transactional properties as regular Redshift `COPY` commands.
+
+**Overwriting an existing table**: By default, `spark-redshift` uses transactions to perform overwrites. Outside of a transaction, it will create an empty temporary table and append the new rows using a `COPY` statement. If the `COPY` suceeeds, it will use a transaction to atomically delete the overwritten table and rename the temporay table to destination table.
+
+This behavior can be disabled by setting `usestagingtable` to `false`, in which case the destination table will be deleted before the `COPY`.
+
+**Creating a new table**: `spark-redshift` currently does not use a transaction when creating a new table, so the creation of the empty table and the initial `COPY` to that table may become visible at different times to readers. The `COPY` itself is atomic, so the table will never be visible in a state where it contains a non-empty subset of the saved rows.
+
+**Reading**: Reads use Redshift's [`UNLOAD`](https://docs.aws.amazon.com/redshift/latest/dg/r_UNLOAD.html) command. According to the documentation for Redshift's [`BEGIN`](https://docs.aws.amazon.com/redshift/latest/dg/r_BEGIN.html) command, "[although] you can use any of the four transaction isolation levels, Amazon Redshift processes all isolation levels as serializable." `UNLOAD` saves the result of a `SELECT` query and this `SELECT` query should observe a consistent snapshot of the database.
+
 ## Migration Guide
 
 
