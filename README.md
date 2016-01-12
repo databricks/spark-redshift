@@ -395,6 +395,8 @@ This behavior can be disabled by setting `usestagingtable` to `false`, in which 
 
 **Reading**: Reads use Redshift's [`UNLOAD`](https://docs.aws.amazon.com/redshift/latest/dg/r_UNLOAD.html) command. According to the documentation for Redshift's [`BEGIN`](https://docs.aws.amazon.com/redshift/latest/dg/r_BEGIN.html) command, "[although] you can use any of the four transaction isolation levels, Amazon Redshift processes all isolation levels as serializable." `UNLOAD` saves the result of a `SELECT` query and this `SELECT` query should observe a consistent snapshot of the database.
 
+According to the [Amazon S3 Data Consistency Model](https://docs.aws.amazon.com/AmazonS3/latest/dev/Introduction.html#ConsistencyModel) documentation, S3 bucket listing is eventually-consistent. In `spark-redshift` 1.6.0 and earlier, the S3 read path performs bucket-listing and thus may be impacted by this eventual-consistency, meaning that in rare circumstances reads may see only a subset of the unloaded data. This will be fixed in future releases by using `UNLOAD`'s `MANIFEST` support.
+
 ## Migration Guide
 
 
