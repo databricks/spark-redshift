@@ -17,6 +17,7 @@ This library is more suited to ETL than interactive queries, since large amounts
   - [AWS Credentials](#aws-credentials)
   - [Parameters](#parameters)
   - [Configuring the maximum size of string columns](#configuring-the-maximum-size-of-string-columns)
+- [Transactional Guarantees](#transactional-guarantees)
 - [Migration Guide](#migration-guide)
 
 ## Installation
@@ -379,6 +380,32 @@ df.write
   .option("dbtable", sessionTable)
   .save()
 ```
+
+## Transactional Guarantees
+
+This section describes `spark-redshift`'s transactional guarantees.
+
+### General background on Redshift and S3's properties
+
+For general information on Redshift's transactional guarantees, see the [Managing Concurrent Write Operations](https://docs.aws.amazon.com/redshift/latest/dg/c_Concurrent_writes.html) chapter in the Redshift documentation. In a nutshell, Redshift provides [serializable isolation](https://docs.aws.amazon.com/redshift/latest/dg/c_serial_isolation.html) (according to the documentation for Redshift's [`BEGIN`](https://docs.aws.amazon.com/redshift/latest/dg/r_BEGIN.html) command, "[although] you can use any of the four transaction isolation levels, Amazon Redshift processes all isolation levels as serializable"). According to its [documentation](https://docs.aws.amazon.com/redshift/latest/dg/c_serial_isolation.html), "Amazon Redshift supports a default _automatic commit_ behavior in which each separately-executed SQL command commits individually." Thus, individual commands like `COPY` and `UNLOAD` are atomic and transactional, while explicit `BEGIN` and `END` should only be necessary to enforce the atomicity of multiple commands / queries.
+
+When reading from / writing to Redshift, `spark-redshift` reads and writes data in S3. Both Spark and Redshift produce partitioned output which is stored in multiple files in S3. According to the [Amazon S3 Data Consistency Model](https://docs.aws.amazon.com/AmazonS3/latest/dev/Introduction.html#ConsistencyModel) documentation, S3 bucket listing operations are eventually-consistent, so `spark-redshift` must to go to special lengths to avoid missing / incomplete data due to this source of eventual-consistency.
+
+### `spark-redshift`'s guarantees
+
+**Creating a new table**: Creating a new table is a two-step process, consisting of a `CREATE TABLE` command followed by a [`COPY`](https://docs.aws.amazon.com/redshift/latest/dg/r_COPY.html) command to append the initial set of rows. Currently, these two steps are performed in separate transactions, so their effects may become visible at different times to readers. The `COPY` itself is atomic, so the table will never be visible in a state where it contains a non-empty subset of the saved rows. In a future release, this will be changed so that the `CREATE TABLE` and `COPY` statements are issued as part of the same transaction.
+
+**Appending to an existing table**: In the [`COPY`](https://docs.aws.amazon.com/redshift/latest/dg/r_COPY.html) command, `spark-redshift` uses [manifests](https://docs.aws.amazon.com/redshift/latest/dg/loading-data-files-using-manifest.html) to guard against certain eventually-consistent S3 operations. As a result, `spark-redshift` appends to existing tables have the same atomic and transactional properties as regular Redshift `COPY` commands.
+
+**Overwriting an existing table**: By default, `spark-redshift` uses transactions to perform overwrites. Outside of a transaction, it will create an empty temporary table and append the new rows using a `COPY` statement. If the `COPY` succeeds, it will use a transaction to atomically delete the overwritten table and rename the temporary table to destination table.
+
+In a future release, this will be changed so that the temporary table is created in the same transaction as the `COPY`.
+
+This use of a staging table can be disabled by setting `usestagingtable` to `false`, in which case the destination table will be deleted before the `COPY`, sacrificing the atomicity of the overwrite operation.
+
+**Querying Redshift tables**: Queries use Redshift's [`UNLOAD`](https://docs.aws.amazon.com/redshift/latest/dg/r_UNLOAD.html) command to execute a query and save its results to S3. The data which is written to S3 should reflect a consistent snapshot of the database.
+
+In `spark-redshift` 1.6.0 and earlier, the S3 read path performs bucket-listing and thus may be impacted by the eventually-consistent nature of this S3 operation, meaning that in rare circumstances reads may see reflect a subset of the unloaded data stored in S3. This will be fixed in future releases by using `UNLOAD`'s `MANIFEST` support.
 
 ## Migration Guide
 
