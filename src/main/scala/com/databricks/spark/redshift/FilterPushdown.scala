@@ -52,7 +52,7 @@ private[redshift] object FilterPushdown {
           // Workaround for SPARK-10195: prior to Spark 1.5.0, the Data Sources API exposed internal
           // types, so we must perform conversions if running on older versions:
           if (SPARK_VERSION < "1.5.0") {
-            CatalystTypeConverters.convertToScala(internalValue, DateType)
+            CatalystTypeConverters.convertToScala(internalValue, dataType)
           } else {
             internalValue
           }
