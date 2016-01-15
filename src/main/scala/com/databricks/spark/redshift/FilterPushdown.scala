@@ -17,7 +17,7 @@
 package com.databricks.spark.redshift
 
 import org.apache.spark.sql.sources._
-import org.apache.spark.sql.types.{DataType, StringType, StructType}
+import org.apache.spark.sql.types._
 
 /**
  * Helper methods for pushing filters into Redshift queries.
@@ -46,6 +46,7 @@ private[redshift] object FilterPushdown {
      getTypeForAttribute(schema, attr).map { dataType =>
        val sqlEscapedValue: String = dataType match {
          case StringType => s"\\'${value.toString.replace("'", "\\'\\'")}\\'"
+         case DateType | TimestampType => s"\\'$value\\'"
          case _ => value.toString
        }
        s""""$attr" $comparisonOp $sqlEscapedValue"""
