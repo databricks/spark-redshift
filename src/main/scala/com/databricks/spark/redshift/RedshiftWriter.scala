@@ -47,20 +47,15 @@ import org.apache.spark.sql.types._
  *     non-empty. After the write operation completes, we use this to construct a list of non-empty
  *     Avro partition files.
  *
- *   - Using JDBC, start a new tra
- *
- *   - Use JDBC to issue any CREATE TABLE commands, if required.
- *
  *   - If there is data to be written (i.e. not all partitions were empty), then use the list of
  *     non-empty Avro files to construct a JSON manifest file to tell Redshift to load those files.
  *     This manifest is written to S3 alongside the Avro files themselves. We need to use an
  *     explicit manifest, as opposed to simply passing the name of the directory containing the
  *     Avro files, in order to work around a bug related to parsing of empty Avro files (see #96).
  *
- *   - Use JDBC to issue a COPY command in order to instruct Redshift to load the Avro data into
- *     the appropriate table. If the Overwrite SaveMode is being used, then by default the data
- *     will be loaded into a temporary staging table, which later will atomically replace the
- *     original table via a transaction.
+ *   - Start a new JDBC transaction and disable auto-commit. Depending on the SaveMode, issue
+ *     DELETE TABLE or CREATE TABLE commands, then use the COPY command to instruct Redshift to load
+ *     the Avro data into the appropriate table.
  */
 private[redshift] class RedshiftWriter(
     jdbcWrapper: JDBCWrapper,
@@ -126,6 +121,7 @@ private[redshift] class RedshiftWriter(
         case e: SQLException =>
           // Try to query Redshift's STL_LOAD_ERRORS table to figure out why the load failed.
           // See http://docs.aws.amazon.com/redshift/latest/dg/r_STL_LOAD_ERRORS.html for details.
+          conn.rollback()
           val errorLookupQuery =
             """
               | SELECT *
