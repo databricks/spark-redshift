@@ -26,7 +26,6 @@ import org.apache.spark.TaskContext
 import org.slf4j.LoggerFactory
 
 import scala.collection.mutable
-import scala.util.Random
 import scala.util.control.NonFatal
 
 import com.databricks.spark.redshift.Parameters.MergedParameters
@@ -47,6 +46,8 @@ import org.apache.spark.sql.types._
  *     While writing the Avro files, we use accumulators to keep track of which partitions were
  *     non-empty. After the write operation completes, we use this to construct a list of non-empty
  *     Avro partition files.
+ *
+ *   - Using JDBC, start a new tra
  *
  *   - Use JDBC to issue any CREATE TABLE commands, if required.
  *
@@ -102,59 +103,14 @@ private[redshift] class RedshiftWriter(
   }
 
   /**
-   * Sets up a staging table then runs the given action, passing the temporary table name
-   * as a parameter.
-   */
-  private def withStagingTable(
-      conn: Connection,
-      table: TableName,
-      action: (String) => Unit) {
-    val randomSuffix = Math.abs(Random.nextInt()).toString
-    val tempTable =
-      table.copy(unescapedTableName = s"${table.unescapedTableName}_staging_$randomSuffix")
-    val backupTable =
-      table.copy(unescapedTableName = s"${table.unescapedTableName}_backup_$randomSuffix")
-    log.info("Loading new Redshift data to: " + tempTable)
-    log.info("Existing data will be backed up in: " + backupTable)
-
-    try {
-      action(tempTable.toString)
-
-      if (jdbcWrapper.tableExists(conn, table.toString)) {
-        jdbcWrapper.executeInterruptibly(conn.prepareStatement(
-          s"""
-             | BEGIN;
-             | ALTER TABLE $table RENAME TO ${backupTable.escapedTableName};
-             | ALTER TABLE $tempTable RENAME TO ${table.escapedTableName};
-             | DROP TABLE $backupTable;
-             | END;
-           """.stripMargin.trim))
-      } else {
-        jdbcWrapper.executeInterruptibly(conn.prepareStatement(
-          s"ALTER TABLE $tempTable RENAME TO ${table.escapedTableName}"))
-      }
-    } finally {
-      jdbcWrapper.executeInterruptibly(conn.prepareStatement(s"DROP TABLE IF EXISTS $tempTable"))
-    }
-  }
-
-  /**
-   * Perform the Redshift load, including deletion of existing data in the case of an overwrite,
-   * and creating the table if it doesn't already exist.
+   * Perform the Redshift load by issuing a COPY statement.
    */
   private def doRedshiftLoad(
       conn: Connection,
       data: DataFrame,
-      saveMode: SaveMode,
       params: MergedParameters,
       creds: AWSCredentials,
       manifestUrl: Option[String]): Unit = {
-
-    // Overwrites must drop the table, in case there has been a schema update
-    if (saveMode == SaveMode.Overwrite) {
-      jdbcWrapper.executeInterruptibly(
-        conn.prepareStatement(s"DROP TABLE IF EXISTS ${params.table.get}"))
-    }
 
     // If the table doesn't exist, we need to create it first, using JDBC to infer column types
     val createStatement = createTableSql(data, params)
@@ -360,19 +316,35 @@ private[redshift] class RedshiftWriter(
 
     Utils.checkThatBucketHasObjectLifecycleConfiguration(params.rootTempDir, s3ClientFactory(creds))
 
-    val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
+    // Save the table's rows to S3:
+    val manifestUrl = unloadData(sqlContext, data, params.createPerQueryTempDir())
 
+    val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
+    conn.setAutoCommit(false)
     try {
-      val tempDir = params.createPerQueryTempDir()
-      val manifestUrl = unloadData(sqlContext, data, tempDir)
-      if (saveMode == SaveMode.Overwrite && params.useStagingTable) {
-        withStagingTable(conn, params.table.get, stagingTable => {
-          val updatedParams = MergedParameters(params.parameters.updated("dbtable", stagingTable))
-          doRedshiftLoad(conn, data, saveMode, updatedParams, creds, manifestUrl)
-        })
-      } else {
-        doRedshiftLoad(conn, data, saveMode, params, creds, manifestUrl)
+      val table: TableName = params.table.get
+      if (saveMode == SaveMode.Overwrite) {
+        // Overwrites must drop the table in case there has been a schema update
+        jdbcWrapper.executeInterruptibly(conn.prepareStatement(s"DROP TABLE IF EXISTS $table;"))
+        if (!params.useStagingTable) {
+          // If we're not using a staging table, commit now so that Redshift doesn't have to
+          // maintain a snapshot of the old table during the COPY; this sacrifices atomicity for
+          // performance.
+          conn.commit()
+        }
       }
+      log.info(s"Loading new Redshift data to: $table")
+      doRedshiftLoad(conn, data, params, creds, manifestUrl)
+      conn.commit()
+    } catch {
+      case NonFatal(e) =>
+        try {
+          conn.rollback()
+        } catch {
+          case NonFatal(e2) =>
+            log.error("Exception while rolling back transaction", e2)
+        }
+        throw e
     } finally {
       conn.close()
     }

@@ -266,19 +266,11 @@ class RedshiftSourceSuite
       "distkey" -> "testint")
 
     val expectedCommands = Seq(
-      "DROP TABLE IF EXISTS \"PUBLIC\"\\.\"test_table_staging_.*\"".r,
-      ("CREATE TABLE IF NOT EXISTS \"PUBLIC\"\\.\"test_table_staging.*" +
+      "DROP TABLE IF EXISTS \"PUBLIC\"\\.\"test_table.*\"".r,
+      ("CREATE TABLE IF NOT EXISTS \"PUBLIC\"\\.\"test_table.*" +
         " DISTSTYLE KEY DISTKEY \\(testint\\).*").r,
-      "COPY \"PUBLIC\"\\.\"test_table_staging_.*\"".r,
-      "GRANT SELECT ON \"PUBLIC\"\\.\"test_table_staging.+\" TO jeremy".r,
-      """
-        | BEGIN;
-        | ALTER TABLE "PUBLIC"\."test_table" RENAME TO "test_table_backup_.*";
-        | ALTER TABLE "PUBLIC"\."test_table_staging_.*" RENAME TO "test_table";
-        | DROP TABLE "PUBLIC"\."test_table_backup_.*";
-        | END;
-      """.stripMargin.trim.r,
-      "DROP TABLE IF EXISTS \"PUBLIC\"\\.\"test_table_staging_.*\"".r)
+      "COPY \"PUBLIC\"\\.\"test_table.*\"".r,
+      "GRANT SELECT ON \"PUBLIC\"\\.\"test_table\" TO jeremy".r)
 
     val mockRedshift = new MockRedshift(
       defaultParams("url"),
@@ -316,6 +308,7 @@ class RedshiftSourceSuite
         testSqlContext, df, SaveMode.Append, Parameters.mergeParameters(defaultParams))
     }
     mockRedshift.verifyThatConnectionsWereClosed()
+    mockRedshift.verifyThatCommitWasNotCalled()
     mockRedshift.verifyThatExpectedQueriesWereIssued(Seq.empty)
   }
 
@@ -325,23 +318,21 @@ class RedshiftSourceSuite
     val mockRedshift = new MockRedshift(
       defaultParams("url"),
       Map(TableName.parseFromEscaped("test_table").toString -> TestUtils.testSchema),
-      jdbcQueriesThatShouldFail = Seq("COPY \"PUBLIC\".\"test_table_staging_.*\"".r))
+      jdbcQueriesThatShouldFail = Seq("COPY \"PUBLIC\".\"test_table.*\"".r))
 
     val expectedCommands = Seq(
-      "DROP TABLE IF EXISTS \"PUBLIC\".\"test_table_staging_.*\"".r,
-      "CREATE TABLE IF NOT EXISTS \"PUBLIC\".\"test_table_staging_.*\"".r,
-      "COPY \"PUBLIC\".\"test_table_staging_.*\"".r,
-      ".*FROM stl_load_errors.*".r,
-      "DROP TABLE IF EXISTS \"PUBLIC\".\"test_table_staging_.*\"".r
+      "DROP TABLE IF EXISTS \"PUBLIC\".\"test_table.*\"".r,
+      "CREATE TABLE IF NOT EXISTS \"PUBLIC\".\"test_table.*\"".r,
+      "COPY \"PUBLIC\".\"test_table.*\"".r,
+      ".*FROM stl_load_errors.*".r
     )
 
     val source = new DefaultSource(mockRedshift.jdbcWrapper, _ => mockS3Client)
     intercept[Exception] {
       source.createRelation(testSqlContext, SaveMode.Overwrite, params, expectedDataDF)
-      mockRedshift.verifyThatConnectionsWereClosed()
-      mockRedshift.verifyThatExpectedQueriesWereIssued(expectedCommands)
     }
     mockRedshift.verifyThatConnectionsWereClosed()
+    mockRedshift.verifyThatCommitWasNotCalled()
     mockRedshift.verifyThatExpectedQueriesWereIssued(expectedCommands)
   }
 

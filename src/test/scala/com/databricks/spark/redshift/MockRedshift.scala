@@ -88,6 +88,12 @@ class MockRedshift(
     }
   }
 
+  def verifyThatCommitWasNotCalled(): Unit = {
+    jdbcConnections.foreach { conn =>
+      verify(conn, never()).commit()
+    }
+  }
+
   def verifyThatExpectedQueriesWereIssued(expectedQueries: Seq[Regex]): Unit = {
     expectedQueries.zip(queriesIssued).foreach { case (expected, actual) =>
       if (expected.findFirstMatchIn(actual).isEmpty) {
