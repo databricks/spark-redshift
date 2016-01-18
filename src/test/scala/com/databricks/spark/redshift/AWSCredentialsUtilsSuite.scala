@@ -19,7 +19,7 @@ package com.databricks.spark.redshift
 import scala.language.implicitConversions
 
 import com.amazonaws.AmazonClientException
-import com.amazonaws.auth.{BasicSessionCredentials, BasicAWSCredentials}
+import com.amazonaws.auth.{AWSSessionCredentials, BasicSessionCredentials, BasicAWSCredentials}
 import org.apache.hadoop.conf.Configuration
 import org.scalatest.FunSuite
 
@@ -28,7 +28,7 @@ import com.databricks.spark.redshift.Parameters.MergedParameters
 class AWSCredentialsUtilsSuite extends FunSuite {
 
   private implicit def string2Params(tempdir: String): MergedParameters = {
-    MergedParameters.apply(Map("tempdir" -> tempdir))
+    MergedParameters(Map("tempdir" -> tempdir))
   }
 
   test("credentialsString with regular keys") {
@@ -41,6 +41,25 @@ class AWSCredentialsUtilsSuite extends FunSuite {
     val creds = new BasicSessionCredentials("ACCESSKEYID", "SECRET/KEY", "SESSION/Token")
     assert(AWSCredentialsUtils.getRedshiftCredentialsString(creds) ===
       "aws_access_key_id=ACCESSKEYID;aws_secret_access_key=SECRET/KEY;token=SESSION/Token")
+  }
+
+  test("AWSCredentials.load() STS temporary keys should take precedence") {
+    val conf = new Configuration(false)
+    conf.set("fs.s3.awsAccessKeyId", "CONFID")
+    conf.set("fs.s3.awsSecretAccessKey", "CONFKEY")
+
+    val params = MergedParameters(Map(
+      "tempdir" -> "s3://URIID:URIKEY@bucket/path",
+      "temporary_aws_access_key_id" -> "key_id",
+      "temporary_aws_secret_access_key" -> "secret",
+      "temporary_aws_session_token" -> "token"
+    ))
+
+    val creds = AWSCredentialsUtils.load(params, conf)
+    assert(creds.isInstanceOf[AWSSessionCredentials])
+    assert(creds.getAWSAccessKeyId === "key_id")
+    assert(creds.getAWSSecretKey === "secret")
+    assert(creds.asInstanceOf[AWSSessionCredentials].getSessionToken === "token")
   }
 
   test("AWSCredentials.load() credentials precedence for s3:// URIs") {
