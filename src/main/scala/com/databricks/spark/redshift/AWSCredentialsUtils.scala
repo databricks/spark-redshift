@@ -21,6 +21,8 @@ import java.net.URI
 import com.amazonaws.auth.{BasicAWSCredentials, AWSCredentials, AWSSessionCredentials, InstanceProfileCredentialsProvider}
 import org.apache.hadoop.conf.Configuration
 
+import com.databricks.spark.redshift.Parameters.MergedParameters
+
 private[redshift] object AWSCredentialsUtils {
 
   /**
@@ -37,7 +39,11 @@ private[redshift] object AWSCredentialsUtils {
     }
   }
 
-  def load(tempPath: String, hadoopConfiguration: Configuration): AWSCredentials = {
+  def load(params: MergedParameters, hadoopConfiguration: Configuration): AWSCredentials = {
+    params.temporaryAWSCredentials.getOrElse(loadFromURI(params.rootTempDir, hadoopConfiguration))
+  }
+
+  def loadFromURI(tempPath: String, hadoopConfiguration: Configuration): AWSCredentials = {
     // scalastyle:off
     // A good reference on Hadoop's configuration loading / precedence is
     // https://github.com/apache/hadoop/blob/trunk/hadoop-tools/hadoop-aws/src/site/markdown/tools/hadoop-aws/index.md

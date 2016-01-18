@@ -34,67 +34,67 @@ class AWSCredentialsUtilsSuite extends FunSuite {
       "aws_access_key_id=ACCESSKEYID;aws_secret_access_key=SECRET/KEY;token=SESSION/Token")
   }
 
-  test("AWSCredentials.load() credentials precedence for s3:// URIs") {
+  test("AWSCredentials.loadFromURI() credentials precedence for s3:// URIs") {
     val conf = new Configuration(false)
     conf.set("fs.s3.awsAccessKeyId", "CONFID")
     conf.set("fs.s3.awsSecretAccessKey", "CONFKEY")
 
     {
-      val creds = AWSCredentialsUtils.load("s3://URIID:URIKEY@bucket/path", conf)
+      val creds = AWSCredentialsUtils.loadFromURI("s3://URIID:URIKEY@bucket/path", conf)
       assert(creds.getAWSAccessKeyId === "URIID")
       assert(creds.getAWSSecretKey === "URIKEY")
     }
 
     {
-      val creds = AWSCredentialsUtils.load("s3://bucket/path", conf)
+      val creds = AWSCredentialsUtils.loadFromURI("s3://bucket/path", conf)
       assert(creds.getAWSAccessKeyId === "CONFID")
       assert(creds.getAWSSecretKey === "CONFKEY")
     }
 
     // The s3:// protocol does not work with EC2 IAM instance profiles.
     val e = intercept[IllegalArgumentException] {
-      AWSCredentialsUtils.load("s3://bucket/path", new Configuration(false))
+      AWSCredentialsUtils.loadFromURI("s3://bucket/path", new Configuration(false))
     }
     assert(e.getMessage.contains("Key must be specified"))
   }
 
-  test("AWSCredentials.load() credentials precedence for s3n:// URIs") {
+  test("AWSCredentials.loadFromURI() credentials precedence for s3n:// URIs") {
     val conf = new Configuration(false)
     conf.set("fs.s3n.awsAccessKeyId", "CONFID")
     conf.set("fs.s3n.awsSecretAccessKey", "CONFKEY")
 
     {
-      val creds = AWSCredentialsUtils.load("s3n://URIID:URIKEY@bucket/path", conf)
+      val creds = AWSCredentialsUtils.loadFromURI("s3n://URIID:URIKEY@bucket/path", conf)
       assert(creds.getAWSAccessKeyId === "URIID")
       assert(creds.getAWSSecretKey === "URIKEY")
     }
 
     {
-      val creds = AWSCredentialsUtils.load("s3n://bucket/path", conf)
+      val creds = AWSCredentialsUtils.loadFromURI("s3n://bucket/path", conf)
       assert(creds.getAWSAccessKeyId === "CONFID")
       assert(creds.getAWSSecretKey === "CONFKEY")
     }
 
     // The s3n:// protocol does not work with EC2 IAM instance profiles.
     val e = intercept[IllegalArgumentException] {
-      AWSCredentialsUtils.load("s3n://bucket/path", new Configuration(false))
+      AWSCredentialsUtils.loadFromURI("s3n://bucket/path", new Configuration(false))
     }
     assert(e.getMessage.contains("Key must be specified"))
   }
 
-  test("AWSCredentials.load() credentials precedence for s3a:// URIs") {
+  test("AWSCredentials.loadFromURI() credentials precedence for s3a:// URIs") {
     val conf = new Configuration(false)
     conf.set("fs.s3a.access.key", "CONFID")
     conf.set("fs.s3a.secret.key", "CONFKEY")
 
     {
-      val creds = AWSCredentialsUtils.load("s3a://URIID:URIKEY@bucket/path", conf)
+      val creds = AWSCredentialsUtils.loadFromURI("s3a://URIID:URIKEY@bucket/path", conf)
       assert(creds.getAWSAccessKeyId === "URIID")
       assert(creds.getAWSSecretKey === "URIKEY")
     }
 
     {
-      val creds = AWSCredentialsUtils.load("s3a://bucket/path", conf)
+      val creds = AWSCredentialsUtils.loadFromURI("s3a://bucket/path", conf)
       assert(creds.getAWSAccessKeyId === "CONFID")
       assert(creds.getAWSSecretKey === "CONFKEY")
     }
@@ -104,7 +104,7 @@ class AWSCredentialsUtilsSuite extends FunSuite {
     // just check that this test fails because the AWS client fails to obtain those credentials.
     // TODO: refactor and mock to enable proper tests here.
     val e = intercept[AmazonClientException] {
-      AWSCredentialsUtils.load("s3a://bucket/path", new Configuration(false))
+      AWSCredentialsUtils.loadFromURI("s3a://bucket/path", new Configuration(false))
     }
     assert(e.getMessage === "Unable to load credentials from Amazon EC2 metadata service" ||
       e.getMessage.contains("The requested metadata is not found at"))
