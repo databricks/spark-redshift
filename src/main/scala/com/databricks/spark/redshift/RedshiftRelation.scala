@@ -20,7 +20,6 @@ import java.net.URI
 
 import com.amazonaws.auth.AWSCredentials
 import com.amazonaws.services.s3.AmazonS3Client
-import org.apache.hadoop.conf.Configuration
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types._
@@ -85,8 +84,7 @@ private[redshift] case class RedshiftRelation(
   }
 
   override def buildScan(requiredColumns: Array[String], filters: Array[Filter]): RDD[Row] = {
-    val creds =
-      AWSCredentialsUtils.load(params.rootTempDir, sqlContext.sparkContext.hadoopConfiguration)
+    val creds = AWSCredentialsUtils.load(params, sqlContext.sparkContext.hadoopConfiguration)
     Utils.checkThatBucketHasObjectLifecycleConfiguration(params.rootTempDir, s3ClientFactory(creds))
     if (requiredColumns.isEmpty) {
       // In the special case where no columns were requested, issue a `count(*)` against Redshift
@@ -141,8 +139,7 @@ private[redshift] case class RedshiftRelation(
     // Always quote column names:
     val columnList = requiredColumns.map(col => s""""$col"""").mkString(", ")
     val whereClause = FilterPushdown.buildWhereClause(schema, filters)
-    val creds = params.temporaryAWSCredentials.getOrElse(
-      AWSCredentialsUtils.load(params.rootTempDir, sqlContext.sparkContext.hadoopConfiguration))
+    val creds = AWSCredentialsUtils.load(params, sqlContext.sparkContext.hadoopConfiguration)
     val credsString: String = AWSCredentialsUtils.getRedshiftCredentialsString(creds)
     val query = {
       // Since the query passed to UNLOAD will be enclosed in single quotes, we need to escape
