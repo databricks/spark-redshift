@@ -68,7 +68,7 @@ class MockRedshift(
 
   doAnswer(new Answer[Connection] {
       override def answer(invocation: InvocationOnMock): Connection = createMockConnection()
-    }).when(jdbcWrapper).getConnector(any[Option[String]](), same(jdbcUrl))
+    }).when(jdbcWrapper).getConnector(any[Option[String]](), same(jdbcUrl), any[Option[(String, String)]]())
 
   doAnswer(new Answer[Boolean] {
     override def answer(invocation: InvocationOnMock): Boolean = {

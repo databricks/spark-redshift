@@ -103,6 +103,16 @@ private[redshift] object Parameters {
     }
 
     /**
+    * User and password to be used to authenticate to Redshift
+    */
+    def credentials: Option[(String, String)] = {
+      for (
+        user <- parameters.get("user");
+        password <- parameters.get("password")
+      ) yield (user, password)
+    }
+    
+    /**
      * A JDBC URL, of the format:
      *
      *    jdbc:subprotocol://host:port/database?user=username&password=password
