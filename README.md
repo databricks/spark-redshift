@@ -220,6 +220,18 @@ The parameter map or <tt>OPTIONS</tt> provided in Spark SQL supports the followi
     <td>The query to read from in Redshift</td>
  </tr>
  <tr>
+    <td><tt>user</tt></td>
+    <td>No</td>
+    <td>No default</td>
+    <td>The Redshift username.  Must be used in tandem with <tt>password</tt> option.  May only be used if the user and password are not passed in the URL, passing both will result in an error.</td>
+ </tr>
+ <tr>
+    <td><tt>password</tt></td>
+    <td>No</td>
+    <td>No default</td>
+    <td>The Redshift password.  Must be used in tandem with <tt>user</tt> option.  May only be used if the user and password are not passed in the URL, passing both will result in an error.</td>
+ </tr>
+ <tr>
     <td><tt>url</tt></td>
     <td>Yes</td>
     <td>No default</td>
@@ -227,8 +239,8 @@ The parameter map or <tt>OPTIONS</tt> provided in Spark SQL supports the followi
 <p>A JDBC URL, of the format, <tt>jdbc:subprotocol://host:port/database?user=username&password=password</tt></p>
 
 <ul>
- <li><tt>subprotocol</tt> can be <tt>postgresql</tt> or <tt>redshift</tt>, depending on which JDBC driver 
-    you have loaded. Note however that one Redshift-compatible driver must be on the classpath and match 
+ <li><tt>subprotocol</tt> can be <tt>postgresql</tt> or <tt>redshift</tt>, depending on which JDBC driver
+    you have loaded. Note however that one Redshift-compatible driver must be on the classpath and match
     this URL.</li>
  <li><tt>host</tt> and <tt>port</tt> should point to the Redshift master node, so security groups and/or VPC will
 need to be configured to allow access from your driver application.
