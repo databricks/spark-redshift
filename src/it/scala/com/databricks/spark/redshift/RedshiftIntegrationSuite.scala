@@ -534,4 +534,26 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
       sqlContext.sql("select * from test_table"),
       TestUtils.expectedData)
   }
+
+  test("filtering based on date constants (regression test for #152)") {
+    val date = TestUtils.toDate(year = 2015, zeroBasedMonth = 6, date = 3)
+    val df = sqlContext.sql("select testdate from test_table")
+
+    checkAnswer(df.filter(df("testdate") === date), Seq(Row(date)))
+    // This query failed in Spark 1.6.0 but not in earlier versions. It looks like 1.6.0 performs
+    // constant-folding, whereas earlier Spark versions would preserve the cast which prevented
+    // filter pushdown.
+    checkAnswer(df.filter("testdate = to_date('2015-07-03')"), Seq(Row(date)))
+  }
+
+  test("filtering based on timestamp constants (regression test for #152)") {
+    val timestamp = TestUtils.toTimestamp(2015, zeroBasedMonth = 6, 1, 0, 0, 0, 1)
+    val df = sqlContext.sql("select testtimestamp from test_table")
+
+    checkAnswer(df.filter(df("testtimestamp") === timestamp), Seq(Row(timestamp)))
+    // This query failed in Spark 1.6.0 but not in earlier versions. It looks like 1.6.0 performs
+    // constant-folding, whereas earlier Spark versions would preserve the cast which prevented
+    // filter pushdown.
+    checkAnswer(df.filter("testtimestamp = '2015-07-01 00:00:00.001'"), Seq(Row(timestamp)))
+  }
 }
