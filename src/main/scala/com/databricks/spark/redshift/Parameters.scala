@@ -56,6 +56,14 @@ private[redshift] object Parameters {
       throw new IllegalArgumentException(
         "You cannot specify both the 'dbtable' and 'query' parameters at the same time.")
     }
+    if (userParameters.contains("user") || userParameters.contains("password")) {
+      userParameters.get("url")
+        .filter (url => url.contains("user=") || url.contains("password="))
+        .foreach { _ =>
+          throw new IllegalArgumentException(
+            "You cannot specify credential in both the url and as options")
+        }
+    }
 
     MergedParameters(DEFAULT_PARAMETERS ++ userParameters)
   }
@@ -111,7 +119,7 @@ private[redshift] object Parameters {
         password <- parameters.get("password")
       ) yield (user, password)
     }
-    
+
     /**
      * A JDBC URL, of the format:
      *
