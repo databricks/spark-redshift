@@ -197,7 +197,10 @@ private[redshift] class JDBCWrapper {
    *                                discover the appropriate driver class.
    * @param url the JDBC url to connect to.
    */
-  def getConnector(userProvidedDriverClass: Option[String], url: String, credentials: Option[(String, String)] = None): Connection = {
+  def getConnector(
+      userProvidedDriverClass: Option[String],
+      url: String,
+      credentials: Option[(String, String)]) : Connection = {
     val subprotocol = url.stripPrefix("jdbc:").split(":")(0)
     val driverClass: String = getDriverClass(subprotocol, userProvidedDriverClass)
     registerDriver(driverClass)
@@ -225,9 +228,6 @@ private[redshift] class JDBCWrapper {
     val properties = new Properties()
     credentials match {
       case Some((user, password)) => {
-        if (url.contains("user=") || url.contains("password=")) {
-          throw new IllegalArgumentException(s"Ambiguous Credentials: User and password must be passed as options or within the URL, not both")
-        }
         properties.setProperty("user", user)
         properties.setProperty("password", password)
       }
