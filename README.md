@@ -26,9 +26,17 @@ This library is more suited to ETL than interactive queries, since large amounts
 
 You may use this library in your applications with the following dependency information:
 
+**Scala 2.10**
 ```
 groupId: com.databricks
-artifactId: spark-redshift
+artifactId: spark-redshift_2.10
+version: 0.6.0
+```
+
+**Scala 2.11**
+```
+groupId: com.databricks
+artifactId: spark-redshift_2.11
 version: 0.6.0
 ```
 
