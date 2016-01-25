@@ -27,7 +27,7 @@ class ParametersSuite extends FunSuite with Matchers {
     val params = Map(
       "tempdir" -> "s3://foo/bar",
       "dbtable" -> "test_schema.test_table",
-      "url" -> "jdbc:redshift://foo/bar")
+      "url" -> "jdbc:redshift://foo/bar?user=user&password=password")
 
     val mergedParams = Parameters.mergeParameters(params)
 
@@ -46,7 +46,7 @@ class ParametersSuite extends FunSuite with Matchers {
     val params = Map(
       "tempdir" -> "s3://foo/bar",
       "dbtable" -> "test_table",
-      "url" -> "jdbc:redshift://foo/bar")
+      "url" -> "jdbc:redshift://foo/bar?user=user&password=password")
 
     val mergedParams = Parameters.mergeParameters(params)
 
@@ -60,8 +60,8 @@ class ParametersSuite extends FunSuite with Matchers {
       }
     }
 
-    checkMerge(Map("dbtable" -> "test_table", "url" -> "jdbc:redshift://foo/bar"))
-    checkMerge(Map("tempdir" -> "s3://foo/bar", "url" -> "jdbc:redshift://foo/bar"))
+    checkMerge(Map("dbtable" -> "test_table", "url" -> "jdbc:redshift://foo/bar?user=user&password=password"))
+    checkMerge(Map("tempdir" -> "s3://foo/bar", "url" -> "jdbc:redshift://foo/bar?user=user&password=password"))
     checkMerge(Map("dbtable" -> "test_table", "tempdir" -> "s3://foo/bar"))
   }
 
@@ -69,7 +69,7 @@ class ParametersSuite extends FunSuite with Matchers {
     intercept[IllegalArgumentException] {
       Parameters.mergeParameters(Map(
         "tempdir" -> "s3://foo/bar",
-        "url" -> "jdbc:redshift://foo/bar"))
+        "url" -> "jdbc:redshift://foo/bar?user=user&password=password"))
     }.getMessage should (include ("dbtable") and include ("query"))
 
     intercept[IllegalArgumentException] {
@@ -77,12 +77,35 @@ class ParametersSuite extends FunSuite with Matchers {
         "tempdir" -> "s3://foo/bar",
         "dbtable" -> "test_table",
         "query" -> "select * from test_table",
-        "url" -> "jdbc:redshift://foo/bar"))
+        "url" -> "jdbc:redshift://foo/bar?user=user&password=password"))
     }.getMessage should (include ("dbtable") and include ("query") and include("both"))
 
     Parameters.mergeParameters(Map(
       "tempdir" -> "s3://foo/bar",
       "query" -> "select * from test_table",
-      "url" -> "jdbc:redshift://foo/bar"))
+      "url" -> "jdbc:redshift://foo/bar?user=user&password=password"))
+  }
+
+  test("Must specify credentials in either URL or 'user' and 'password' parameters, but not both") {
+    intercept[IllegalArgumentException] {
+      Parameters.mergeParameters(Map(
+        "tempdir" -> "s3://foo/bar",
+        "query" -> "select * from test_table",
+        "url" -> "jdbc:redshift://foo/bar"))
+    }.getMessage should (include ("credentials"))
+
+    intercept[IllegalArgumentException] {
+      Parameters.mergeParameters(Map(
+        "tempdir" -> "s3://foo/bar",
+        "query" -> "select * from test_table",
+        "user" -> "user",
+        "password" -> "password",
+        "url" -> "jdbc:redshift://foo/bar?user=user&password=password"))
+    }.getMessage should (include ("credentials") and include("both"))
+
+    Parameters.mergeParameters(Map(
+      "tempdir" -> "s3://foo/bar",
+      "query" -> "select * from test_table",
+      "url" -> "jdbc:redshift://foo/bar?user=user&password=password"))
   }
 }
