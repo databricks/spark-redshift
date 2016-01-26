@@ -59,9 +59,9 @@ class ParametersSuite extends FunSuite with Matchers {
         Parameters.mergeParameters(params)
       }
     }
-
-    checkMerge(Map("dbtable" -> "test_table", "url" -> "jdbc:redshift://foo/bar?user=user&password=password"))
-    checkMerge(Map("tempdir" -> "s3://foo/bar", "url" -> "jdbc:redshift://foo/bar?user=user&password=password"))
+    val testURL = "jdbc:redshift://foo/bar?user=user&password=password"
+    checkMerge(Map("dbtable" -> "test_table", "url" -> testURL))
+    checkMerge(Map("tempdir" -> "s3://foo/bar", "url" -> testURL))
     checkMerge(Map("dbtable" -> "test_table", "tempdir" -> "s3://foo/bar"))
   }
 
