@@ -231,6 +231,7 @@ private[redshift] class JDBCWrapper {
         properties.setProperty("user", user)
         properties.setProperty("password", password)
       }
+      case None =>
     }
     driver.connect(url, properties)
   }
