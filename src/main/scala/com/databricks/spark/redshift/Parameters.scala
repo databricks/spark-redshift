@@ -63,7 +63,7 @@ private[redshift] object Parameters {
         throw new IllegalArgumentException(
           "You cannot specify credentials in both the URL and as user/password options")
         }
-    } else if(credsInURL.isEmpty) {
+    } else if (credsInURL.isEmpty) {
       throw new IllegalArgumentException(
         "You must specify credentials in either the URL or as user/password options")
     }
