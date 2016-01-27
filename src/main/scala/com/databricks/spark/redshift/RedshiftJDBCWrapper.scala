@@ -226,12 +226,10 @@ private[redshift] class JDBCWrapper {
       throw new IllegalArgumentException(s"Did not find registered driver with class $driverClass")
     }
     val properties = new Properties()
-    credentials match {
-      case Some((user, password)) => {
+    credentials.foreach { case(user, password) => {
         properties.setProperty("user", user)
         properties.setProperty("password", password)
       }
-      case None =>
     }
     driver.connect(url, properties)
   }
