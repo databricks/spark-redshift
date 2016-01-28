@@ -352,8 +352,8 @@ private[redshift] class RedshiftWriter(
         "For save operations you must specify a Redshift table name with the 'dbtable' parameter")
     }
 
-    val creds: AWSCredentials = params.temporaryAWSCredentials.getOrElse(
-      AWSCredentialsUtils.load(params.rootTempDir, sqlContext.sparkContext.hadoopConfiguration))
+    val creds: AWSCredentials =
+      AWSCredentialsUtils.load(params, sqlContext.sparkContext.hadoopConfiguration)
 
     Utils.assertThatFileSystemIsNotS3BlockFileSystem(
       new URI(params.rootTempDir), sqlContext.sparkContext.hadoopConfiguration)

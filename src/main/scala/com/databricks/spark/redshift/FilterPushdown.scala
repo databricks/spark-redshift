@@ -16,8 +16,12 @@
 
 package com.databricks.spark.redshift
 
+import java.sql.{Date, Timestamp}
+
+import org.apache.spark.SPARK_VERSION
+import org.apache.spark.sql.catalyst.CatalystTypeConverters
 import org.apache.spark.sql.sources._
-import org.apache.spark.sql.types.{DataType, StringType, StructType}
+import org.apache.spark.sql.types._
 
 /**
  * Helper methods for pushing filters into Redshift queries.
@@ -42,10 +46,21 @@ private[redshift] object FilterPushdown {
    * could not be converted.
    */
   def buildFilterExpression(schema: StructType, filter: Filter): Option[String] = {
-    def buildComparison(attr: String, value: Any, comparisonOp: String): Option[String] = {
-     getTypeForAttribute(schema, attr).map { dataType =>
+    def buildComparison(attr: String, internalValue: Any, comparisonOp: String): Option[String] = {
+      getTypeForAttribute(schema, attr).map { dataType =>
+        val value: Any = {
+          // Workaround for SPARK-10195: prior to Spark 1.5.0, the Data Sources API exposed internal
+          // types, so we must perform conversions if running on older versions:
+          if (SPARK_VERSION < "1.5.0") {
+            CatalystTypeConverters.convertToScala(internalValue, dataType)
+          } else {
+            internalValue
+          }
+        }
        val sqlEscapedValue: String = dataType match {
          case StringType => s"\\'${value.toString.replace("'", "\\'\\'")}\\'"
+         case DateType => s"\\'${value.asInstanceOf[Date]}\\'"
+         case TimestampType => s"\\'${value.asInstanceOf[Timestamp]}\\'"
          case _ => value.toString
        }
        s""""$attr" $comparisonOp $sqlEscapedValue"""
