@@ -97,8 +97,12 @@ private[redshift] class RedshiftWriter(
       manifestUrl: String): String = {
     val credsString: String = AWSCredentialsUtils.getRedshiftCredentialsString(creds)
     val fixedUrl = Utils.fixS3Url(manifestUrl)
+    val format = params.tempFormat match {
+      case "AVRO" => "AVRO 'auto'"
+      case csv => csv + s" NULL AS '${params.nullString}'"
+    }
     s"COPY ${params.table.get} FROM '$fixedUrl' CREDENTIALS '$credsString' FORMAT AS " +
-      s"AVRO 'auto' manifest ${params.extraCopyOptions}"
+      s"${format} manifest ${params.extraCopyOptions}"
   }
 
   /**
@@ -164,6 +168,7 @@ private[redshift] class RedshiftWriter(
     manifestUrl.foreach { manifestUrl =>
       // Load the temporary data into the new file
       val copyStatement = copySql(data.sqlContext, params, creds, manifestUrl)
+      log.info(copyStatement.replaceFirst("CREDENTIALS +'[^']*'", "CREDENTIALS ''"))
       try {
         jdbcWrapper.executeInterruptibly(conn.prepareStatement(copyStatement))
       } catch {
@@ -228,7 +233,9 @@ private[redshift] class RedshiftWriter(
   private def unloadData(
       sqlContext: SQLContext,
       data: DataFrame,
-      tempDir: String): Option[String] = {
+      tempDir: String,
+      tempFormat: String,
+      nullString: String): Option[String] = {
     // spark-avro does not support Date types. In addition, it converts Timestamps into longs
     // (milliseconds since the Unix epoch). Redshift is capable of loading timestamps in
     // 'epochmillisecs' format but there's no equivalent format for dates. To work around this, we
@@ -296,10 +303,15 @@ private[redshift] class RedshiftWriter(
       }
     )
 
-    sqlContext.createDataFrame(convertedRows, convertedSchema)
-      .write
-      .format("com.databricks.spark.avro")
-      .save(tempDir)
+    val writer = sqlContext.createDataFrame(convertedRows, convertedSchema).write
+    (tempFormat match {
+      case "AVRO" => writer.format("com.databricks.spark.avro")
+      case "CSV" => writer.format("com.databricks.spark.csv")
+          .option("nullValue", nullString)
+      case "CSV GZIP" => writer.format("com.databricks.spark.csv")
+          .option("nullValue", nullString)
+          .option("codec", "org.apache.hadoop.io.compress.GzipCodec")
+    }).save(tempDir)
 
     if (nonEmptyPartitions.value.isEmpty) {
       None
@@ -308,12 +320,12 @@ private[redshift] class RedshiftWriter(
       // for a description of the manifest file format. The URLs in this manifest must be absolute
       // and complete.
 
-      // The saved filenames depend on the spark-avro version. In spark-avro 1.0.0, the write
+      // The saved filenames depend on the spark-avro/csv version. In spark-avro 1.0.0, the write
       // path uses SparkContext.saveAsHadoopFile(), which produces filenames of the form
       // part-XXXXX.avro. In spark-avro 2.0.0+, the partition filenames are of the form
-      // part-r-XXXXX-UUID.avro.
+      // part-r-XXXXX-UUID.avro. In spark-csv, the partition filenames are of the form part-XXXXX.
       val fs = FileSystem.get(URI.create(tempDir), sqlContext.sparkContext.hadoopConfiguration)
-      val partitionIdRegex = "^part-(?:r-)?(\\d+)[^\\d+].*$".r
+      val partitionIdRegex = "^part-(?:r-)?(\\d+)(?:[.-].*)?$".r
       val filesToLoad: Seq[String] = {
         val nonEmptyPartitionIds = nonEmptyPartitions.value.toSet
         fs.listStatus(new Path(tempDir)).map(_.getPath.getName).collect {
@@ -340,7 +352,7 @@ private[redshift] class RedshiftWriter(
   }
 
   /**
-   * Write a DataFrame to a Redshift table, using S3 and Avro serialization
+   * Write a DataFrame to a Redshift table, using S3 and Avro or CSV serialization
    */
   def saveToRedshift(
       sqlContext: SQLContext,
@@ -364,7 +376,7 @@ private[redshift] class RedshiftWriter(
 
     try {
       val tempDir = params.createPerQueryTempDir()
-      val manifestUrl = unloadData(sqlContext, data, tempDir)
+      val manifestUrl = unloadData(sqlContext, data, tempDir, params.tempFormat, params.nullString)
       if (saveMode == SaveMode.Overwrite && params.useStagingTable) {
         withStagingTable(conn, params.table.get, stagingTable => {
           val updatedParams = MergedParameters(params.parameters.updated("dbtable", stagingTable))
