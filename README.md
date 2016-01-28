@@ -411,9 +411,7 @@ In a future release, this will be changed so that the temporary table is created
 
 This use of a staging table can be disabled by setting `usestagingtable` to `false`, in which case the destination table will be deleted before the `COPY`, sacrificing the atomicity of the overwrite operation.
 
-**Querying Redshift tables**: Queries use Redshift's [`UNLOAD`](https://docs.aws.amazon.com/redshift/latest/dg/r_UNLOAD.html) command to execute a query and save its results to S3. The data which is written to S3 should reflect a consistent snapshot of the database.
-
-In `spark-redshift` 1.6.0 and earlier, the S3 read path performs bucket-listing and thus may be impacted by the eventually-consistent nature of this S3 operation, meaning that in rare circumstances reads may see reflect a subset of the unloaded data stored in S3. This will be fixed in future releases by using `UNLOAD`'s `MANIFEST` support.
+**Querying Redshift tables**: Queries use Redshift's [`UNLOAD`](https://docs.aws.amazon.com/redshift/latest/dg/r_UNLOAD.html) command to execute a query and save its results to S3 and use [manifests](https://docs.aws.amazon.com/redshift/latest/dg/loading-data-files-using-manifest.html) to guard against certain eventually-consistent S3 operations. As a result, `spark-redshift` queries should have the same consistency properties as regular Redshift queries.
 
 ## Migration Guide
 
