@@ -16,12 +16,13 @@
 
 package com.databricks.spark.redshift
 
-import java.io.File
+import java.io.{ByteArrayInputStream, File}
 import java.net.URI
 
 import com.amazonaws.services.s3.AmazonS3Client
-import com.amazonaws.services.s3.model.BucketLifecycleConfiguration
+import com.amazonaws.services.s3.model.{S3ObjectInputStream, S3Object, BucketLifecycleConfiguration}
 import com.amazonaws.services.s3.model.BucketLifecycleConfiguration.Rule
+import org.apache.http.client.methods.HttpRequestBase
 import org.mockito.Matchers._
 import org.mockito.Mockito
 import org.mockito.Mockito.when
@@ -29,6 +30,8 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.mapreduce.InputFormat
 import org.apache.hadoop.fs.{Path, FileSystem}
 import org.apache.hadoop.fs.s3native.S3NInMemoryFileSystem
+import org.mockito.invocation.InvocationOnMock
+import org.mockito.stubbing.Answer
 import org.scalatest.{BeforeAndAfterEach, BeforeAndAfterAll, Matchers}
 
 import org.apache.spark.SparkContext
@@ -115,6 +118,26 @@ class RedshiftSourceSuite
       new BucketLifecycleConfiguration().withRules(
         new Rule().withPrefix("").withStatus(BucketLifecycleConfiguration.ENABLED)
       ))
+    val mockManifest = Mockito.mock(classOf[S3Object], Mockito.RETURNS_SMART_NULLS)
+    when(mockManifest.getObjectContent).thenAnswer {
+      new Answer[S3ObjectInputStream] {
+        override def answer(invocationOnMock: InvocationOnMock): S3ObjectInputStream = {
+          val manifest =
+            """
+              | {
+              |   "entries": [
+              |     { "url": "s3://test-bucket/some-uuid(a-hack-for-mocking)/part-00000" }
+              |    ]
+              | }
+            """.stripMargin
+          val is = new ByteArrayInputStream(manifest.getBytes("UTF-8"))
+          new S3ObjectInputStream(
+            is,
+            Mockito.mock(classOf[HttpRequestBase], Mockito.RETURNS_SMART_NULLS))
+        }
+      }
+    }
+    when(mockS3Client.getObject(anyString(), endsWith("manifest"))).thenReturn(mockManifest)
   }
 
   override def afterEach(): Unit = {

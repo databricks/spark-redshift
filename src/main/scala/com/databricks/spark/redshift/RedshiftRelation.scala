@@ -16,10 +16,15 @@
 
 package com.databricks.spark.redshift
 
+import java.io.InputStreamReader
+import java.lang
 import java.net.URI
 
+import scala.collection.JavaConverters._
+
 import com.amazonaws.auth.AWSCredentials
-import com.amazonaws.services.s3.AmazonS3Client
+import com.amazonaws.services.s3.{AmazonS3Client, AmazonS3URI}
+import com.eclipsesource.json.Json
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types._
@@ -117,12 +122,38 @@ private[redshift] case class RedshiftRelation(
       } finally {
         conn.close()
       }
+      // Read the MANIFEST file to get the list of S3 part files that were written by Redshift.
+      // We need to use a manifest in order to guard against S3's eventually-consistent listings.
+      val filesToRead: Seq[String] = {
+        val cleanedTempDirUri =
+          Utils.fixS3Url(Utils.removeCredentialsFromURI(URI.create(tempDir)).toString)
+        val s3URI = new AmazonS3URI(cleanedTempDirUri)
+        val s3Client = s3ClientFactory(creds)
+        val is = s3Client.getObject(s3URI.getBucket, s3URI.getKey + "manifest").getObjectContent
+        val s3Files = try {
+          val entries = Json.parse(new InputStreamReader(is)).asObject().get("entries").asArray()
+          entries.iterator().asScala.map(_.asObject().get("url").asString()).toSeq
+        } finally {
+          is.close()
+        }
+        // The filenames in the manifest are of the form s3://bucket/key, without credentials.
+        // If the S3 credentials were originally specified in the tempdir's URI, then we need to
+        // reintroduce them here
+        s3Files.map { file =>
+          tempDir.stripSuffix("/") + '/' + file.stripPrefix(cleanedTempDirUri).stripPrefix("/")
+        }
+      }
       // Create a DataFrame to read the unloaded data:
-      val rdd = sqlContext.sparkContext.newAPIHadoopFile(
-        tempDir,
-        classOf[RedshiftInputFormat],
-        classOf[java.lang.Long],
-        classOf[Array[String]])
+      val rdd: RDD[(lang.Long, Array[String])] = {
+        val rdds = filesToRead.map { file =>
+          sqlContext.sparkContext.newAPIHadoopFile(
+            file,
+            classOf[RedshiftInputFormat],
+            classOf[java.lang.Long],
+            classOf[Array[String]])
+        }.toArray
+        sqlContext.sparkContext.union(rdds)
+      }
       val prunedSchema = pruneSchema(schema, requiredColumns)
       rdd.values.mapPartitions { iter =>
         val converter: Array[String] => Row = Conversions.createRowConverter(prunedSchema)
@@ -151,7 +182,7 @@ private[redshift] case class RedshiftRelation(
     // the credentials passed via `credsString`.
     val fixedUrl = Utils.fixS3Url(Utils.removeCredentialsFromURI(new URI(tempDir)).toString)
 
-    s"UNLOAD ('$query') TO '$fixedUrl' WITH CREDENTIALS '$credsString' ESCAPE"
+    s"UNLOAD ('$query') TO '$fixedUrl' WITH CREDENTIALS '$credsString' ESCAPE MANIFEST"
   }
 
   private def pruneSchema(schema: StructType, columns: Array[String]): StructType = {

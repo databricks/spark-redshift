@@ -59,6 +59,7 @@ object SparkRedshiftBuild extends Build {
       javacOptions ++= Seq("-source", "1.6", "-target", "1.6"),
       libraryDependencies ++= Seq(
         "org.slf4j" % "slf4j-api" % "1.7.5",
+        "com.eclipsesource.minimal-json" % "minimal-json" % "0.9.4",
         // These Amazon SDK depdencies are marked as 'provided' in order to reduce the risk of
         // dependency conflicts with other user libraries. In many environments, such as EMR and
         // Databricks, the Amazon SDK will already be on the classpath. In other cases, the SDK is
