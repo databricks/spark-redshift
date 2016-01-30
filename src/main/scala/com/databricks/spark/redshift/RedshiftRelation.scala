@@ -55,7 +55,7 @@ private[redshift] case class RedshiftRelation(
     userSchema.getOrElse {
       val tableNameOrSubquery =
         params.query.map(q => s"($q)").orElse(params.table.map(_.toString)).get
-      val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
+      val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, params.credentials)
       try {
         jdbcWrapper.resolveTable(conn, tableNameOrSubquery)
       } finally {
@@ -92,7 +92,7 @@ private[redshift] case class RedshiftRelation(
       val whereClause = FilterPushdown.buildWhereClause(schema, filters)
       val countQuery = s"SELECT count(*) FROM $tableNameOrSubquery $whereClause"
       log.info(countQuery)
-      val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
+      val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, params.credentials)
       try {
         val results = jdbcWrapper.executeQueryInterruptibly(conn.prepareStatement(countQuery))
         if (results.next()) {
@@ -111,7 +111,7 @@ private[redshift] case class RedshiftRelation(
       val tempDir = params.createPerQueryTempDir()
       val unloadSql = buildUnloadStmt(requiredColumns, filters, tempDir)
       log.info(unloadSql)
-      val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
+      val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, params.credentials)
       try {
         jdbcWrapper.executeInterruptibly(conn.prepareStatement(unloadSql))
       } finally {

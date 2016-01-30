@@ -83,7 +83,7 @@ class RedshiftSourceSuite
 
   // Parameters common to most tests. Some parameters are overridden in specific tests.
   private def defaultParams: Map[String, String] = Map(
-    "url" -> "jdbc:redshift://foo/bar",
+    "url" -> "jdbc:redshift://foo/bar?user=user&password=password",
     "tempdir" -> s3TempDir,
     "dbtable" -> "test_table")
 
@@ -412,7 +412,7 @@ class RedshiftSourceSuite
 
   test("Cannot save when 'query' parameter is specified instead of 'dbtable'") {
     val invalidParams = Map(
-      "url" -> "jdbc:redshift://foo/bar",
+      "url" -> "jdbc:redshift://foo/bar?user=user&password=password",
       "tempdir" -> s3TempDir,
       "query" -> "select * from test_table")
 
