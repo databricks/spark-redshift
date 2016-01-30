@@ -26,7 +26,7 @@ import org.apache.spark.sql.types.{IntegerType, StructField, StructType}
  * This suite performs basic integration tests where the AWS credentials have been
  * encoded into the tempdir URI rather than being set in the Hadoop configuration.
  */
-class CredentialsInUriIntegrationSuite extends IntegrationSuiteBase {
+class AWSCredentialsInUriIntegrationSuite extends IntegrationSuiteBase {
 
   override protected val tempDir: String = {
     val uri = new URI(AWS_S3_SCRATCH_SPACE + randomSuffix + "/")
@@ -52,6 +52,6 @@ class CredentialsInUriIntegrationSuite extends IntegrationSuiteBase {
   test("roundtrip save and load") {
     val df = sqlContext.createDataFrame(sc.parallelize(Seq(Row(1)), 1),
       StructType(StructField("foo", IntegerType) :: Nil))
-    testRoundtripSaveAndLoad(s"save_with_one_empty_partition_$randomSuffix", df)
+    testRoundtripSaveAndLoad(s"roundtrip_save_and_load_$randomSuffix", df)
   }
 }
