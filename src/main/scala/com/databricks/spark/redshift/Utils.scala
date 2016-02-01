@@ -93,7 +93,8 @@ private[redshift] object Utils {
       val key = Option(s3URI.getKey).getOrElse("")
       Option(s3Client.getBucketLifecycleConfiguration(bucket)) match {
         case None =>
-          log.error(s"The S3 bucket $bucket does not exist")
+          log.warn(s"No configuration were found for S3 bucket $bucket. " +
+             "Please make sure that the bucket exists and it has a Life Cycle configuration applied")
         case Some(lifecycleConfiguration) =>
           val someRuleMatchesTempDir = lifecycleConfiguration.getRules.asScala.exists { rule =>
             // Note: this only checks that there is an active rule which matches the temp directory;
