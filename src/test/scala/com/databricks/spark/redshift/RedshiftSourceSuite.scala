@@ -282,6 +282,41 @@ class RedshiftSourceSuite
     mockRedshift.verifyThatExpectedQueriesWereIssued(Seq(expectedQuery))
   }
 
+  test("DefaultSource supports preactions options to run queries before running COPY command") {
+    val mockRedshift = new MockRedshift(
+      defaultParams("url"),
+      Map(TableName.parseFromEscaped("test_table").toString -> TestUtils.testSchema))
+    val source = new DefaultSource(mockRedshift.jdbcWrapper, _ => mockS3Client)
+    val params = defaultParams ++ Map(
+      "preactions" ->
+        """
+          | DELETE FROM %s WHERE id < 100;
+          | DELETE FROM %s WHERE id > 100;
+          | DELETE FROM %s WHERE id = -1;
+        """.stripMargin.trim,
+      "usestagingtable" -> "true")
+
+    val expectedCommands = Seq(
+      "DROP TABLE IF EXISTS \"PUBLIC\".\"test_table_staging_.*\"".r,
+      "CREATE TABLE IF NOT EXISTS \"PUBLIC\".\"test_table_staging_.*\"".r,
+      "DELETE FROM \"PUBLIC\".\"test_table_staging_.*\" WHERE id < 100".r,
+      "DELETE FROM \"PUBLIC\".\"test_table_staging_.*\" WHERE id > 100".r,
+      "DELETE FROM \"PUBLIC\".\"test_table_staging_.*\" WHERE id = -1".r,
+      "COPY \"PUBLIC\".\"test_table_staging_.*\"".r,
+      """
+        | BEGIN;
+        | ALTER TABLE "PUBLIC"\."test_table" RENAME TO "test_table_backup_.*";
+        | ALTER TABLE "PUBLIC"\."test_table_staging_.*" RENAME TO "test_table";
+        | DROP TABLE "PUBLIC"\."test_table_backup_.*";
+        | END;
+      """.stripMargin.trim.r,
+      "DROP TABLE IF EXISTS \"PUBLIC\"\\.\"test_table_staging_.*\"".r)
+
+    source.createRelation(testSqlContext, SaveMode.Overwrite, params, expectedDataDF)
+    mockRedshift.verifyThatExpectedQueriesWereIssued(expectedCommands)
+    mockRedshift.verifyThatConnectionsWereClosed()
+  }
+
   test("DefaultSource serializes data as Avro, then sends Redshift COPY command") {
     val params = defaultParams ++ Map(
       "postactions" -> "GRANT SELECT ON %s TO jeremy",

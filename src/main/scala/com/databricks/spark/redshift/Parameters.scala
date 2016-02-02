@@ -34,6 +34,7 @@ private[redshift] object Parameters {
     "overwrite" -> "false",
     "diststyle" -> "EVEN",
     "usestagingtable" -> "true",
+    "preactions" -> ";",
     "postactions" -> ";"
   )
 
@@ -203,6 +204,17 @@ private[redshift] object Parameters {
      * Extra options to append to the Redshift COPY command (e.g. "MAXERROR 100").
      */
     def extraCopyOptions: String = parameters.get("extracopyoptions").getOrElse("")
+
+    /**
+      * List of semi-colon separated SQL statements to run before write operations.
+      * This can be useful for running DELETE operations to clean up data
+      *
+      * If the action string contains %s, the table name will be substituted in, in case a staging
+      * table is being used.
+      *
+      * Defaults to empty.
+      */
+    def preActions: Array[String] = parameters("preactions").split(";")
 
     /**
      * List of semi-colon separated SQL statements to run after successful write operations.

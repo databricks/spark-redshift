@@ -161,6 +161,13 @@ private[redshift] class RedshiftWriter(
     log.info(createStatement)
     jdbcWrapper.executeInterruptibly(conn.prepareStatement(createStatement))
 
+    // Execute preActions
+    params.preActions.foreach { action =>
+      val actionSql = if (action.contains("%s")) action.format(params.table.get) else action
+      log.info("Executing preAction: " + actionSql)
+      jdbcWrapper.executeInterruptibly(conn.prepareStatement(actionSql))
+    }
+
     manifestUrl.foreach { manifestUrl =>
       // Load the temporary data into the new file
       val copyStatement = copySql(data.sqlContext, params, creds, manifestUrl)
