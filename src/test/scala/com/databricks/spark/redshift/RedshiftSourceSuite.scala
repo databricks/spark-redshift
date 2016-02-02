@@ -284,6 +284,7 @@ class RedshiftSourceSuite
 
   test("DefaultSource serializes data as Avro, then sends Redshift COPY command") {
     val params = defaultParams ++ Map(
+      "preactions" -> "DELETE FROM %s",
       "postactions" -> "GRANT SELECT ON %s TO jeremy",
       "diststyle" -> "KEY",
       "distkey" -> "testint")
@@ -292,6 +293,7 @@ class RedshiftSourceSuite
       "DROP TABLE IF EXISTS \"PUBLIC\"\\.\"test_table_staging_.*\"".r,
       ("CREATE TABLE IF NOT EXISTS \"PUBLIC\"\\.\"test_table_staging.*" +
         " DISTSTYLE KEY DISTKEY \\(testint\\).*").r,
+      "DELETE FROM \"PUBLIC\"\\.\"test_table_staging.+\"".r,
       "COPY \"PUBLIC\"\\.\"test_table_staging_.*\"".r,
       "GRANT SELECT ON \"PUBLIC\"\\.\"test_table_staging.+\" TO jeremy".r,
       """
