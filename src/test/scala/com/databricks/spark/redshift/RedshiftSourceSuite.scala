@@ -464,7 +464,7 @@ class RedshiftSourceSuite
 
   test("configuring descriptions on columns") {
     val descriptionMetadata1 = new MetadataBuilder().putString("description", "Test1").build()
-    val descriptionMetadata2 = new MetadataBuilder().putString("description", "Test2").build()
+    val descriptionMetadata2 = new MetadataBuilder().putString("description", "Test'2").build()
     val schema = StructType(
       StructField("first_str", StringType, metadata = descriptionMetadata1) ::
         StructField("second_str", StringType, metadata = descriptionMetadata2) ::
@@ -475,8 +475,8 @@ class RedshiftSourceSuite
       DefaultRedshiftWriter.commentActions(Some("Test"), schema)
     val expectedCommentCommands = List(
       "COMMENT ON TABLE %s IS 'Test'",
-      "COMMENT ON COLUMN %s.first_str IS 'Test1'",
-      "COMMENT ON COLUMN %s.second_str IS 'Test2'")
+      "COMMENT ON COLUMN %s.\"first_str\" IS 'Test1'",
+      "COMMENT ON COLUMN %s.\"second_str\" IS 'Test''2'")
     assert(commentCommands === expectedCommentCommands)
   }
 

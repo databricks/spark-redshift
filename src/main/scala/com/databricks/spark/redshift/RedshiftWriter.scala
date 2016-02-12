@@ -143,10 +143,11 @@ private[redshift] class RedshiftWriter(
     */
   private[redshift] def commentActions(tableComment: Option[String], schema: StructType):
       List[String] = {
-    tableComment.toList.map(desc => s"COMMENT ON TABLE %s IS '$desc'") ++
+    tableComment.toList.map(desc => s"COMMENT ON TABLE %s IS '${desc.replace("'", "''")}'") ++
     schema.fields
       .withFilter(f => f.metadata.contains("description"))
-      .map(f => s"""COMMENT ON COLUMN %s.${f.name} IS '${f.metadata.getString("description")}'""")
+      .map(f => s"""COMMENT ON COLUMN %s."${f.name.replace("\"", "\\\"")}""""
+              + s" IS '${f.metadata.getString("description").replace("'", "''")}'")
   }
 
   /**
