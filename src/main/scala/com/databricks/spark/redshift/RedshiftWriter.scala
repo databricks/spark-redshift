@@ -141,7 +141,8 @@ private[redshift] class RedshiftWriter(
   /**
     * Generate COMMENT SQL statements for the table and columns.
     */
-  private def commentActions(tableComment: Option[String], schema: StructType): List[String] = {
+  private[redshift] def commentActions(tableComment: Option[String], schema: StructType):
+      List[String] = {
     tableComment.toList.map(desc => s"COMMENT ON TABLE %s IS '$desc'") ++
     schema.fields
       .withFilter(f => f.metadata.contains("description"))

@@ -445,6 +445,41 @@ class RedshiftSourceSuite
     assert(createTableCommand === expectedCreateTableCommand)
   }
 
+  test("configuring encoding on columns") {
+    val lzoMetadata = new MetadataBuilder().putString("encoding", "LZO").build()
+    val runlengthMetadata = new MetadataBuilder().putString("encoding", "RUNLENGTH").build()
+    val schema = StructType(
+      StructField("lzo_str", StringType, metadata = lzoMetadata) ::
+        StructField("runlength_str", StringType, metadata = runlengthMetadata) ::
+        StructField("default_str", StringType) ::
+        Nil)
+    val df = testSqlContext.createDataFrame(sc.emptyRDD[Row], schema)
+    val createTableCommand =
+      DefaultRedshiftWriter.createTableSql(df, MergedParameters.apply(defaultParams)).trim
+    val expectedCreateTableCommand =
+      """CREATE TABLE IF NOT EXISTS "PUBLIC"."test_table" ("lzo_str" TEXT  ENCODE LZO,""" +
+    """ "runlength_str" TEXT  ENCODE RUNLENGTH, "default_str" TEXT)"""
+    assert(createTableCommand === expectedCreateTableCommand)
+  }
+
+  test("configuring descriptions on columns") {
+    val descriptionMetadata1 = new MetadataBuilder().putString("description", "Test1").build()
+    val descriptionMetadata2 = new MetadataBuilder().putString("description", "Test2").build()
+    val schema = StructType(
+      StructField("first_str", StringType, metadata = descriptionMetadata1) ::
+        StructField("second_str", StringType, metadata = descriptionMetadata2) ::
+        StructField("default_str", StringType) ::
+        Nil)
+    val df = testSqlContext.createDataFrame(sc.emptyRDD[Row], schema)
+    val commentCommands =
+      DefaultRedshiftWriter.commentActions(Some("Test"), schema)
+    val expectedCommentCommands = List(
+      "COMMENT ON TABLE %s IS 'Test'",
+      "COMMENT ON COLUMN %s.first_str IS 'Test1'",
+      "COMMENT ON COLUMN %s.second_str IS 'Test2'")
+    assert(commentCommands === expectedCommentCommands)
+  }
+
   test("Respect SaveMode.ErrorIfExists when table exists") {
     val mockRedshift = new MockRedshift(
       defaultParams("url"),
