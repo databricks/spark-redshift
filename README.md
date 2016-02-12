@@ -336,6 +336,19 @@ Redshift cluster and/or don't have requirements to keep the table availability h
     </td>
  </tr>
  <tr>
+    <td><tt>preactions</tt></td>
+    <td>No</td>
+    <td>No default</td>
+    <td>
+<p>This can be a <tt>;</tt> separated list of SQL commands to be executed before loading <tt>COPY</tt> command.
+It may be useful to have some <tt>DELETE</tt> commands or similar run here before loading new data. If the command contains
+<tt>%s</tt>, the table name will be formatted in before execution (in case you're using a staging table).</p>
+
+<p>Be warned that if this commands fail, it is treated as an error and you'll get an exception. If using a staging
+table, the changes will be reverted and the backup table restored if pre actions fail.</p>
+    </td>
+ </tr>
+ <tr>
     <td><tt>postactions</tt></td>
     <td>No</td>
     <td>No default</td>
