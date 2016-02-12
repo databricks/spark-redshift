@@ -336,6 +336,14 @@ Redshift cluster and/or don't have requirements to keep the table availability h
     </td>
  </tr>
  <tr>
+    <td><tt>description</tt></td>
+    <td>No</td>
+    <td>No default</td>
+    <td>
+<p>A description for the table. Will be set using the SQL COMMENT command, and should show up in most query tools.
+See also the <tt>description</tt> metadata to set descriptions on individual columns.
+ </tr>
+ <tr>
     <td><tt>preactions</tt></td>
     <td>No</td>
     <td>No default</td>
@@ -413,6 +421,14 @@ df.write
   .option("dbtable", sessionTable)
   .save()
 ```
+
+### Configuring column encoding
+
+When creating a table, `spark-redshift` can be configured to use a specific compression encoding on individual columns. You can use the `encoding` column metadata field to specify a compression encoding for each column (see [Amazon docs](http://docs.aws.amazon.com/redshift/latest/dg/c_Compression_encodings.html) for available encodings).
+
+### Setting descriptions on columns
+
+Redshift allows columns to have descriptions attached that should show up in most query tools (using the `COMMENT` command). You can set the `description` column metadata field to specify a description for individual columns.
 
 ## Transactional Guarantees
 
