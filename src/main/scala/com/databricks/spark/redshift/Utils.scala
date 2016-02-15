@@ -91,23 +91,23 @@ private[redshift] object Utils {
       val bucket = s3URI.getBucket
       assert(bucket != null, "Could not get bucket from S3 URI")
       val key = Option(s3URI.getKey).getOrElse("")
-      Option(s3Client.getBucketLifecycleConfiguration(bucket)) match {
-        case None =>
-          log.error(s"The S3 bucket $bucket does not exist")
-        case Some(lifecycleConfiguration) =>
-          val someRuleMatchesTempDir = lifecycleConfiguration.getRules.asScala.exists { rule =>
-            // Note: this only checks that there is an active rule which matches the temp directory;
-            // it does not actually check that the rule will delete the files. This check is still
-            // better than nothing, though, and we can always improve it later.
-            rule.getStatus == BucketLifecycleConfiguration.ENABLED && key.startsWith(rule.getPrefix)
-          }
-          if (!someRuleMatchesTempDir) {
-            log.warn(s"The S3 bucket $bucket does not have an object lifecycle configuration to " +
-              "ensure cleanup of temporary files. Consider configuring `tempdir` to point to a " +
-              "bucket with an object lifecycle policy that automatically deletes files after an " +
-              "expiration period. For more information, see " +
-              "https://docs.aws.amazon.com/AmazonS3/latest/dev/object-lifecycle-mgmt.html")
-          }
+      val hasMatchingBucketLifecycleRule: Boolean = {
+        val rules = Option(s3Client.getBucketLifecycleConfiguration(bucket))
+          .map(_.getRules.asScala)
+          .getOrElse(Seq.empty)
+        rules.exists { rule =>
+          // Note: this only checks that there is an active rule which matches the temp directory;
+          // it does not actually check that the rule will delete the files. This check is still
+          // better than nothing, though, and we can always improve it later.
+          rule.getStatus == BucketLifecycleConfiguration.ENABLED && key.startsWith(rule.getPrefix)
+        }
+      }
+      if (!hasMatchingBucketLifecycleRule) {
+        log.warn(s"The S3 bucket $bucket does not have an object lifecycle configuration to " +
+          "ensure cleanup of temporary files. Consider configuring `tempdir` to point to a " +
+          "bucket with an object lifecycle policy that automatically deletes files after an " +
+          "expiration period. For more information, see " +
+          "https://docs.aws.amazon.com/AmazonS3/latest/dev/object-lifecycle-mgmt.html")
       }
     } catch {
       case NonFatal(e) =>
