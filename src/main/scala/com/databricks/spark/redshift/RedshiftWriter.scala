@@ -171,6 +171,7 @@ private[redshift] class RedshiftWriter(
     manifestUrl.foreach { manifestUrl =>
       // Load the temporary data into the new file
       val copyStatement = copySql(data.sqlContext, params, creds, manifestUrl)
+      log.info(copyStatement)
       try {
         jdbcWrapper.executeInterruptibly(conn.prepareStatement(copyStatement))
       } catch {
