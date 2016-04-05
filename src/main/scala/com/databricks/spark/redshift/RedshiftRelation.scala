@@ -23,7 +23,7 @@ import java.net.URI
 import scala.collection.JavaConverters._
 
 import com.amazonaws.auth.AWSCredentials
-import com.amazonaws.services.s3.{AmazonS3Client, AmazonS3URI}
+import com.amazonaws.services.s3.AmazonS3Client
 import com.eclipsesource.json.Json
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.sources._
@@ -124,7 +124,7 @@ private[redshift] case class RedshiftRelation(
       val filesToRead: Seq[String] = {
         val cleanedTempDirUri =
           Utils.fixS3Url(Utils.removeCredentialsFromURI(URI.create(tempDir)).toString)
-        val s3URI = new AmazonS3URI(cleanedTempDirUri)
+        val s3URI = Utils.createS3URI(cleanedTempDirUri)
         val s3Client = s3ClientFactory(creds)
         val is = s3Client.getObject(s3URI.getBucket, s3URI.getKey + "manifest").getObjectContent
         val s3Files = try {
