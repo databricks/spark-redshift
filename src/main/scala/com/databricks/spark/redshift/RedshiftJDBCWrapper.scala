@@ -165,7 +165,11 @@ private[redshift] class JDBCWrapper {
    * @throws SQLException if the table contains an unsupported type.
    */
   def resolveTable(conn: Connection, table: String): StructType = {
-    val rs = executeQueryInterruptibly(conn.prepareStatement(s"SELECT * FROM $table WHERE 1=0"))
+    // We need the `LIMIT 1` here to work around a corner-case bug where a query which returns no
+    // rows may sometimes cause Redshift to report the wrong decimal precision, leading to a loss of
+    // precision when we apply this schema to the results of the full unload. For more details,
+    // see https://github.com/databricks/spark-redshift/issues/203
+    val rs = executeQueryInterruptibly(conn.prepareStatement(s"SELECT * FROM $table LIMIT 1"))
     try {
       val rsmd = rs.getMetaData
       val ncols = rsmd.getColumnCount
