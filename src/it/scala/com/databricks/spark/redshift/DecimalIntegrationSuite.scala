@@ -82,4 +82,31 @@ class DecimalIntegrationSuite extends IntegrationSuiteBase {
     "1234567.8910",
     null
   ))
+
+  test("Decimal precision is preserved when reading from query (regression test for issue #203)") {
+    val tableName = s"issue203_$randomSuffix"
+    val sqlc = sqlContext
+    import sqlc.implicits._
+    try {
+      sc.parallelize(Seq(Tuple1(91593373L)))
+        .toDF("foo")
+        .write
+        .format("com.databricks.spark.redshift")
+        .option("url", jdbcUrl)
+        .option("dbtable", tableName)
+        .option("tempdir", tempDir)
+        .save()
+      val df = sqlContext.read
+        .format("com.databricks.spark.redshift")
+        .option("url", jdbcUrl)
+        .option("tempdir", tempDir)
+        .option("query", s"select foo / 1000000.0 from $tableName limit 1")
+        .load()
+      val res: math.BigDecimal = df.collect().toSeq.head.getDecimal(0).stripTrailingZeros()
+      assert(res === new java.math.BigDecimal(91593373L).divide(new java.math.BigDecimal(1000000L)))
+    } finally {
+      conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
+      conn.commit()
+    }
+  }
 }
