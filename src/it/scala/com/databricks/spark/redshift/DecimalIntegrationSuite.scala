@@ -17,6 +17,7 @@
 package com.databricks.spark.redshift
 
 import org.apache.spark.sql.Row
+import org.apache.spark.sql.types.DecimalType
 
 /**
  * Integration tests for decimal support. For a reference on Redshift's DECIMAL type, see
@@ -102,8 +103,9 @@ class DecimalIntegrationSuite extends IntegrationSuiteBase {
         .option("tempdir", tempDir)
         .option("query", s"select foo / 1000000.0 from $tableName limit 1")
         .load()
-      val res: math.BigDecimal = df.collect().toSeq.head.getDecimal(0).stripTrailingZeros()
-      assert(res === new java.math.BigDecimal(91593373L).divide(new java.math.BigDecimal(1000000L)))
+      val res: Double = df.collect().toSeq.head.getDecimal(0).doubleValue()
+      assert(res === (91593373L / 1000000.0) +- 0.001)
+      assert(df.schema.fields.head.dataType === DecimalType(28, 8))
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
       conn.commit()
