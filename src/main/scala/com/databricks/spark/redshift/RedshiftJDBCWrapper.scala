@@ -197,7 +197,10 @@ private[redshift] class JDBCWrapper {
    *                                discover the appropriate driver class.
    * @param url the JDBC url to connect to.
    */
-  def getConnector(userProvidedDriverClass: Option[String], url: String): Connection = {
+  def getConnector(
+      userProvidedDriverClass: Option[String],
+      url: String,
+      credentials: Option[(String, String)]) : Connection = {
     val subprotocol = url.stripPrefix("jdbc:").split(":")(0)
     val driverClass: String = getDriverClass(subprotocol, userProvidedDriverClass)
     registerDriver(driverClass)
@@ -222,7 +225,13 @@ private[redshift] class JDBCWrapper {
     }.getOrElse {
       throw new IllegalArgumentException(s"Did not find registered driver with class $driverClass")
     }
-    driver.connect(url, new Properties())
+    val properties = new Properties()
+    credentials.foreach { case(user, password) => {
+        properties.setProperty("user", user)
+        properties.setProperty("password", password)
+      }
+    }
+    driver.connect(url, properties)
   }
 
   /**

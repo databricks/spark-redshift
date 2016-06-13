@@ -112,9 +112,17 @@ private[redshift] class RedshiftWriter(
     log.info(createStatement)
     jdbcWrapper.executeInterruptibly(conn.prepareStatement(createStatement))
 
+    // Execute preActions
+    params.preActions.foreach { action =>
+      val actionSql = if (action.contains("%s")) action.format(params.table.get) else action
+      log.info("Executing preAction: " + actionSql)
+      jdbcWrapper.executeInterruptibly(conn.prepareStatement(actionSql))
+    }
+
     manifestUrl.foreach { manifestUrl =>
       // Load the temporary data into the new file
       val copyStatement = copySql(data.sqlContext, params, creds, manifestUrl)
+      log.info(copyStatement)
       try {
         jdbcWrapper.executeInterruptibly(conn.prepareStatement(copyStatement))
       } catch {
@@ -304,8 +312,8 @@ private[redshift] class RedshiftWriter(
         "For save operations you must specify a Redshift table name with the 'dbtable' parameter")
     }
 
-    val creds: AWSCredentials = params.temporaryAWSCredentials.getOrElse(
-      AWSCredentialsUtils.load(params.rootTempDir, sqlContext.sparkContext.hadoopConfiguration))
+    val creds: AWSCredentials =
+      AWSCredentialsUtils.load(params, sqlContext.sparkContext.hadoopConfiguration)
 
     Utils.assertThatFileSystemIsNotS3BlockFileSystem(
       new URI(params.rootTempDir), sqlContext.sparkContext.hadoopConfiguration)
@@ -314,8 +322,7 @@ private[redshift] class RedshiftWriter(
 
     // Save the table's rows to S3:
     val manifestUrl = unloadData(sqlContext, data, params.createPerQueryTempDir())
-
-    val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl)
+    val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, params.credentials)
     conn.setAutoCommit(false)
     try {
       val table: TableName = params.table.get

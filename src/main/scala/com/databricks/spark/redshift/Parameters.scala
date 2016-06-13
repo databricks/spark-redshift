@@ -34,6 +34,7 @@ private[redshift] object Parameters {
     "overwrite" -> "false",
     "diststyle" -> "EVEN",
     "usestagingtable" -> "true",
+    "preactions" -> ";",
     "postactions" -> ";"
   )
 
@@ -55,6 +56,17 @@ private[redshift] object Parameters {
     if (userParameters.contains("dbtable") && userParameters.contains("query")) {
       throw new IllegalArgumentException(
         "You cannot specify both the 'dbtable' and 'query' parameters at the same time.")
+    }
+    val credsInURL = userParameters.get("url")
+      .filter(url => url.contains("user=") || url.contains("password="))
+    if (userParameters.contains("user") || userParameters.contains("password")) {
+      if (credsInURL.isDefined) {
+        throw new IllegalArgumentException(
+          "You cannot specify credentials in both the URL and as user/password options")
+        }
+    } else if (credsInURL.isEmpty) {
+      throw new IllegalArgumentException(
+        "You must specify credentials in either the URL or as user/password options")
     }
 
     MergedParameters(DEFAULT_PARAMETERS ++ userParameters)
@@ -100,6 +112,16 @@ private[redshift] object Parameters {
         .map(_.trim)
         .filter(t => t.startsWith("(") && t.endsWith(")"))
         .map(t => t.drop(1).dropRight(1))
+    }
+
+    /**
+    * User and password to be used to authenticate to Redshift
+    */
+    def credentials: Option[(String, String)] = {
+      for (
+        user <- parameters.get("user");
+        password <- parameters.get("password")
+      ) yield (user, password)
     }
 
     /**
@@ -182,6 +204,17 @@ private[redshift] object Parameters {
      * Extra options to append to the Redshift COPY command (e.g. "MAXERROR 100").
      */
     def extraCopyOptions: String = parameters.get("extracopyoptions").getOrElse("")
+
+    /**
+      * List of semi-colon separated SQL statements to run before write operations.
+      * This can be useful for running DELETE operations to clean up data
+      *
+      * If the action string contains %s, the table name will be substituted in, in case a staging
+      * table is being used.
+      *
+      * Defaults to empty.
+      */
+    def preActions: Array[String] = parameters("preactions").split(";")
 
     /**
      * List of semi-colon separated SQL statements to run after successful write operations.

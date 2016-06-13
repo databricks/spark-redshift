@@ -16,12 +16,13 @@
 
 package com.databricks.spark.redshift
 
-import java.io.File
+import java.io.{ByteArrayInputStream, File}
 import java.net.URI
 
 import com.amazonaws.services.s3.AmazonS3Client
-import com.amazonaws.services.s3.model.BucketLifecycleConfiguration
+import com.amazonaws.services.s3.model.{S3ObjectInputStream, S3Object, BucketLifecycleConfiguration}
 import com.amazonaws.services.s3.model.BucketLifecycleConfiguration.Rule
+import org.apache.http.client.methods.HttpRequestBase
 import org.mockito.Matchers._
 import org.mockito.Mockito
 import org.mockito.Mockito.when
@@ -29,6 +30,8 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.mapreduce.InputFormat
 import org.apache.hadoop.fs.{Path, FileSystem}
 import org.apache.hadoop.fs.s3native.S3NInMemoryFileSystem
+import org.mockito.invocation.InvocationOnMock
+import org.mockito.stubbing.Answer
 import org.scalatest.{BeforeAndAfterEach, BeforeAndAfterAll, Matchers}
 
 import org.apache.spark.SparkContext
@@ -83,7 +86,7 @@ class RedshiftSourceSuite
 
   // Parameters common to most tests. Some parameters are overridden in specific tests.
   private def defaultParams: Map[String, String] = Map(
-    "url" -> "jdbc:redshift://foo/bar",
+    "url" -> "jdbc:redshift://foo/bar?user=user&password=password",
     "tempdir" -> s3TempDir,
     "dbtable" -> "test_table")
 
@@ -115,6 +118,26 @@ class RedshiftSourceSuite
       new BucketLifecycleConfiguration().withRules(
         new Rule().withPrefix("").withStatus(BucketLifecycleConfiguration.ENABLED)
       ))
+    val mockManifest = Mockito.mock(classOf[S3Object], Mockito.RETURNS_SMART_NULLS)
+    when(mockManifest.getObjectContent).thenAnswer {
+      new Answer[S3ObjectInputStream] {
+        override def answer(invocationOnMock: InvocationOnMock): S3ObjectInputStream = {
+          val manifest =
+            """
+              | {
+              |   "entries": [
+              |     { "url": "s3://test-bucket/some-uuid(a-hack-for-mocking)/part-00000" }
+              |    ]
+              | }
+            """.stripMargin
+          val is = new ByteArrayInputStream(manifest.getBytes("UTF-8"))
+          new S3ObjectInputStream(
+            is,
+            Mockito.mock(classOf[HttpRequestBase], Mockito.RETURNS_SMART_NULLS))
+        }
+      }
+    }
+    when(mockS3Client.getObject(anyString(), endsWith("manifest"))).thenReturn(mockManifest)
   }
 
   override def afterEach(): Unit = {
@@ -257,6 +280,41 @@ class RedshiftSourceSuite
     assert(rdd.collect().contains(Row(1, true)))
     mockRedshift.verifyThatConnectionsWereClosed()
     mockRedshift.verifyThatExpectedQueriesWereIssued(Seq(expectedQuery))
+  }
+
+  test("DefaultSource supports preactions options to run queries before running COPY command") {
+    val mockRedshift = new MockRedshift(
+      defaultParams("url"),
+      Map(TableName.parseFromEscaped("test_table").toString -> TestUtils.testSchema))
+    val source = new DefaultSource(mockRedshift.jdbcWrapper, _ => mockS3Client)
+    val params = defaultParams ++ Map(
+      "preactions" ->
+        """
+          | DELETE FROM %s WHERE id < 100;
+          | DELETE FROM %s WHERE id > 100;
+          | DELETE FROM %s WHERE id = -1;
+        """.stripMargin.trim,
+      "usestagingtable" -> "true")
+
+    val expectedCommands = Seq(
+      "DROP TABLE IF EXISTS \"PUBLIC\".\"test_table_staging_.*\"".r,
+      "CREATE TABLE IF NOT EXISTS \"PUBLIC\".\"test_table_staging_.*\"".r,
+      "DELETE FROM \"PUBLIC\".\"test_table_staging_.*\" WHERE id < 100".r,
+      "DELETE FROM \"PUBLIC\".\"test_table_staging_.*\" WHERE id > 100".r,
+      "DELETE FROM \"PUBLIC\".\"test_table_staging_.*\" WHERE id = -1".r,
+      "COPY \"PUBLIC\".\"test_table_staging_.*\"".r,
+      """
+        | BEGIN;
+        | ALTER TABLE "PUBLIC"\."test_table" RENAME TO "test_table_backup_.*";
+        | ALTER TABLE "PUBLIC"\."test_table_staging_.*" RENAME TO "test_table";
+        | DROP TABLE "PUBLIC"\."test_table_backup_.*";
+        | END;
+      """.stripMargin.trim.r,
+      "DROP TABLE IF EXISTS \"PUBLIC\"\\.\"test_table_staging_.*\"".r)
+
+    source.createRelation(testSqlContext, SaveMode.Overwrite, params, expectedDataDF)
+    mockRedshift.verifyThatExpectedQueriesWereIssued(expectedCommands)
+    mockRedshift.verifyThatConnectionsWereClosed()
   }
 
   test("DefaultSource serializes data as Avro, then sends Redshift COPY command") {
@@ -403,7 +461,7 @@ class RedshiftSourceSuite
 
   test("Cannot save when 'query' parameter is specified instead of 'dbtable'") {
     val invalidParams = Map(
-      "url" -> "jdbc:redshift://foo/bar",
+      "url" -> "jdbc:redshift://foo/bar?user=user&password=password",
       "tempdir" -> s3TempDir,
       "query" -> "select * from test_table")
 
