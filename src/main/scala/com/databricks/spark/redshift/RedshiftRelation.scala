@@ -21,16 +21,14 @@ import java.lang
 import java.net.URI
 
 import scala.collection.JavaConverters._
-
 import com.amazonaws.auth.AWSCredentials
 import com.amazonaws.services.s3.{AmazonS3Client, AmazonS3URI}
 import com.eclipsesource.json.Json
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{DataFrame, Row, SaveMode, SQLContext}
+import org.apache.spark.sql.{DataFrame, Row, SQLContext, SaveMode}
 import org.slf4j.LoggerFactory
-
 import com.databricks.spark.redshift.Parameters.MergedParameters
 
 /**
@@ -171,7 +169,7 @@ private[redshift] case class RedshiftRelation(
     val columnList = requiredColumns.map(col => s""""$col"""").mkString(", ")
     val whereClause = FilterPushdown.buildWhereClause(schema, filters)
     val creds = AWSCredentialsUtils.load(params, sqlContext.sparkContext.hadoopConfiguration)
-    val credsString: String = AWSCredentialsUtils.getRedshiftCredentialsString(creds)
+    val credsString: String = AWSCredentialsUtils.getRedshiftCredentialsString(params, creds)
     val query = {
       // Since the query passed to UNLOAD will be enclosed in single quotes, we need to escape
       // any single quotes that appear in the query itself
