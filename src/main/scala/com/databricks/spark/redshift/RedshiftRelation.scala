@@ -32,17 +32,17 @@ import org.slf4j.LoggerFactory
 import com.databricks.spark.redshift.Parameters.MergedParameters
 
 /**
- * Data Source API implementation for Amazon Redshift database tables
- */
+  * Data Source API implementation for Amazon Redshift database tables
+  */
 private[redshift] case class RedshiftRelation(
-    jdbcWrapper: JDBCWrapper,
-    s3ClientFactory: AWSCredentials => AmazonS3Client,
-    params: MergedParameters,
-    userSchema: Option[StructType])
-    (@transient val sqlContext: SQLContext)
+                                               jdbcWrapper: JDBCWrapper,
+                                               s3ClientFactory: AWSCredentials => AmazonS3Client,
+                                               params: MergedParameters,
+                                               userSchema: Option[StructType])
+                                             (@transient val sqlContext: SQLContext)
   extends BaseRelation
-  with PrunedFilteredScan
-  with InsertableRelation {
+    with PrunedFilteredScan
+    with InsertableRelation {
 
   private val log = LoggerFactory.getLogger(getClass)
 
@@ -161,9 +161,9 @@ private[redshift] case class RedshiftRelation(
   }
 
   private def buildUnloadStmt(
-      requiredColumns: Array[String],
-      filters: Array[Filter],
-      tempDir: String): String = {
+                               requiredColumns: Array[String],
+                               filters: Array[Filter],
+                               tempDir: String): String = {
     assert(!requiredColumns.isEmpty)
     // Always quote column names:
     val columnList = requiredColumns.map(col => s""""$col"""").mkString(", ")
@@ -180,7 +180,12 @@ private[redshift] case class RedshiftRelation(
     // the credentials passed via `credsString`.
     val fixedUrl = Utils.fixS3Url(Utils.removeCredentialsFromURI(new URI(tempDir)).toString)
 
-    s"UNLOAD ('$query') TO '$fixedUrl' WITH CREDENTIALS '$credsString' ESCAPE MANIFEST"
+    val userUnloadOptions = params.parameters.getOrElse("unloadoptions", "").toUpperCase()
+    val unloadOptions = (userUnloadOptions ++ Array("ESCAPE", "MANIFEST")
+      .filterNot(r => userUnloadOptions.contains(r))
+      .mkString(" ", " ", "")).trim
+
+    s"UNLOAD ('$query') TO '$fixedUrl' WITH CREDENTIALS '$credsString' $unloadOptions"
   }
 
   private def pruneSchema(schema: StructType, columns: Array[String]): StructType = {
