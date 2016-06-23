@@ -20,7 +20,7 @@ package com.databricks.spark
 import com.amazonaws.services.s3.AmazonS3Client
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
-import org.apache.spark.sql.{DataFrame, DataFrameReader, DataFrameWriter, Row, SaveMode, SQLContext}
+import org.apache.spark.sql.{DataFrame, Row, SaveMode, SQLContext}
 
 package object redshift {
 

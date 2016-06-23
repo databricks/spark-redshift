@@ -21,17 +21,17 @@ import java.sql.{Connection, Date, SQLException, Timestamp}
 
 import com.amazonaws.auth.AWSCredentials
 import com.amazonaws.services.s3.AmazonS3Client
-import org.apache.hadoop.fs.{Path, FileSystem}
+import org.apache.hadoop.fs.{FileSystem, Path}
+
 import org.apache.spark.TaskContext
 import org.slf4j.LoggerFactory
-
 import scala.collection.mutable
 import scala.util.control.NonFatal
 
 import com.databricks.spark.redshift.Parameters.MergedParameters
 
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{DataFrame, Row, SaveMode, SQLContext}
+import org.apache.spark.sql.{DataFrame, Row, SQLContext, SaveMode}
 import org.apache.spark.sql.types._
 
 /**
@@ -234,7 +234,7 @@ private[redshift] class RedshiftWriter(
     val nonEmptyPartitions =
       sqlContext.sparkContext.accumulableCollection(mutable.HashSet.empty[Int])
 
-    val convertedRows: RDD[Row] = data.mapPartitions { iter =>
+    val convertedRows: RDD[Row] = data.rdd.mapPartitions { iter: Iterator[Row] =>
       if (iter.hasNext) {
         nonEmptyPartitions += TaskContext.get.partitionId()
       }

@@ -44,9 +44,9 @@ object SparkRedshiftBuild extends Build {
       organization := "com.databricks",
       scalaVersion := "2.10.5",
       crossScalaVersions := Seq("2.10.5", "2.11.7"),
-      sparkVersion := "1.4.1",
+      sparkVersion := "2.0.0-SNAPSHOT",
       testSparkVersion := sys.props.get("spark.testVersion").getOrElse(sparkVersion.value),
-      testSparkAvroVersion := sys.props.get("sparkAvro.testVersion").getOrElse("2.0.1"),
+      testSparkAvroVersion := sys.props.get("sparkAvro.testVersion").getOrElse("3.0.0-preview"),
       testHadoopVersion := sys.props.get("hadoop.testVersion").getOrElse("2.2.0"),
       spName := "databricks/spark-redshift",
       sparkComponents ++= Seq("sql", "hive"),
@@ -55,6 +55,8 @@ object SparkRedshiftBuild extends Build {
       credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"),
       resolvers +=
         "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
+      // TODO: remove after Spark 2.0.0 is released:
+      resolvers += "apache-snapshots" at "https://repository.apache.org/snapshots/",
       scalacOptions ++= Seq("-target:jvm-1.6"),
       javacOptions ++= Seq("-source", "1.6", "-target", "1.6"),
       libraryDependencies ++= Seq(
@@ -75,7 +77,7 @@ object SparkRedshiftBuild extends Build {
         "com.amazonaws" % "aws-java-sdk-sts" % "1.10.22" % "test" exclude("com.fasterxml.jackson.core", "jackson-databind"),
         // We require spark-avro, but avro-mapred must be provided to match Hadoop version.
         // In most cases, avro-mapred will be provided as part of the Spark assembly JAR.
-        "com.databricks" %% "spark-avro" % "2.0.1",
+        "com.databricks" %% "spark-avro" % "3.0.0-preview",
         if (testHadoopVersion.value.startsWith("1")) {
           "org.apache.avro" % "avro-mapred" % "1.7.7" % "provided" classifier "hadoop1" exclude("org.mortbay.jetty", "servlet-api")
         } else {
