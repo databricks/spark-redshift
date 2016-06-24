@@ -95,7 +95,7 @@ private[redshift] class RedshiftWriter(
       params: MergedParameters,
       creds: AWSCredentials,
       manifestUrl: String): String = {
-    val credsString: String = AWSCredentialsUtils.getRedshiftCredentialsString(creds)
+    val credsString: String = AWSCredentialsUtils.getRedshiftCredentialsString(params, creds)
     val fixedUrl = Utils.fixS3Url(manifestUrl)
     s"COPY ${params.table.get} FROM '$fixedUrl' CREDENTIALS '$credsString' FORMAT AS " +
       s"AVRO 'auto' manifest ${params.extraCopyOptions}"

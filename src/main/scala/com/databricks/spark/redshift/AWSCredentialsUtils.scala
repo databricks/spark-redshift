@@ -26,17 +26,22 @@ import com.databricks.spark.redshift.Parameters.MergedParameters
 private[redshift] object AWSCredentialsUtils {
 
   /**
-   * Generates a credentials string for use in Redshift LOAD and UNLOAD statements.
-   */
-  def getRedshiftCredentialsString(awsCredentials: AWSCredentials): String = {
-    awsCredentials match {
-      case creds: AWSSessionCredentials =>
-        s"aws_access_key_id=${creds.getAWSAccessKeyId};" +
-          s"aws_secret_access_key=${creds.getAWSSecretKey};token=${creds.getSessionToken}"
-      case creds =>
-        s"aws_access_key_id=${creds.getAWSAccessKeyId};" +
-          s"aws_secret_access_key=${creds.getAWSSecretKey}"
-    }
+    * Generates a credentials string for use in Redshift COPY and UNLOAD statements.
+    * Favors a configured `aws_iam_role` if available in the parameters.
+    */
+  def getRedshiftCredentialsString(params: MergedParameters,
+                                   awsCredentials: AWSCredentials): String = {
+    params.iamRole
+      .map { role => s"aws_iam_role=$role" }
+      .getOrElse(
+        awsCredentials match {
+          case creds: AWSSessionCredentials =>
+            s"aws_access_key_id=${creds.getAWSAccessKeyId};" +
+              s"aws_secret_access_key=${creds.getAWSSecretKey};token=${creds.getSessionToken}"
+          case creds =>
+            s"aws_access_key_id=${creds.getAWSAccessKeyId};" +
+              s"aws_secret_access_key=${creds.getAWSSecretKey}"
+        })
   }
 
   def load(params: MergedParameters, hadoopConfiguration: Configuration): AWSCredentials = {
