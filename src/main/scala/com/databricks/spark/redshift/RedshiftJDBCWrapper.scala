@@ -232,26 +232,32 @@ private[redshift] class JDBCWrapper {
     val sb = new StringBuilder()
     schema.fields.foreach { field => {
       val name = field.name
-      val typ: String = field.dataType match {
-        case IntegerType => "INTEGER"
-        case LongType => "BIGINT"
-        case DoubleType => "DOUBLE PRECISION"
-        case FloatType => "REAL"
-        case ShortType => "INTEGER"
-        case ByteType => "SMALLINT" // Redshift does not support the BYTE type.
-        case BooleanType => "BOOLEAN"
-        case StringType =>
-          if (field.metadata.contains("maxlength")) {
-            s"VARCHAR(${field.metadata.getLong("maxlength")})"
-          } else {
-            "TEXT"
-          }
-        case BinaryType => "BLOB"
-        case TimestampType => "TIMESTAMP"
-        case DateType => "DATE"
-        case t: DecimalType => s"DECIMAL(${t.precision},${t.scale})"
-        case _ => throw new IllegalArgumentException(s"Don't know how to save $field to JDBC")
+      val typ: String = if (field.metadata.contains("redshift_type")) {
+        field.metadata.getString("redshift_type")
       }
+      else {
+        field.dataType match {
+          case IntegerType => "INTEGER"
+          case LongType => "BIGINT"
+          case DoubleType => "DOUBLE PRECISION"
+          case FloatType => "REAL"
+          case ShortType => "INTEGER"
+          case ByteType => "SMALLINT" // Redshift does not support the BYTE type.
+          case BooleanType => "BOOLEAN"
+          case StringType =>
+            if (field.metadata.contains("maxlength")) {
+              s"VARCHAR(${field.metadata.getLong("maxlength")})"
+            } else {
+              "TEXT"
+            }
+          case BinaryType => "BLOB"
+          case TimestampType => "TIMESTAMP"
+          case DateType => "DATE"
+          case t: DecimalType => s"DECIMAL(${t.precision},${t.scale})"
+          case _ => throw new IllegalArgumentException(s"Don't know how to save $field to JDBC")
+        }
+      }
+
       val nullable = if (field.nullable) "" else "NOT NULL"
       sb.append(s""", "${name.replace("\"", "\\\"")}" $typ $nullable""".trim)
     }}
