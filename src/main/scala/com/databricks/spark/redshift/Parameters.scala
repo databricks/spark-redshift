@@ -234,6 +234,12 @@ private[redshift] object Parameters {
     def postActions: Array[String] = parameters("postactions").split(";")
 
     /**
+      * The IAM role to assume for Redshift COPY/UNLOAD operations.  This takes precedence over
+      * other forms of authentication.
+      */
+    def iamRole: Option[String] = parameters.get("aws_iam_role")
+
+    /**
      * Temporary AWS credentials which are passed to Redshift. These only need to be supplied by
      * the user when Hadoop is configured to authenticate to S3 via IAM roles assigned to EC2
      * instances.

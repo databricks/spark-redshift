@@ -86,6 +86,16 @@ df.write
     .option("tempdir", "s3n://path/for/temp/data")
   .mode("error")
   .save()
+  
+// Using IAM Role based authentication
+df.write
+  .format("com.databricks.spark.redshift")
+    .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass")
+    .option("dbtable", "my_table_copy")
+    .option("aws_iam_role", "arn:aws:iam::123456789000:role/redshift_iam_role")
+    .option("tempdir", "s3n://path/for/temp/data")
+  .mode("error")
+  .save()
 ```
 
 #### Python
@@ -118,6 +128,17 @@ df.write \
   .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass") \
   .option("dbtable", "my_table_copy") \
   .option("tempdir", "s3n://path/for/temp/data") \
+  .mode("error") \
+  .save()
+  
+  
+# Using IAM Role based authentication
+df.write \
+  .format("com.databricks.spark.redshift") \
+  .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass") \
+  .option("dbtable", "my_table_copy") \
+  .option("tempdir", "s3n://path/for/temp/data") \
+  .option("aws_iam_role", "arn:aws:iam::123456789000:role/redshift_iam_role")
   .mode("error") \
   .save()
 ```
@@ -173,7 +194,7 @@ val records = sc.newAPIHadoopFile(
 
 This library reads and writes data to S3 when transferring data to/from Redshift. As a result, it requires AWS credentials with read and write access to a S3 bucket (specified using the `tempdir` configuration parameter). Assuming that Spark has been configured to access S3, it should automatically discover the proper credentials to pass to Redshift.
 
-There are three ways of configuring AWS credentials for use by this library:
+There are four ways of configuring AWS credentials for use by this library:
 
 1. **Set keys in Hadoop conf (best option for most users):** You can specify AWS keys via [Hadoop configuration properties](https://github.com/apache/hadoop/blob/trunk/hadoop-tools/hadoop-aws/src/site/markdown/tools/hadoop-aws/index.md). For example, if your `tempdir` configuration points to a `s3n://` filesystem then you can set the `fs.s3n.awsAccessKeyId` and `fs.s3n.awsSecretAccessKey` properties in a Hadoop XML configuration file or call `sc.hadoopConfiguration.set()` to mutate Spark's global Hadoop configuration.
 
@@ -199,7 +220,8 @@ There are three ways of configuring AWS credentials for use by this library:
  ```
 
 2. **Encode keys in `tempdir` URI**: For example, the URI `s3n://ACCESSKEY:SECRETKEY@bucket/path/to/temp/dir` encodes the key pair (`ACCESSKEY`, `SECRETKEY`). Due to [Hadoop limitations](https://issues.apache.org/jira/browse/HADOOP-3733), this approach will not work for secret keys which contain forward slash (`/`) characters.
-3. **IAM instance profiles:** If you are running on EC2 and authenticate to S3 using IAM and [instance profiles](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html), then you must must configure the `temporary_aws_access_key_id`, `temporary_aws_secret_access_key`, and `temporary_aws_session_token` configuration properties to point to temporary keys created via the AWS [Security Token Service](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp.html). These temporary keys will then be passed to Redshift via `LOAD` and `UNLOAD` commands.
+3. **Set the `aws_iam_role` parameter:** If set, this takes precedence over any other authentication option.  You will need to have this IAM role attached to the Redshift cluster which allows read/write access to your `tempdir` bucket.  More info [here](http://docs.aws.amazon.com/redshift/latest/mgmt/copy-unload-iam-role.html)
+4. **IAM instance profiles:** If you are running on EC2 and authenticate to S3 using IAM and [instance profiles](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html), then you must must configure the `temporary_aws_access_key_id`, `temporary_aws_secret_access_key`, and `temporary_aws_session_token` configuration properties to point to temporary keys created via the AWS [Security Token Service](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp.html). These temporary keys will then be passed to Redshift via `LOAD` and `UNLOAD` commands.
 
 > **:warning: Note**: This library does not clean up the temporary files that it creates in S3. As a result, we recommend that you use a dedicated temporary S3 bucket with an [object lifecycle configuration](http://docs.aws.amazon.com/AmazonS3/latest/dev/object-lifecycle-mgmt.html) to ensure that temporary files are automatically deleted after a specified expiration period.
 
@@ -256,6 +278,12 @@ need to be configured to allow access from your driver application.
  <li><tt>user</tt> and <tt>password</tt> are credentials to access the database, which must be embedded
     in this URL for JDBC, and your user account should have necessary privileges for the table being referenced. </li>
     </td>
+ </tr>
+ <tr>
+   <td><tt>aws_iam_role</tt></td>
+   <td>Only if using IAM roles to authorize Redshift COPY/UNLOAD operations</td>
+   <td>No default</td>
+   <td>Fully specified ARN of the <a href="http://docs.aws.amazon.com/redshift/latest/mgmt/copy-unload-iam-role.html">IAM Role</a> attached to the Redshift cluster, ex: arn:aws:iam::123456789000:role/redshift_iam_role</td>
  </tr>
  <tr>
     <td><tt>temporary_aws_access_key_id</tt></td>
