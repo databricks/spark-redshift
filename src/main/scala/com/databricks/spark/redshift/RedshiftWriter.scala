@@ -139,6 +139,18 @@ private[redshift] class RedshiftWriter(
   }
 
   /**
+    * Generate COMMENT SQL statements for the table and columns.
+    */
+  private[redshift] def commentActions(tableComment: Option[String], schema: StructType):
+      List[String] = {
+    tableComment.toList.map(desc => s"COMMENT ON TABLE %s IS '${desc.replace("'", "''")}'") ++
+    schema.fields
+      .withFilter(f => f.metadata.contains("description"))
+      .map(f => s"""COMMENT ON COLUMN %s."${f.name.replace("\"", "\\\"")}""""
+              + s" IS '${f.metadata.getString("description").replace("'", "''")}'")
+  }
+
+  /**
    * Perform the Redshift load, including deletion of existing data in the case of an overwrite,
    * and creating the table if it doesn't already exist.
    */
@@ -161,8 +173,10 @@ private[redshift] class RedshiftWriter(
     log.info(createStatement)
     jdbcWrapper.executeInterruptibly(conn.prepareStatement(createStatement))
 
+    val preActions = commentActions(params.description, data.schema) ++ params.preActions
+
     // Execute preActions
-    params.preActions.foreach { action =>
+    preActions.foreach { action =>
       val actionSql = if (action.contains("%s")) action.format(params.table.get) else action
       log.info("Executing preAction: " + actionSql)
       jdbcWrapper.executeInterruptibly(conn.prepareStatement(actionSql))

@@ -206,6 +206,11 @@ private[redshift] object Parameters {
     def extraCopyOptions: String = parameters.get("extracopyoptions").getOrElse("")
 
     /**
+      * Description of the table, set using the SQL COMMENT command.
+      */
+    def description: Option[String] = parameters.get("description")
+
+    /**
       * List of semi-colon separated SQL statements to run before write operations.
       * This can be useful for running DELETE operations to clean up data
       *
