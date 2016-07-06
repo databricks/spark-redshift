@@ -408,13 +408,12 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
         .load()
       checkAnswer(loadedDf, Seq(Row("a" * 128)))
       val encodingDF = sqlContext.read
-        .format("com.databricks.spark.redshift")
+        .format("jdbc")
         .option("url", jdbcUrl)
         .option("dbtable",
-          s"""(SELECT "column", encoding FROM pg_table_def WHERE tablename='$tableName')""")
-        .option("tempdir", tempDir)
+          s"""(SELECT "column", lower(encoding) FROM pg_table_def WHERE tablename='$tableName')""")
         .load()
-      checkAnswer(encodingDF, Seq(Row("x", "LZO")))
+      checkAnswer(encodingDF, Seq(Row("x", "lzo")))
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
       conn.commit()
@@ -431,6 +430,7 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
         .format("com.databricks.spark.redshift")
         .option("url", jdbcUrl)
         .option("dbtable", tableName)
+        .option("description", "Hello Table")
         .option("tempdir", tempDir)
         .mode(SaveMode.ErrorIfExists)
         .save()
@@ -440,14 +440,12 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
         .option("url", jdbcUrl)
         .option("dbtable", tableName)
         .option("tempdir", tempDir)
-        .option("description", "Hello Table")
         .load()
       checkAnswer(loadedDf, Seq(Row("a" * 128)))
       val tableDF = sqlContext.read
-        .format("com.databricks.spark.redshift")
+        .format("jdbc")
         .option("url", jdbcUrl)
         .option("dbtable", s"(SELECT pg_catalog.obj_description('$tableName'::regclass))")
-        .option("tempdir", tempDir)
         .load()
       checkAnswer(tableDF, Seq(Row("Hello Table")))
       val commentQuery =
@@ -459,12 +457,11 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
            |INNER JOIN information_schema.columns c
            |   ON (pgd.objsubid=c.ordinal_position AND c.table_name=st.relname)
            |WHERE c.table_name='$tableName')
-         """.stripMargin;
+         """.stripMargin
       val columnDF = sqlContext.read
-        .format("com.databricks.spark.redshift")
+        .format("jdbc")
         .option("url", jdbcUrl)
         .option("dbtable", commentQuery)
-        .option("tempdir", tempDir)
         .load()
       checkAnswer(columnDF, Seq(Row("x", "Hello Column")))
     } finally {
