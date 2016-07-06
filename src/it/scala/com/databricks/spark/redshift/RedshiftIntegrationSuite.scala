@@ -392,7 +392,7 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
       val metadata = new MetadataBuilder().putString("encoding", "LZO").build()
       val schema = StructType(
         StructField("x", StringType, metadata = metadata) :: Nil)
-      sqlContext.createDataFrame(sc.parallelize(Seq(Row("a" * 512))), schema).write
+      sqlContext.createDataFrame(sc.parallelize(Seq(Row("a" * 128))), schema).write
         .format("com.databricks.spark.redshift")
         .option("url", jdbcUrl)
         .option("dbtable", tableName)
@@ -406,12 +406,12 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
         .option("dbtable", tableName)
         .option("tempdir", tempDir)
         .load()
-      checkAnswer(loadedDf, Seq(Row("a" * 512)))
+      checkAnswer(loadedDf, Seq(Row("a" * 128)))
       val encodingDF = sqlContext.read
         .format("com.databricks.spark.redshift")
         .option("url", jdbcUrl)
         .option("dbtable",
-          s"(SELECT column, encoding FROM pg_table_def WHERE tablename='$tableName')")
+          s"""(SELECT "column", encoding FROM pg_table_def WHERE tablename='$tableName')""")
         .option("tempdir", tempDir)
         .load()
       checkAnswer(encodingDF, Seq(Row("x", "LZO")))
@@ -427,7 +427,7 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
       val metadata = new MetadataBuilder().putString("description", "Hello Column").build()
       val schema = StructType(
         StructField("x", StringType, metadata = metadata) :: Nil)
-      sqlContext.createDataFrame(sc.parallelize(Seq(Row("a" * 512))), schema).write
+      sqlContext.createDataFrame(sc.parallelize(Seq(Row("a" * 128))), schema).write
         .format("com.databricks.spark.redshift")
         .option("url", jdbcUrl)
         .option("dbtable", tableName)
@@ -442,11 +442,11 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
         .option("tempdir", tempDir)
         .option("description", "Hello Table")
         .load()
-      checkAnswer(loadedDf, Seq(Row("a" * 512)))
+      checkAnswer(loadedDf, Seq(Row("a" * 128)))
       val tableDF = sqlContext.read
         .format("com.databricks.spark.redshift")
         .option("url", jdbcUrl)
-        .option("dbtable", s"(SELECT obj_description('$tableName'::regclass))")
+        .option("dbtable", s"(SELECT pg_catalog.obj_description('$tableName'::regclass))")
         .option("tempdir", tempDir)
         .load()
       checkAnswer(tableDF, Seq(Row("Hello Table")))
