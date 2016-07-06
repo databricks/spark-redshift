@@ -548,4 +548,23 @@ class RedshiftSourceSuite
     }
     assert(e.getMessage.contains("Block FileSystem"))
   }
+
+  test("Can specifiy extra unloadoptions") {
+    val expectedQuery = (
+      "UNLOAD \\('SELECT \"testbyte\" FROM \"PUBLIC\".\"test_table\" '\\) " +
+        "TO '.*' " +
+        "WITH CREDENTIALS 'aws_access_key_id=test1;aws_secret_access_key=test2' " +
+        "SEPARATOR ',' ESCAPE MANIFEST").r
+    val extraParams = defaultParams + ("unloadoptions" -> "SEPARATOR ','")
+    val mockRedshift =
+      new MockRedshift(defaultParams("url"), Map("test_table" -> TestUtils.testSchema))
+    // Construct the source with a custom schema
+    val source = new DefaultSource(mockRedshift.jdbcWrapper, _ => mockS3Client)
+    val relation = source.createRelation(testSqlContext, extraParams, TestUtils.testSchema)
+
+    val rdd = relation.asInstanceOf[PrunedFilteredScan]
+      .buildScan(Array("testbyte"), Array.empty[Filter])
+    mockRedshift.verifyThatConnectionsWereClosed()
+    mockRedshift.verifyThatExpectedQueriesWereIssued(Seq(expectedQuery))
+  }
 }

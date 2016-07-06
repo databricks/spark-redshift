@@ -21,30 +21,28 @@ import java.lang
 import java.net.URI
 
 import scala.collection.JavaConverters._
-
 import com.amazonaws.auth.AWSCredentials
 import com.amazonaws.services.s3.{AmazonS3Client, AmazonS3URI}
 import com.eclipsesource.json.Json
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{DataFrame, Row, SaveMode, SQLContext}
+import org.apache.spark.sql.{DataFrame, Row, SQLContext, SaveMode}
 import org.slf4j.LoggerFactory
-
 import com.databricks.spark.redshift.Parameters.MergedParameters
 
 /**
- * Data Source API implementation for Amazon Redshift database tables
- */
+  * Data Source API implementation for Amazon Redshift database tables
+  */
 private[redshift] case class RedshiftRelation(
-    jdbcWrapper: JDBCWrapper,
-    s3ClientFactory: AWSCredentials => AmazonS3Client,
-    params: MergedParameters,
-    userSchema: Option[StructType])
-    (@transient val sqlContext: SQLContext)
+                                               jdbcWrapper: JDBCWrapper,
+                                               s3ClientFactory: AWSCredentials => AmazonS3Client,
+                                               params: MergedParameters,
+                                               userSchema: Option[StructType])
+                                             (@transient val sqlContext: SQLContext)
   extends BaseRelation
-  with PrunedFilteredScan
-  with InsertableRelation {
+    with PrunedFilteredScan
+    with InsertableRelation {
 
   private val log = LoggerFactory.getLogger(getClass)
 
@@ -163,15 +161,15 @@ private[redshift] case class RedshiftRelation(
   }
 
   private def buildUnloadStmt(
-      requiredColumns: Array[String],
-      filters: Array[Filter],
-      tempDir: String): String = {
+                               requiredColumns: Array[String],
+                               filters: Array[Filter],
+                               tempDir: String): String = {
     assert(!requiredColumns.isEmpty)
     // Always quote column names:
     val columnList = requiredColumns.map(col => s""""$col"""").mkString(", ")
     val whereClause = FilterPushdown.buildWhereClause(schema, filters)
     val creds = AWSCredentialsUtils.load(params, sqlContext.sparkContext.hadoopConfiguration)
-    val credsString: String = AWSCredentialsUtils.getRedshiftCredentialsString(creds)
+    val credsString: String = AWSCredentialsUtils.getRedshiftCredentialsString(params, creds)
     val query = {
       // Since the query passed to UNLOAD will be enclosed in single quotes, we need to escape
       // any single quotes that appear in the query itself
@@ -182,7 +180,12 @@ private[redshift] case class RedshiftRelation(
     // the credentials passed via `credsString`.
     val fixedUrl = Utils.fixS3Url(Utils.removeCredentialsFromURI(new URI(tempDir)).toString)
 
-    s"UNLOAD ('$query') TO '$fixedUrl' WITH CREDENTIALS '$credsString' ESCAPE MANIFEST"
+    val userUnloadOptions = params.parameters.getOrElse("unloadoptions", "").toUpperCase()
+    val unloadOptions = (userUnloadOptions ++ Array("ESCAPE", "MANIFEST")
+      .filterNot(r => userUnloadOptions.contains(r))
+      .mkString(" ", " ", "")).trim
+
+    s"UNLOAD ('$query') TO '$fixedUrl' WITH CREDENTIALS '$credsString' $unloadOptions"
   }
 
   private def pruneSchema(schema: StructType, columns: Array[String]): StructType = {

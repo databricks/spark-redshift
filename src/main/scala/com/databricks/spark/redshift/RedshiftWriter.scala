@@ -21,18 +21,16 @@ import java.sql.{Connection, Date, SQLException, Timestamp}
 
 import com.amazonaws.auth.AWSCredentials
 import com.amazonaws.services.s3.AmazonS3Client
-import org.apache.hadoop.fs.{Path, FileSystem}
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.TaskContext
 import org.slf4j.LoggerFactory
 
 import scala.collection.mutable
 import scala.util.Random
 import scala.util.control.NonFatal
-
 import com.databricks.spark.redshift.Parameters.MergedParameters
-
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{DataFrame, Row, SaveMode, SQLContext}
+import org.apache.spark.sql.{DataFrame, Row, SQLContext, SaveMode}
 import org.apache.spark.sql.types._
 
 /**
@@ -95,7 +93,7 @@ private[redshift] class RedshiftWriter(
       params: MergedParameters,
       creds: AWSCredentials,
       manifestUrl: String): String = {
-    val credsString: String = AWSCredentialsUtils.getRedshiftCredentialsString(creds)
+    val credsString: String = AWSCredentialsUtils.getRedshiftCredentialsString(params, creds)
     val fixedUrl = Utils.fixS3Url(manifestUrl)
     s"COPY ${params.table.get} FROM '$fixedUrl' CREDENTIALS '$credsString' FORMAT AS " +
       s"AVRO 'auto' manifest ${params.extraCopyOptions}"

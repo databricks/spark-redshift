@@ -33,14 +33,24 @@ class AWSCredentialsUtilsSuite extends FunSuite {
 
   test("credentialsString with regular keys") {
     val creds = new BasicAWSCredentials("ACCESSKEYID", "SECRET/KEY/WITH/SLASHES")
-    assert(AWSCredentialsUtils.getRedshiftCredentialsString(creds) ===
+    val params: MergedParameters = new MergedParameters(Map.empty)
+    assert(AWSCredentialsUtils.getRedshiftCredentialsString(params, creds) ===
       "aws_access_key_id=ACCESSKEYID;aws_secret_access_key=SECRET/KEY/WITH/SLASHES")
   }
 
   test("credentialsString with STS temporary keys") {
     val creds = new BasicSessionCredentials("ACCESSKEYID", "SECRET/KEY", "SESSION/Token")
-    assert(AWSCredentialsUtils.getRedshiftCredentialsString(creds) ===
+    val params: MergedParameters = new MergedParameters(Map.empty)
+    assert(AWSCredentialsUtils.getRedshiftCredentialsString(params, creds) ===
       "aws_access_key_id=ACCESSKEYID;aws_secret_access_key=SECRET/KEY;token=SESSION/Token")
+  }
+
+  test("credentialsString with iam role") {
+    val creds = new BasicSessionCredentials("ACCESSKEYID", "SECRET/KEY", "SESSION/Token")
+    val params = new MergedParameters(
+      Map("aws_iam_role" -> "arn:aws:iam::XXXX:role/XXXX"))
+    assert(AWSCredentialsUtils.getRedshiftCredentialsString(params, creds) ===
+      "aws_iam_role=arn:aws:iam::XXXX:role/XXXX")
   }
 
   test("AWSCredentials.load() STS temporary keys should take precedence") {
