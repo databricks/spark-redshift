@@ -61,6 +61,7 @@ class IAMIntegrationSuite extends IntegrationSuiteBase {
 
   test("load fails if IAM role cannot be assumed") {
     val tableName = s"iam_load_fails_if_role_cannot_be_assumed$randomSuffix"
+    try {
       val df = sqlContext.createDataFrame(sc.parallelize(Seq(Row(1))),
         StructType(StructField("a", IntegerType) :: Nil))
       val err = intercept[SQLException] {
@@ -72,7 +73,11 @@ class IAMIntegrationSuite extends IntegrationSuiteBase {
           .option("aws_iam_role", IAM_ROLE_ARN + "-some-bogus-suffix")
           .mode(SaveMode.ErrorIfExists)
           .save()
+      }
+      assert(err.getMessage.contains("is not authorized to assume IAM Role"))
+    } finally {
+      conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
+      conn.commit()
     }
-    assert(err.getMessage.contains("is not authorized to assume IAM Role"))
   }
 }

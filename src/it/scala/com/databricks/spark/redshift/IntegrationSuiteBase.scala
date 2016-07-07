@@ -146,7 +146,14 @@ trait IntegrationSuiteBase
         .option("tempdir", tempDir)
         .mode(saveMode)
         .save()
-      assert(DefaultJDBCWrapper.tableExists(conn, tableName))
+      // Check that the table exists. It appears that creating a table in one connection then
+      // immediately querying for existence from another connection may result in spurious "table
+      // doesn't exist" errors; this caused the "save with all empty partitions" test to become
+      // flaky (see #146). To work around this, add a small sleep and check again:
+      if (!DefaultJDBCWrapper.tableExists(conn, tableName)) {
+        Thread.sleep(1000)
+        assert(DefaultJDBCWrapper.tableExists(conn, tableName))
+      }
       val loadedDf = sqlContext.read
         .format("com.databricks.spark.redshift")
         .option("url", jdbcUrl)
