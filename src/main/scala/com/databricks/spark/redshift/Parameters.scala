@@ -206,6 +206,11 @@ private[redshift] object Parameters {
     def extraCopyOptions: String = parameters.get("extracopyoptions").getOrElse("")
 
     /**
+      * Description of the table, set using the SQL COMMENT command.
+      */
+    def description: Option[String] = parameters.get("description")
+
+    /**
       * List of semi-colon separated SQL statements to run before write operations.
       * This can be useful for running DELETE operations to clean up data
       *
@@ -227,6 +232,12 @@ private[redshift] object Parameters {
      * Defaults to empty.
      */
     def postActions: Array[String] = parameters("postactions").split(";")
+
+    /**
+      * The IAM role to assume for Redshift COPY/UNLOAD operations.  This takes precedence over
+      * other forms of authentication.
+      */
+    def iamRole: Option[String] = parameters.get("aws_iam_role")
 
     /**
      * Temporary AWS credentials which are passed to Redshift. These only need to be supplied by

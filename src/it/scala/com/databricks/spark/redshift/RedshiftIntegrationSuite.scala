@@ -386,6 +386,90 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
     }
   }
 
+  test("configuring compression on columns") {
+    val tableName = s"configuring_compression_on_columns_$randomSuffix"
+    try {
+      val metadata = new MetadataBuilder().putString("encoding", "LZO").build()
+      val schema = StructType(
+        StructField("x", StringType, metadata = metadata) :: Nil)
+      sqlContext.createDataFrame(sc.parallelize(Seq(Row("a" * 128))), schema).write
+        .format("com.databricks.spark.redshift")
+        .option("url", jdbcUrl)
+        .option("dbtable", tableName)
+        .option("tempdir", tempDir)
+        .mode(SaveMode.ErrorIfExists)
+        .save()
+      assert(DefaultJDBCWrapper.tableExists(conn, tableName))
+      val loadedDf = sqlContext.read
+        .format("com.databricks.spark.redshift")
+        .option("url", jdbcUrl)
+        .option("dbtable", tableName)
+        .option("tempdir", tempDir)
+        .load()
+      checkAnswer(loadedDf, Seq(Row("a" * 128)))
+      val encodingDF = sqlContext.read
+        .format("jdbc")
+        .option("url", jdbcUrl)
+        .option("dbtable",
+          s"""(SELECT "column", lower(encoding) FROM pg_table_def WHERE tablename='$tableName')""")
+        .load()
+      checkAnswer(encodingDF, Seq(Row("x", "lzo")))
+    } finally {
+      conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
+      conn.commit()
+    }
+  }
+
+  test("configuring comments on columns") {
+    val tableName = s"configuring_comments_on_columns_$randomSuffix"
+    try {
+      val metadata = new MetadataBuilder().putString("description", "Hello Column").build()
+      val schema = StructType(
+        StructField("x", StringType, metadata = metadata) :: Nil)
+      sqlContext.createDataFrame(sc.parallelize(Seq(Row("a" * 128))), schema).write
+        .format("com.databricks.spark.redshift")
+        .option("url", jdbcUrl)
+        .option("dbtable", tableName)
+        .option("description", "Hello Table")
+        .option("tempdir", tempDir)
+        .mode(SaveMode.ErrorIfExists)
+        .save()
+      assert(DefaultJDBCWrapper.tableExists(conn, tableName))
+      val loadedDf = sqlContext.read
+        .format("com.databricks.spark.redshift")
+        .option("url", jdbcUrl)
+        .option("dbtable", tableName)
+        .option("tempdir", tempDir)
+        .load()
+      checkAnswer(loadedDf, Seq(Row("a" * 128)))
+      val tableDF = sqlContext.read
+        .format("jdbc")
+        .option("url", jdbcUrl)
+        .option("dbtable", s"(SELECT pg_catalog.obj_description('$tableName'::regclass))")
+        .load()
+      checkAnswer(tableDF, Seq(Row("Hello Table")))
+      val commentQuery =
+        s"""
+           |(SELECT c.column_name, pgd.description
+           |FROM pg_catalog.pg_statio_all_tables st
+           |INNER JOIN pg_catalog.pg_description pgd
+           |   ON (pgd.objoid=st.relid)
+           |INNER JOIN information_schema.columns c
+           |   ON (pgd.objsubid=c.ordinal_position AND c.table_name=st.relname)
+           |WHERE c.table_name='$tableName')
+         """.stripMargin
+      val columnDF = sqlContext.read
+        .format("jdbc")
+        .option("url", jdbcUrl)
+        .option("dbtable", commentQuery)
+        .load()
+      checkAnswer(columnDF, Seq(Row("x", "Hello Column")))
+    } finally {
+      conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
+      conn.commit()
+    }
+  }
+
   test("informative error message when saving a table with string that is longer than max length") {
     val tableName = s"error_message_when_string_too_long_$randomSuffix"
     try {
