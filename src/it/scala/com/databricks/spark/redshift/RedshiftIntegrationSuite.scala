@@ -186,6 +186,19 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
     )
   }
 
+  test("backslashes in queries/subqueries are escaped (regression test for #215)") {
+    val loadedDf = sqlContext.read
+      .format("com.databricks.spark.redshift")
+      .option("url", jdbcUrl)
+      .option("query", s"select replace(teststring, '\\\\', '') as col from $test_table")
+      .option("tempdir", tempDir)
+      .load()
+    checkAnswer(
+      loadedDf.filter("col = 'asdf'"),
+      Seq(Row("asdf"))
+    )
+  }
+
   test("Can load output when 'dbtable' is a subquery wrapped in parentheses") {
     // scalastyle:off
     val query =
