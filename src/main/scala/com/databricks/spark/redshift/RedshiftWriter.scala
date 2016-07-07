@@ -254,7 +254,7 @@ private[redshift] class RedshiftWriter(
     // spark-avro does not support Date types. In addition, it converts Timestamps into longs
     // (milliseconds since the Unix epoch). Redshift is capable of loading timestamps in
     // 'epochmillisecs' format but there's no equivalent format for dates. To work around this, we
-    // choose to write out both dates and timestamps as strings using the same timestamp format.
+    // choose to write out both dates and timestamps as strings.
     // For additional background and discussion, see #39.
 
     // Convert the rows so that timestamps and dates become formatted strings.
@@ -263,12 +263,12 @@ private[redshift] class RedshiftWriter(
     val conversionFunctions: Array[Any => Any] = data.schema.fields.map { field =>
       field.dataType match {
         case DateType =>
-          val dateFormat = new RedshiftDateFormat()
+          val dateFormat = Conversions.createRedshiftDateFormat()
           (v: Any) => {
             if (v == null) null else dateFormat.format(v.asInstanceOf[Date])
           }
         case TimestampType =>
-          val timestampFormat = new RedshiftTimestampFormat()
+          val timestampFormat = Conversions.createRedshiftTimestampFormat()
           (v: Any) => {
             if (v == null) null else timestampFormat.format(v.asInstanceOf[Timestamp])
           }
