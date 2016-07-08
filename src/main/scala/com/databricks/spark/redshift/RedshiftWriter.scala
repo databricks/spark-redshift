@@ -141,6 +141,8 @@ private[redshift] class RedshiftWriter(
         jdbcWrapper.executeInterruptibly(conn.prepareStatement(copyStatement))
       } catch {
         case e: SQLException =>
+          log.error("SQLException thrown while running COPY query; will attempt to retrieve " +
+            "more information by querying the STL_LOAD_ERRORS table", e)
           // Try to query Redshift's STL_LOAD_ERRORS table to figure out why the load failed.
           // See http://docs.aws.amazon.com/redshift/latest/dg/r_STL_LOAD_ERRORS.html for details.
           conn.rollback()
@@ -356,6 +358,7 @@ private[redshift] class RedshiftWriter(
     } catch {
       case NonFatal(e) =>
         try {
+          log.error("Exception thrown during Redshift load; will roll back transaction", e)
           conn.rollback()
         } catch {
           case NonFatal(e2) =>
