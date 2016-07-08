@@ -182,10 +182,10 @@ class RedshiftSourceSuite
         |UNLOAD \('SELECT "testbyte", "testbool" FROM
         |  \(select testbyte, testbool
         |    from test_table
-        |    where teststring = \\'Unicode\\'\\'s樂趣\\'\) '\)
+        |    where teststring = \\'\\\\\\\\Unicode\\'\\'s樂趣\\'\) '\)
       """.stripMargin.lines.map(_.trim).mkString(" ").trim.r
     val query =
-      """select testbyte, testbool from test_table where teststring = 'Unicode''s樂趣'"""
+      """select testbyte, testbool from test_table where teststring = '\\Unicode''s樂趣'"""
     // scalastyle:on
     val querySchema =
       StructType(Seq(StructField("testbyte", ByteType), StructField("testbool", BooleanType)))
