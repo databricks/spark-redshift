@@ -17,8 +17,7 @@
 package com.databricks.spark.redshift
 
 import java.sql.Timestamp
-import java.text.{DecimalFormat, DateFormat, FieldPosition, ParsePosition, SimpleDateFormat}
-import java.util.Date
+import java.text.{DecimalFormat, SimpleDateFormat}
 
 import scala.collection.mutable
 
@@ -53,8 +52,6 @@ private[redshift] object Conversions {
 
   /**
    * Formatter for parsing strings exported from Redshift DATE columns.
-   * This formatter should not be used when saving dates back to Redshift; instead, use
-   * [[RedshiftTimestampFormat]].
    *
    * Note that Java Formatters are NOT thread-safe, so you should not re-use instances of this
    * SimpleDateFormat across threads.
@@ -62,12 +59,24 @@ private[redshift] object Conversions {
   def createRedshiftDateFormat(): SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd")
 
   /**
+   * Formatter for formatting timestamps for insertion into Redshift TIMESTAMP columns.
+   *
+   * This formatter should not be used to parse timestamps returned from Redshift UNLOAD commands;
+   * instead, use [[Timestamp.valueOf()]].
+   *
+   * Note that Java Formatters are NOT thread-safe, so you should not re-use instances of this
+   * SimpleDateFormat across threads.
+   */
+  def createRedshiftTimestampFormat(): SimpleDateFormat = {
+    new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
+  }
+
+  /**
    * Return a function that will convert arrays of strings conforming to the given schema to Rows.
    *
    * Note that instances of this function are NOT thread-safe.
    */
   def createRowConverter(schema: StructType): (Array[String]) => Row = {
-    val timestampFormat = new RedshiftTimestampFormat
     val dateFormat = createRedshiftDateFormat()
     val decimalFormat = createRedshiftDecimalFormat()
     val conversionFunctions: Array[String => Any] = schema.fields.map { field =>
@@ -83,7 +92,7 @@ private[redshift] object Conversions {
         case LongType => (data: String) => data.toLong
         case ShortType => (data: String) => data.toShort
         case StringType => (data: String) => data
-        case TimestampType => (data: String) => new Timestamp(timestampFormat.parse(data).getTime)
+        case TimestampType => (data: String) => Timestamp.valueOf(data)
         case _ => (data: String) => data
       }
     }
@@ -98,63 +107,5 @@ private[redshift] object Conversions {
       }
       Row.fromSeq(converted)
     }
-  }
-}
-
-/**
- * Formatter for parsing strings exported from Redshift TIMESTAMP columns and for formatting
- * timestamps as strings when writing data back to Redshift via Avro.
- *
- * Redshift may or may not include the fraction component in the UNLOAD data, and there are
- * apparently not clues about this in the table schema. This format delegates to one of two
- * formats based on string length.
- *
- * Instances of this class are NOT thread-safe (because they rely on Java's DateFormat classes,
- * which are also not thread-safe).
- */
-private[redshift] class RedshiftTimestampFormat extends DateFormat {
-
-  // Imports and exports with Redshift require that timestamps are represented
-  // as strings, using the following formats
-  private val PATTERN_WITH_MILLIS = "yyyy-MM-dd HH:mm:ss.SSS"
-  private val PATTERN_WITHOUT_MILLIS = "yyyy-MM-dd HH:mm:ss"
-
-  private val redshiftTimestampFormatWithMillis = new SimpleDateFormat(PATTERN_WITH_MILLIS)
-  private val redshiftTimestampFormatWithoutMillis = new SimpleDateFormat(PATTERN_WITHOUT_MILLIS)
-
-  override def format(
-      date: Date,
-      toAppendTo: StringBuffer,
-      fieldPosition: FieldPosition): StringBuffer = {
-    // Always export with milliseconds, as they can just be zero if not specified
-    redshiftTimestampFormatWithMillis.format(date, toAppendTo, fieldPosition)
-  }
-
-  override def parse(source: String, pos: ParsePosition): Date = {
-    if (source.length < PATTERN_WITH_MILLIS.length) {
-      redshiftTimestampFormatWithoutMillis.parse(source, pos)
-    } else {
-      redshiftTimestampFormatWithMillis.parse(source, pos)
-    }
-  }
-}
-
-private[redshift] class RedshiftDateFormat extends DateFormat {
-
-  // Imports and exports with Redshift require that dates are represented
-  // as strings, using the following format
-  private val PATTERN = "yyyy-MM-dd"
-
-  private val redshiftDateFormat = new SimpleDateFormat(PATTERN)
-
-  override def format(
-       date: Date,
-       toAppendTo: StringBuffer,
-       fieldPosition: FieldPosition): StringBuffer = {
-    redshiftDateFormat.format(date, toAppendTo, fieldPosition)
-  }
-
-  override def parse(source: String, pos: ParsePosition): Date = {
-    redshiftDateFormat.parse(source, pos)
   }
 }

@@ -21,7 +21,7 @@ import java.sql.Timestamp
 import org.scalatest.FunSuite
 
 import org.apache.spark.sql.Row
-import org.apache.spark.sql.types.{StructField, BooleanType, StructType}
+import org.apache.spark.sql.types.{TimestampType, StructField, BooleanType, StructType}
 
 /**
  * Unit test for data type conversions
@@ -65,6 +65,26 @@ class ConversionsSuite extends FunSuite {
     assert(convertRow(Array(null)) === Row(null))
     intercept[IllegalArgumentException] {
       convertRow(Array("not-a-boolean"))
+    }
+  }
+
+  test("timestamp conversion handles millisecond-level precision (regression test for #214)") {
+    val convertRow =
+      Conversions.createRowConverter(StructType(Seq(StructField("a", TimestampType))))
+    Seq(
+      "2014-03-01 00:00:01" -> TestUtils.toMillis(2014, 2, 1, 0, 0, 0, millis = 1000),
+      "2014-03-01 00:00:01.000" -> TestUtils.toMillis(2014, 2, 1, 0, 0, 0, millis = 1000),
+      "2014-03-01 00:00:00.1" -> TestUtils.toMillis(2014, 2, 1, 0, 0, 0, millis = 100),
+      "2014-03-01 00:00:00.10" -> TestUtils.toMillis(2014, 2, 1, 0, 0, 0, millis = 100),
+      "2014-03-01 00:00:00.100" -> TestUtils.toMillis(2014, 2, 1, 0, 0, 0, millis = 100),
+      "2014-03-01 00:00:00.01" -> TestUtils.toMillis(2014, 2, 1, 0, 0, 0, millis = 10),
+      "2014-03-01 00:00:00.010" -> TestUtils.toMillis(2014, 2, 1, 0, 0, 0, millis = 10),
+      "2014-03-01 00:00:00.001" -> TestUtils.toMillis(2014, 2, 1, 0, 0, 0, millis = 1)
+    ).foreach { case (timestampString, expectedTime) =>
+      withClue(s"timestamp string is '$timestampString'") {
+        val convertedTimestamp = convertRow(Array(timestampString)).get(0).asInstanceOf[Timestamp]
+        assert(convertedTimestamp === new Timestamp(expectedTime))
+      }
     }
   }
 }
