@@ -191,6 +191,8 @@ private[redshift] object Parameters {
     def sortKeySpec: Option[String] = parameters.get("sortkeyspec")
 
     /**
+     * DEPRECATED: see PR #157.
+     *
      * When true, data is always loaded into a new temporary table when performing an overwrite.
      * This is to ensure that the whole load process succeeds before dropping any data from
      * Redshift, which can be useful if, in the event of failures, stale data is better than no data

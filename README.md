@@ -350,17 +350,15 @@ must also set a distribution key with the <tt>distkey</tt> option.
     </td>
  </tr>
  <tr>
-    <td><tt>usestagingtable</tt></td>
+    <td><del><tt>usestagingtable</tt></del> (Deprecated)</td>
     <td>No</td>
     <td><tt>true</tt></td>
     <td>
-<p>When performing an overwrite of existing data, this setting can be used to stage the new data in a temporary
-table, such that we make sure the <tt>COPY</tt> finishes successfully before making any changes to the existing table.
-This means that we minimize the amount of time that the target table will be unavailable and restore the old
-data should the <tt>COPY</tt> fail.</p>
+    <p>
+    Setting this deprecated option to <tt>false</tt> will cause an overwrite operation's destination table to be dropped immediately at the beginning of the write, making the overwrite operation non-atomic and reducing the availability of the destination table. This may reduce the temporary disk space requirements for overwrites.
+    </p>
 
-<p>You may wish to disable this by setting the parameter to <tt>false</tt> if you can't spare the disk space in your
-Redshift cluster and/or don't have requirements to keep the table availability high.</p>
+    <p>Since setting <tt>usestagingtable=false</tt> operation risks data loss / unavailability, we have chosen to deprecate it in favor of requiring users to manually drop the destination table themselves.</p>
     </td>
  </tr>
  <tr>
@@ -480,7 +478,7 @@ When reading from / writing to Redshift, this library reads and writes data in S
 
 **Overwriting an existing table**: By default, this library uses transactions to perform overwrites, which are implemented by deleting the destination table, creating a new empty table, and appending rows to it.
 
-If `usestagingtable` is set to `false` then this library will commit the `DELETE TABLE` command before appending rows to the new table, sacrificing the atomicity of the overwrite operation but reducing the amount of staging space that Redshift needs during the overwrite.
+If the deprecated `usestagingtable` setting is set to `false` then this library will commit the `DELETE TABLE` command before appending rows to the new table, sacrificing the atomicity of the overwrite operation but reducing the amount of staging space that Redshift needs during the overwrite.
 
 **Querying Redshift tables**: Queries use Redshift's [`UNLOAD`](https://docs.aws.amazon.com/redshift/latest/dg/r_UNLOAD.html) command to execute a query and save its results to S3 and use [manifests](https://docs.aws.amazon.com/redshift/latest/dg/loading-data-files-using-manifest.html) to guard against certain eventually-consistent S3 operations. As a result, queries from Redshift data source for Spark should have the same consistency properties as regular Redshift queries.
 

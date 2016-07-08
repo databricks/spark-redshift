@@ -328,6 +328,12 @@ private[redshift] class RedshiftWriter(
         "For save operations you must specify a Redshift table name with the 'dbtable' parameter")
     }
 
+    if (!params.useStagingTable) {
+      log.warn("Setting useStagingTable=false is deprecated; instead, we recommend that you " +
+        "drop the target table yourself. For more details on this deprecation, see" +
+        "https://github.com/databricks/spark-redshift/pull/157")
+    }
+
     val creds: AWSCredentials =
       AWSCredentialsUtils.load(params, sqlContext.sparkContext.hadoopConfiguration)
 
