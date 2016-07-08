@@ -174,8 +174,8 @@ private[redshift] case class RedshiftRelation(
     val credsString: String = AWSCredentialsUtils.getRedshiftCredentialsString(params, creds)
     val query = {
       // Since the query passed to UNLOAD will be enclosed in single quotes, we need to escape
-      // any single quotes that appear in the query itself
-      val escapedTableNameOrSubqury = tableNameOrSubquery.replace("'", "\\'")
+      // any backslashes and single quotes that appear in the query itself
+      val escapedTableNameOrSubqury = tableNameOrSubquery.replace("\\", "\\\\").replace("'", "\\'")
       s"SELECT $columnList FROM $escapedTableNameOrSubqury $whereClause"
     }
     // We need to remove S3 credentials from the unload path URI because they will conflict with
