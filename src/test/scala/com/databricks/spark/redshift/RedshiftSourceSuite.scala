@@ -359,6 +359,7 @@ class RedshiftSourceSuite
     }
     mockRedshift.verifyThatConnectionsWereClosed()
     mockRedshift.verifyThatCommitWasNotCalled()
+    mockRedshift.verifyThatRollbackWasCalled()
     mockRedshift.verifyThatExpectedQueriesWereIssued(Seq.empty)
   }
 
@@ -383,6 +384,7 @@ class RedshiftSourceSuite
     }
     mockRedshift.verifyThatConnectionsWereClosed()
     mockRedshift.verifyThatCommitWasNotCalled()
+    mockRedshift.verifyThatRollbackWasCalled()
     mockRedshift.verifyThatExpectedQueriesWereIssued(expectedCommands)
   }
 

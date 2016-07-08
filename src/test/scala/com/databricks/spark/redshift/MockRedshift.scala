@@ -89,6 +89,12 @@ class MockRedshift(
     }
   }
 
+  def verifyThatRollbackWasCalled(): Unit = {
+    jdbcConnections.foreach { conn =>
+      verify(conn, atLeastOnce()).rollback()
+    }
+  }
+
   def verifyThatCommitWasNotCalled(): Unit = {
     jdbcConnections.foreach { conn =>
       verify(conn, never()).commit()
