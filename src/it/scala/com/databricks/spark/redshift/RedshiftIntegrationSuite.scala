@@ -355,7 +355,7 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
     // .rdd() forces the first query to be unloaded from Redshift
     val rdd1 = sqlContext.sql("select testint from test_table").rdd
     // Similarly, this also forces an unload:
-    val rdd2 = sqlContext.sql("select testdouble from test_table").rdd
+    sqlContext.sql("select testdouble from test_table").rdd
     // If the unloads were performed into the same directory then this call would fail: the
     // second unload from rdd2 would have overwritten the integers with doubles, so we'd get
     // a NumberFormatException.
@@ -599,9 +599,9 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
   }
 
   test("Respect SaveMode.ErrorIfExists when table exists") {
-    val rdd = sc.parallelize(TestUtils.expectedData.toSeq)
+    val rdd = sc.parallelize(TestUtils.expectedData)
     val df = sqlContext.createDataFrame(rdd, TestUtils.testSchema)
-    df.registerTempTable(test_table) // to ensure that the table already exists
+    df.createOrReplaceTempView(test_table) // to ensure that the table already exists
 
     // Check that SaveMode.ErrorIfExists throws an exception
     intercept[AnalysisException] {
