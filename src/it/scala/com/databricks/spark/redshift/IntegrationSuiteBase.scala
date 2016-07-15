@@ -119,7 +119,7 @@ trait IntegrationSuiteBase
 
   override protected def beforeEach(): Unit = {
     super.beforeEach()
-    sqlContext = new TestHiveContext(sc)
+    sqlContext = new TestHiveContext(sc, loadTestTables = false)
   }
 
   /**
