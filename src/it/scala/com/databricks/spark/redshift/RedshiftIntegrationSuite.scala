@@ -286,7 +286,7 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
     val df = sqlContext.sql("select testbool from test_table where testbool = true")
     val physicalPlan = df.queryExecution.sparkPlan
     physicalPlan.collectFirst { case f: execution.FilterExec => f }.foreach { filter =>
-      fail(s"Filter should have been eliminated; plan is:\n$physicalPlan")
+      fail(s"Filter should have been eliminated:\n${df.queryExecution}")
     }
   }
 
