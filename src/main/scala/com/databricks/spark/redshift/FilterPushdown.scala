@@ -62,6 +62,10 @@ private[redshift] object FilterPushdown {
       case GreaterThan(attr, value) => buildComparison(attr, value, ">")
       case LessThanOrEqual(attr, value) => buildComparison(attr, value, "<=")
       case GreaterThanOrEqual(attr, value) => buildComparison(attr, value, ">=")
+      case IsNotNull(attr) =>
+        getTypeForAttribute(schema, attr).map(dataType => s""""$attr" IS NOT NULL""")
+      case IsNull(attr) =>
+        getTypeForAttribute(schema, attr).map(dataType => s""""$attr" IS NULL""")
       case _ => None
     }
   }
