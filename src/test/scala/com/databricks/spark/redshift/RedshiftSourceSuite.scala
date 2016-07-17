@@ -465,6 +465,25 @@ class RedshiftSourceSuite
     assert(commentCommands === expectedCommentCommands)
   }
 
+  test("configuring redshift_type on columns") {
+    val bpcharMetadata = new MetadataBuilder().putString("redshift_type", "BPCHAR(2)").build()
+    val nvarcharMetadata = new MetadataBuilder().putString("redshift_type", "NVARCHAR(123)").build()
+
+    val schema = StructType(
+      StructField("bpchar_str", StringType, metadata = bpcharMetadata) ::
+      StructField("bpchar_str", StringType, metadata = nvarcharMetadata) ::
+      StructField("default_str", StringType) ::
+      Nil)
+
+    val df = testSqlContext.createDataFrame(sc.emptyRDD[Row], schema)
+    val createTableCommand =
+      DefaultRedshiftWriter.createTableSql(df, MergedParameters.apply(defaultParams)).trim
+    val expectedCreateTableCommand =
+      """CREATE TABLE IF NOT EXISTS "PUBLIC"."test_table" ("bpchar_str" BPCHAR(2),""" +
+        """ "bpchar_str" NVARCHAR(123), "default_str" TEXT)"""
+    assert(createTableCommand === expectedCreateTableCommand)
+  }
+
   test("Respect SaveMode.ErrorIfExists when table exists") {
     val mockRedshift = new MockRedshift(
       defaultParams("url"),

@@ -448,6 +448,30 @@ df.write
   .save()
 ```
 
+### Setting a custom column type
+
+If you need to manually set a column type, you can use the `redshift_type` column metadata. For example, if you desire to override
+the `Spark SQL Schema -> Redshift SQL` type matcher to assign a user-defined column type, you can do the following:
+
+```scala
+import org.apache.spark.sql.types.MetadataBuilder
+
+// Specify the custom width of each column
+val columnTypeMap = Map(
+  "language_code" -> "CHAR(2)",
+  "country_code" -> "CHAR(2)",
+  "url" -> "BPCHAR(111)"
+)
+
+var df = ... // the dataframe you'll want to write to Redshift
+
+// Apply each column metadata customization
+columnTypeMap.foreach { case (colName, colType) =>
+  val metadata = new MetadataBuilder().putString("redshift_type", colType).build()
+  df = df.withColumn(colName, df(colName).as(colName, metadata))
+}
+```
+
 ### Configuring column encoding
 
 When creating a table, this library can be configured to use a specific compression encoding on individual columns. You can use the `encoding` column metadata field to specify a compression encoding for each column (see [Amazon docs](http://docs.aws.amazon.com/redshift/latest/dg/c_Compression_encodings.html) for available encodings).
