@@ -86,6 +86,8 @@ private[redshift] case class RedshiftRelation(
   }
 
   override def buildScan(requiredColumns: Array[String], filters: Array[Filter]): RDD[Row] = {
+    val creds = AWSCredentialsUtils.load(params, sqlContext.sparkContext.hadoopConfiguration)
+    Utils.checkThatBucketHasObjectLifecycleConfiguration(params.rootTempDir, s3ClientFactory(creds))
     if (requiredColumns.isEmpty) {
       // In the special case where no columns were requested, issue a `count(*)` against Redshift
       // rather than unloading data.
@@ -107,9 +109,7 @@ private[redshift] case class RedshiftRelation(
         conn.close()
       }
     } else {
-      val creds = AWSCredentialsUtils.load(params, sqlContext.sparkContext.hadoopConfiguration)
       // Unload data from Redshift into a temporary directory in S3:
-      Utils.checkThatBucketHasObjectLifecycleConfiguration(params.rootTempDir, s3ClientFactory(creds))
       val tempDir = params.createPerQueryTempDir()
       val unloadSql = buildUnloadStmt(requiredColumns, filters, tempDir)
       log.info(unloadSql)
