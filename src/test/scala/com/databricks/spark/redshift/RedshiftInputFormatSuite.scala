@@ -143,7 +143,7 @@ class RedshiftInputFormatSuite extends FunSuite with BeforeAndAfterAll {
         StructField("big_score", LongType, nullable = true),
         StructField("some_long", LongType, nullable = true)))
       assert(srdd.schema === expectedSchema)
-      val parsed = srdd.map {
+      val parsed = srdd.rdd.map {
         case Row(name: String, state: String, id: Int, score: Double,
                  bigScore: Long, someLong: Long) =>
           Seq(name, state, id, score, bigScore, someLong)
