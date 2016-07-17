@@ -17,10 +17,9 @@
 
 package com.databricks.spark
 
-import com.amazonaws.services.s3.AmazonS3Client
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
-import org.apache.spark.sql.{DataFrame, Row, SaveMode, SQLContext}
+import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 
 package object redshift {
 
@@ -45,50 +44,13 @@ package object redshift {
     }
 
     /**
-     * Reads a table unload from Redshift with its schema in format "name0 type0 name1 type1 ...".
+     * Reads a table unload from Redshift with its schema.
      */
-    @deprecated("Use data sources API or perform string -> data type casts yourself", "0.5.0")
-    def redshiftFile(path: String, schema: String): DataFrame = {
-      val structType = SchemaParser.parseSchema(schema)
-      val casts = structType.fields.map { field =>
+    def redshiftFile(path: String, schema: StructType): DataFrame = {
+      val casts = schema.fields.map { field =>
         col(field.name).cast(field.dataType).as(field.name)
       }
-      redshiftFile(path, structType.fieldNames).select(casts: _*)
-    }
-
-    /**
-     * Read a Redshift table into a DataFrame, using S3 for data transfer and JDBC
-     * to control Redshift and resolve the schema
-     */
-    @deprecated("Use sqlContext.read()", "0.5.0")
-    def redshiftTable(parameters: Map[String, String]): DataFrame = {
-      val params = Parameters.mergeParameters(parameters)
-      sqlContext.baseRelationToDataFrame(
-        RedshiftRelation(
-          DefaultJDBCWrapper, creds => new AmazonS3Client(creds), params, None)(sqlContext))
-    }
-  }
-
-  /**
-   * Add write functionality to DataFrame
-   */
-  @deprecated("Use DataFrame.write()", "0.5.0")
-  implicit class RedshiftDataFrame(dataFrame: DataFrame) {
-
-    /**
-     * Load the DataFrame into a Redshift database table. By default, this will append to the
-     * specified table. If the `overwrite` parameter is set to `true` then this will drop the
-     * existing table and re-create it with the contents of this DataFrame.
-     */
-    @deprecated("Use DataFrame.write()", "0.5.0")
-    def saveAsRedshiftTable(parameters: Map[String, String]): Unit = {
-      val params = Parameters.mergeParameters(parameters)
-      val saveMode = if (params.overwrite) {
-        SaveMode.Overwrite
-      } else {
-        SaveMode.Append
-      }
-      DefaultRedshiftWriter.saveToRedshift(dataFrame.sqlContext, dataFrame, saveMode, params)
+      redshiftFile(path, schema.fieldNames).select(casts: _*)
     }
   }
 }
