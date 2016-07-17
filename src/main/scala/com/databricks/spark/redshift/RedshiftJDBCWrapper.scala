@@ -246,7 +246,7 @@ private[redshift] class JDBCWrapper {
         case LongType => "BIGINT"
         case DoubleType => "DOUBLE PRECISION"
         case FloatType => "REAL"
-        case ShortType => "INTEGER"
+        case ShortType => "SMALLINT"
         case ByteType => "SMALLINT" // Redshift does not support the BYTE type.
         case BooleanType => "BOOLEAN"
         case StringType =>
@@ -294,7 +294,8 @@ private[redshift] class JDBCWrapper {
       precision: Int,
       scale: Int,
       signed: Boolean): DataType = {
-    // TODO: cleanup types which are irrelevant for Redshift.
+    // See https://docs.aws.amazon.com/redshift/latest/dg/r_Numeric_types201.html for a reference
+    // on Redshift's numeric types.
     val answer = sqlType match {
       // scalastyle:off
       case java.sql.Types.ARRAY         => null
@@ -326,10 +327,12 @@ private[redshift] class JDBCWrapper {
       case java.sql.Types.NUMERIC       => DecimalType(38, 18) // Spark 1.5.0 default
       case java.sql.Types.NVARCHAR      => StringType
       case java.sql.Types.OTHER         => null
-      case java.sql.Types.REAL          => DoubleType
+      // In Redshift, REAL is a 4-byte floating point number with 6 significant digits of precision.
+      case java.sql.Types.REAL          => FloatType
       case java.sql.Types.REF           => StringType
       case java.sql.Types.ROWID         => LongType
-      case java.sql.Types.SMALLINT      => IntegerType
+      // In Redshift, SMALLINT is a 2-byte signed integer.
+      case java.sql.Types.SMALLINT      => ShortType
       case java.sql.Types.SQLXML        => StringType
       case java.sql.Types.STRUCT        => StringType
       case java.sql.Types.TIME          => TimestampType
