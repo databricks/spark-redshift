@@ -16,7 +16,11 @@ This library is more suited to ETL than interactive queries, since large amounts
 - [Configuration](#configuration)
   - [AWS Credentials](#aws-credentials)
   - [Parameters](#parameters)
-  - [Configuring the maximum size of string columns](#configuring-the-maximum-size-of-string-columns)
+- [Additional configuration options](#additional-configuration-options)
+    - [Configuring the maximum size of string columns](#configuring-the-maximum-size-of-string-columns)
+    - [Setting a custom column type](#setting-a-custom-column-type)
+    - [Configuring column encoding](#configuring-column-encoding)
+    - [Setting descriptions on columns](#setting-descriptions-on-columns)
 - [Transactional Guarantees](#transactional-guarantees)
 - [Migration Guide](#migration-guide)
 
@@ -33,14 +37,14 @@ You may use this library in your applications with the following dependency info
 ```
 groupId: com.databricks
 artifactId: spark-redshift_2.10
-version: 2.0.0-SNAPSHOT
+version: 2.0.0-preview1
 ```
 
 **Scala 2.11**
 ```
 groupId: com.databricks
 artifactId: spark-redshift_2.11
-version: 2.0.0-SNAPSHOT
+version: 2.0.0-preview1
 ```
 
 You will also need to provide a JDBC driver that is compatible with Redshift. Amazon recommend that you use [their driver](http://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-connection.html), which is distributed as a JAR that is hosted on Amazon's website. This library has also been successfully tested using the Postgres JDBC driver.
@@ -510,15 +514,4 @@ If the deprecated `usestagingtable` setting is set to `false` then this library 
 
 ## Migration Guide
 
-
-Some breaking changes were made in version 0.3 of the Hadoop InputFormat. Users should make the
-following changes in their code if they would like to use the 0.3+ versions, when using the input format
-directly:
-
- * <tt>com.databricks.examples.redshift.input</tt> -> <tt>com.databricks.spark.redshift</tt>
- * <tt>SchemaRDD</tt> -> <tt>DataFrame</tt>
- * `import com.databricks.examples.redshift.input.RedshiftInputFormat._` -> `import com.databricks.spark.redshift._`
-
-Version 0.4+ adds the DataSource API and JDBC, which is an entirely new API, so although this won't break
-code using the InputFormat directly, you may wish to make use of the new functionality to avoid performing
-<tt>UNLOAD</tt> queries manually.
+- Version 2.0 removed a number of deprecated APIs; for details, see https://github.com/databricks/spark-redshift/pull/239
