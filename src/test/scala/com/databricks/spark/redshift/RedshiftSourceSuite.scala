@@ -513,7 +513,7 @@ class RedshiftSourceSuite
       "query" -> "select * from test_table")
 
     val e1 = intercept[IllegalArgumentException] {
-      expectedDataDF.saveAsRedshiftTable(invalidParams)
+      expectedDataDF.write.format("com.databricks.spark.redshift").options(invalidParams).save()
     }
     assert(e1.getMessage.contains("dbtable"))
   }
@@ -522,12 +522,12 @@ class RedshiftSourceSuite
     val invalidParams = Map("dbtable" -> "foo") // missing tempdir and url
 
     val e1 = intercept[IllegalArgumentException] {
-      expectedDataDF.saveAsRedshiftTable(invalidParams)
+      expectedDataDF.write.format("com.databricks.spark.redshift").options(invalidParams).save()
     }
     assert(e1.getMessage.contains("tempdir"))
 
     val e2 = intercept[IllegalArgumentException] {
-      testSqlContext.redshiftTable(invalidParams)
+      expectedDataDF.write.format("com.databricks.spark.redshift").options(invalidParams).save()
     }
     assert(e2.getMessage.contains("tempdir"))
   }
@@ -539,7 +539,11 @@ class RedshiftSourceSuite
   test("Saves throw error message if S3 Block FileSystem would be used") {
     val params = defaultParams + ("tempdir" -> defaultParams("tempdir").replace("s3n", "s3"))
     val e = intercept[IllegalArgumentException] {
-      expectedDataDF.saveAsRedshiftTable(params)
+      expectedDataDF.write
+        .format("com.databricks.spark.redshift")
+        .mode("append")
+        .options(params)
+        .save()
     }
     assert(e.getMessage.contains("Block FileSystem"))
   }

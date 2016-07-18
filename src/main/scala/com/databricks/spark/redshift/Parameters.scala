@@ -148,17 +148,6 @@ private[redshift] object Parameters {
     def jdbcDriver: Option[String] = parameters.get("jdbcdriver")
 
     /**
-     * If true, when writing, replace any existing data. When false, append to the table instead.
-     * Note that the table schema will need to be compatible with whatever you have in the DataFrame
-     * you're writing. spark-redshift makes no attempt to enforce that - you'll just see Redshift
-     * errors if they don't match.
-     *
-     * Defaults to false.
-     */
-    @deprecated("Use SaveMode instead", "0.5.0")
-    def overwrite: Boolean = parameters("overwrite").toBoolean
-
-    /**
      * Set the Redshift table distribution style, which can be one of: EVEN, KEY or ALL. If you set
      * it to KEY, you'll also need to use the distkey parameter to set the distribution key.
      *

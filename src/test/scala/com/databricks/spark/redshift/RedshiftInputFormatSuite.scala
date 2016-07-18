@@ -126,15 +126,7 @@ class RedshiftInputFormatSuite extends FunSuite with BeforeAndAfterAll {
       val escaped = escape(testRecords.map(_.map(_.toString)), DEFAULT_DELIMITER)
       writeToFile(escaped, new File(dir, "part-00000"))
 
-      val conf = new Configuration
-      conf.setLong(KEY_BLOCK_SIZE, 4)
-
       val sqlContext = new SQLContext(sc)
-
-      val srdd = sqlContext.redshiftFile(
-        dir.toString,
-        "name varchar(10) state text id integer score float big_score numeric(4, 0) " +
-          "some_long bigint")
       val expectedSchema = StructType(Seq(
         StructField("name", StringType, nullable = true),
         StructField("state", StringType, nullable = true),
@@ -142,11 +134,14 @@ class RedshiftInputFormatSuite extends FunSuite with BeforeAndAfterAll {
         StructField("score", DoubleType, nullable = true),
         StructField("big_score", LongType, nullable = true),
         StructField("some_long", LongType, nullable = true)))
-      assert(srdd.schema === expectedSchema)
-      val parsed = srdd.rdd.map {
-        case Row(name: String, state: String, id: Int, score: Double,
-                 bigScore: Long, someLong: Long) =>
-          Seq(name, state, id, score, bigScore, someLong)
+
+      val df = sqlContext.redshiftFile(dir.toString, expectedSchema)
+      assert(df.schema === expectedSchema)
+
+      val parsed = df.rdd.map {
+        case Row(
+          name: String, state: String, id: Int, score: Double, bigScore: Long, someLong: Long
+        ) => Seq(name, state, id, score, bigScore, someLong)
       }.collect().toSet
 
       assert(parsed === testRecords)
