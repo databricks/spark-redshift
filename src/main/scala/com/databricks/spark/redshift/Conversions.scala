@@ -17,7 +17,8 @@
 package com.databricks.spark.redshift
 
 import java.sql.Timestamp
-import java.text.{DecimalFormat, SimpleDateFormat}
+import java.text.{DecimalFormat, DecimalFormatSymbols, SimpleDateFormat}
+import java.util.Locale
 
 import scala.collection.mutable
 
@@ -47,6 +48,7 @@ private[redshift] object Conversions {
   def createRedshiftDecimalFormat(): DecimalFormat = {
     val format = new DecimalFormat()
     format.setParseBigDecimal(true)
+    format.setDecimalFormatSymbols(new DecimalFormatSymbols(Locale.US))
     format
   }
 
