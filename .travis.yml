@@ -10,11 +10,11 @@ matrix:
     # Scala 2.10.5 tests:
     - jdk: openjdk7
       scala: 2.10.5
-      env: HADOOP_VERSION="2.2.0" SPARK_VERSION="2.0.1-SNAPSHOT" SPARK_AVRO_VERSION="3.0.0-preview2"
+      env: HADOOP_VERSION="2.2.0" SPARK_VERSION="2.0.0" SPARK_AVRO_VERSION="3.0.0-preview2"
     # Scala 2.11 tests:
     - jdk: openjdk7
       scala: 2.11.7
-      env: HADOOP_VERSION="2.2.0" SPARK_VERSION="2.0.1-SNAPSHOT" SPARK_AVRO_VERSION="3.0.0-preview2"
+      env: HADOOP_VERSION="2.2.0" SPARK_VERSION="2.0.0" SPARK_AVRO_VERSION="3.0.0-preview2"
 env:
   global:
     # AWS_REDSHIFT_JDBC_URL

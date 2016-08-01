@@ -44,7 +44,7 @@ object SparkRedshiftBuild extends Build {
       organization := "com.databricks",
       scalaVersion := "2.11.7",
       crossScalaVersions := Seq("2.10.5", "2.11.7"),
-      sparkVersion := "2.0.1-SNAPSHOT",
+      sparkVersion := "2.0.0",
       testSparkVersion := sys.props.get("spark.testVersion").getOrElse(sparkVersion.value),
       testSparkAvroVersion := sys.props.get("sparkAvro.testVersion").getOrElse("3.0.0-preview2"),
       testHadoopVersion := sys.props.get("hadoop.testVersion").getOrElse("2.2.0"),
@@ -53,11 +53,6 @@ object SparkRedshiftBuild extends Build {
       spIgnoreProvided := true,
       licenses += "Apache-2.0" -> url("http://opensource.org/licenses/Apache-2.0"),
       credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"),
-      resolvers ++= Seq(
-        "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
-        // TODO: remove after Spark 2.0.0 is released:
-        "Apache Snapshots" at "https://repository.apache.org/snapshots/"
-      ),
       scalacOptions ++= Seq("-target:jvm-1.6"),
       javacOptions ++= Seq("-source", "1.6", "-target", "1.6"),
       libraryDependencies ++= Seq(
