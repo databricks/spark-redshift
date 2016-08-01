@@ -17,6 +17,7 @@
 package com.databricks.spark.redshift
 
 import java.sql.Timestamp
+import java.util.Locale
 
 import org.scalatest.FunSuite
 
@@ -84,6 +85,18 @@ class ConversionsSuite extends FunSuite {
       withClue(s"timestamp string is '$timestampString'") {
         val convertedTimestamp = convertRow(Array(timestampString)).get(0).asInstanceOf[Timestamp]
         assert(convertedTimestamp === new Timestamp(expectedTime))
+      }
+    }
+  }
+
+  test("RedshiftDecimalFormat is locale-insensitive (regression test for #243)") {
+    for (locale <- Seq(Locale.US, Locale.GERMAN, Locale.UK)) {
+      withClue(s"locale = $locale") {
+        TestUtils.withDefaultLocale(locale) {
+          val decimalFormat = Conversions.createRedshiftDecimalFormat()
+          val parsed = decimalFormat.parse("151.20").asInstanceOf[java.math.BigDecimal]
+          assert(parsed.doubleValue() === 151.20)
+        }
       }
     }
   }
