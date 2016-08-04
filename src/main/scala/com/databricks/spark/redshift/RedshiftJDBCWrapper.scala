@@ -258,7 +258,6 @@ private[redshift] class JDBCWrapper {
             } else {
               "TEXT"
             }
-          case BinaryType => "BLOB"
           case TimestampType => "TIMESTAMP"
           case DateType => "DATE"
           case t: DecimalType => s"DECIMAL(${t.precision},${t.scale})"
