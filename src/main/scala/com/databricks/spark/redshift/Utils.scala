@@ -60,7 +60,8 @@ private[redshift] object Utils {
   }
 
   /**
-   * Factory method to create new S3URI in order to handle various library incompatabilities with older AWS Java Libraries
+   * Factory method to create new S3URI in order to handle various library incompatabilities with
+   * older AWS Java Libraries
    */
   def createS3URI(url: String): AmazonS3URI = {
     try {
@@ -68,7 +69,8 @@ private[redshift] object Utils {
       new AmazonS3URI(url)
     } catch {
       case e: java.lang.IllegalArgumentException => {
-        if (e.getMessage().startsWith("Invalid S3 URI: hostname does not appear to be a valid S3 endpoint")) {
+        if (e.getMessage().
+          startsWith("Invalid S3 URI: hostname does not appear to be a valid S3 endpoint")) {
           new AmazonS3URI(addEndpointToUrl(url))
         } else {
           throw e
