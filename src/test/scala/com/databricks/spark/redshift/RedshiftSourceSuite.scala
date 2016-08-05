@@ -138,6 +138,7 @@ class RedshiftSourceSuite
       }
     }
     when(mockS3Client.getObject(anyString(), endsWith("manifest"))).thenReturn(mockManifest)
+    when(mockS3Client.getObject(anyString(), endsWith("manifest.json"))).thenReturn(mockManifest)
   }
 
   override def afterEach(): Unit = {
