@@ -80,7 +80,7 @@ private[redshift] object Utils {
    */
   def addEndpointToUrl(url: String, domain: String = "s3.amazonaws.com"): String = {
     val uri = new URI(url)
-    val hostWithEndpoint = uri.getHost() + "." + domain
+    val hostWithEndpoint = uri.getHost + "." + domain
     new URI(uri.getScheme,
       uri.getUserInfo,
       hostWithEndpoint,
