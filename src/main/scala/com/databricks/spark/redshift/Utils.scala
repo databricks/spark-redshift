@@ -68,7 +68,8 @@ private[redshift] object Utils {
       // try to instantiate AmazonS3URI with url
       new AmazonS3URI(url)
     } catch {
-      case e: IllegalArgumentException if e.getMessage.startsWith("Invalid S3 URI: hostname does not appear to be a valid S3 endpoint") => {
+      case e: IllegalArgumentException if e.getMessage.
+        startsWith("Invalid S3 URI: hostname does not appear to be a valid S3 endpoint") => {
         new AmazonS3URI(addEndpointToUrl(url))
       }
     }
