@@ -60,6 +60,38 @@ private[redshift] object Utils {
   }
 
   /**
+   * Factory method to create new S3URI in order to handle various library incompatibilities with
+   * older AWS Java Libraries
+   */
+  def createS3URI(url: String): AmazonS3URI = {
+    try {
+      // try to instantiate AmazonS3URI with url
+      new AmazonS3URI(url)
+    } catch {
+      case e: IllegalArgumentException if e.getMessage.
+        startsWith("Invalid S3 URI: hostname does not appear to be a valid S3 endpoint") => {
+        new AmazonS3URI(addEndpointToUrl(url))
+      }
+    }
+  }
+
+  /**
+   * Since older AWS Java Libraries do not handle S3 urls that have just the bucket name
+   * as the host, add the endpoint to the host
+   */
+  def addEndpointToUrl(url: String, domain: String = "s3.amazonaws.com"): String = {
+    val uri = new URI(url)
+    val hostWithEndpoint = uri.getHost + "." + domain
+    new URI(uri.getScheme,
+      uri.getUserInfo,
+      hostWithEndpoint,
+      uri.getPort,
+      uri.getPath,
+      uri.getQuery,
+      uri.getFragment).toString
+  }
+
+  /**
    * Returns a copy of the given URI with the user credentials removed.
    */
   def removeCredentialsFromURI(uri: URI): URI = {
@@ -87,7 +119,7 @@ private[redshift] object Utils {
       tempDir: String,
       s3Client: AmazonS3Client): Unit = {
     try {
-      val s3URI = new AmazonS3URI(Utils.fixS3Url(tempDir))
+      val s3URI = createS3URI(Utils.fixS3Url(tempDir))
       val bucket = s3URI.getBucket
       assert(bucket != null, "Could not get bucket from S3 URI")
       val key = Option(s3URI.getKey).getOrElse("")

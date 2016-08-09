@@ -13,29 +13,33 @@ matrix:
     # so the published Spark Maven artifacts will not work with Hadoop 1.x.
     - jdk: openjdk6
       scala: 2.10.5
-      env: HADOOP_VERSION="2.2.0" SPARK_VERSION="1.4.1" SPARK_AVRO_VERSION="2.0.1"
+      env: HADOOP_VERSION="2.2.0" SPARK_VERSION="1.4.1" SPARK_AVRO_VERSION="2.0.1" AWS_JAVA_SDK_VERSION="1.10.22"
     - jdk: openjdk7
       scala: 2.10.5
-      env: HADOOP_VERSION="1.0.4" SPARK_VERSION="1.5.0" SPARK_AVRO_VERSION="2.0.1"
+      env: HADOOP_VERSION="1.0.4" SPARK_VERSION="1.5.0" SPARK_AVRO_VERSION="2.0.1" AWS_JAVA_SDK_VERSION="1.10.22"
     - jdk: openjdk7
       scala: 2.10.5
-      env: HADOOP_VERSION="1.2.1" SPARK_VERSION="1.5.0" SPARK_AVRO_VERSION="2.0.1"
+      env: HADOOP_VERSION="1.2.1" SPARK_VERSION="1.5.0" SPARK_AVRO_VERSION="2.0.1" AWS_JAVA_SDK_VERSION="1.10.22"
     - jdk: openjdk7
       scala: 2.10.5
-      env: HADOOP_VERSION="2.2.0" SPARK_VERSION="1.5.0" SPARK_AVRO_VERSION="2.0.1"
+      env: HADOOP_VERSION="2.2.0" SPARK_VERSION="1.5.0" SPARK_AVRO_VERSION="2.0.1" AWS_JAVA_SDK_VERSION="1.10.22"
     - jdk: openjdk7
       scala: 2.10.5
-      env: HADOOP_VERSION="2.2.0" SPARK_VERSION="1.6.0" SPARK_AVRO_VERSION="2.0.1"
+      env: HADOOP_VERSION="2.2.0" SPARK_VERSION="1.6.0" SPARK_AVRO_VERSION="2.0.1" AWS_JAVA_SDK_VERSION="1.10.22"
     # Configuration corresponding to DBC 1.4.x driver package as of DBC 2.4,
     # which uses spark-avro 1.0.0. We use Hadoop 2.2.0 here, while DBC uses
     # 1.2.1, because the 1.4.1 published to Maven Central is a Hadoop 2.x build.
     - jdk: openjdk7
       scala: 2.10.5
-      env: HADOOP_VERSION="2.2.0" SPARK_VERSION="1.4.1" SPARK_AVRO_VERSION="1.0.0"
+      env: HADOOP_VERSION="2.2.0" SPARK_VERSION="1.4.1" SPARK_AVRO_VERSION="1.0.0" AWS_JAVA_SDK_VERSION="1.10.22"
+    # Test with an old version of the AWS Java SDK
+    - jdk: openjdk7
+      scala: 2.10.5
+      env: HADOOP_VERSION="2.2.0" SPARK_VERSION="1.6.0" SPARK_AVRO_VERSION="2.0.1" AWS_JAVA_SDK_VERSION="1.7.4"
     # Scala 2.11 tests:
     - jdk: openjdk7
       scala: 2.11.7
-      env: HADOOP_VERSION="2.2.0" SPARK_VERSION="1.5.0" SPARK_AVRO_VERSION="2.0.1"
+      env: HADOOP_VERSION="2.2.0" SPARK_VERSION="1.5.0" SPARK_AVRO_VERSION="2.0.1" AWS_JAVA_SDK_VERSION="1.10.22"
 env:
   global:
     # AWS_REDSHIFT_JDBC_URL

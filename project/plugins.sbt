@@ -18,3 +18,6 @@ addSbtPlugin("me.lessis" % "bintray-sbt" % "0.3.0")
 addSbtPlugin("com.github.gseitz" % "sbt-release" % "1.0.0")
 
 addSbtPlugin("com.jsuereth" % "sbt-pgp" % "1.0.0")
+
+// Cannot use 3.3.9 because we need to be Java-6 compatible for the Spark 1.4.x tests
+libraryDependencies += "org.apache.maven" % "maven-artifact" % "3.2.5"
