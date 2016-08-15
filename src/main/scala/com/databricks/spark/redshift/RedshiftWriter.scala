@@ -282,8 +282,10 @@ private[redshift] class RedshiftWriter(
     (tempFormat match {
       case "AVRO" => writer.format("com.databricks.spark.avro")
       case "CSV" => writer.format("csv")
+          .option("escape", "\"")
           .option("nullValue", nullString)
       case "CSV GZIP" => writer.format("csv")
+          .option("escape", "\"")
           .option("nullValue", nullString)
           .option("compression", "gzip")
     }).save(tempDir)
