@@ -71,16 +71,23 @@ private[redshift] class JDBCWrapper {
       jdbcSubprotocol match {
         case "redshift" =>
           try {
-            Utils.classForName("com.amazon.redshift.jdbc41.Driver").getName
+            Utils.classForName("com.amazon.redshift.jdbc42.Driver").getName
           } catch {
             case _: ClassNotFoundException =>
               try {
-                Utils.classForName("com.amazon.redshift.jdbc4.Driver").getName
+                Utils.classForName("com.amazon.redshift.jdbc41.Driver").getName
               } catch {
-                case e: ClassNotFoundException =>
-                  throw new ClassNotFoundException(
-                    "Could not load an Amazon Redshift JDBC driver; see the README for " +
-                      "instructions on downloading and configuring the official Amazon driver.", e)
+                case _: ClassNotFoundException =>
+                  try {
+                    Utils.classForName("com.amazon.redshift.jdbc4.Driver").getName
+                  } catch {
+                    case e: ClassNotFoundException =>
+                      throw new ClassNotFoundException(
+                        "Could not load an Amazon Redshift JDBC driver; see the README for " +
+                          "instructions on downloading and configuring the official Amazon driver.",
+                        e
+                      )
+                  }
               }
           }
         case "postgresql" => "org.postgresql.Driver"
