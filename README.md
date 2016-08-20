@@ -37,14 +37,14 @@ You may use this library in your applications with the following dependency info
 ```
 groupId: com.databricks
 artifactId: spark-redshift_2.10
-version: 2.0.0
+version: 2.0.1
 ```
 
 **Scala 2.11**
 ```
 groupId: com.databricks
 artifactId: spark-redshift_2.11
-version: 2.0.0
+version: 2.0.1
 ```
 
 You will also need to provide a JDBC driver that is compatible with Redshift. Amazon recommend that you use [their driver](http://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-connection.html), which is distributed as a JAR that is hosted on Amazon's website. This library has also been successfully tested using the Postgres JDBC driver.
