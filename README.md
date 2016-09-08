@@ -138,7 +138,7 @@ df.write \
   .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass") \
   .option("dbtable", "my_table_copy") \
   .option("tempdir", "s3n://path/for/temp/data") \
-  .option("aws_iam_role", "arn:aws:iam::123456789000:role/redshift_iam_role")
+  .option("aws_iam_role", "arn:aws:iam::123456789000:role/redshift_iam_role") \
   .mode("error") \
   .save()
 ```
