@@ -86,8 +86,18 @@ private[redshift] object Conversions {
         case ByteType => (data: String) => data.toByte
         case BooleanType => (data: String) => parseBoolean(data)
         case DateType => (data: String) => new java.sql.Date(dateFormat.parse(data).getTime)
-        case DoubleType => (data: String) => data.toDouble
-        case FloatType => (data: String) => data.toFloat
+        case DoubleType => (data: String) => data.toLowerCase match {
+          case "nan" => Double.NaN
+          case "infinity" => Double.PositiveInfinity
+          case "-infinity" => Double.NegativeInfinity
+          case _ => java.lang.Double.parseDouble(data)
+        }
+        case FloatType => (data: String) => data.toLowerCase match {
+          case "nan" => Float.NaN
+          case "infinity" => Float.PositiveInfinity
+          case "-infinity" => Float.NegativeInfinity
+          case _ => java.lang.Float.parseFloat(data)
+        }
         case dt: DecimalType =>
           (data: String) => decimalFormat.parse(data).asInstanceOf[java.math.BigDecimal]
         case IntegerType => (data: String) => data.toInt
