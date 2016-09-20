@@ -104,16 +104,14 @@ class ConversionsSuite extends FunSuite {
   test("Row conversion properly handles NaN and Inf float values (regression test for #261)") {
     val convertRow = Conversions.createRowConverter(StructType(Seq(StructField("a", FloatType))))
     assert(java.lang.Float.isNaN(convertRow(Array("nan")).getFloat(0)))
-    assert(java.lang.Float.isNaN(convertRow(Array("NaN")).getFloat(0)))
-    assert(convertRow(Array("Infinity")) === Row(Float.PositiveInfinity))
-    assert(convertRow(Array("-Infinity")) === Row(Float.NegativeInfinity))
+    assert(convertRow(Array("inf")) === Row(Float.PositiveInfinity))
+    assert(convertRow(Array("-inf")) === Row(Float.NegativeInfinity))
   }
 
   test("Row conversion properly handles NaN and Inf double values (regression test for #261)") {
     val convertRow = Conversions.createRowConverter(StructType(Seq(StructField("a", DoubleType))))
     assert(java.lang.Double.isNaN(convertRow(Array("nan")).getDouble(0)))
-    assert(java.lang.Double.isNaN(convertRow(Array("nan")).getDouble(0)))
-    assert(convertRow(Array("Infinity")) === Row(Double.PositiveInfinity))
-    assert(convertRow(Array("-Infinity")) === Row(Double.NegativeInfinity))
+    assert(convertRow(Array("inf")) === Row(Double.PositiveInfinity))
+    assert(convertRow(Array("-inf")) === Row(Double.NegativeInfinity))
   }
 }
