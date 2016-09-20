@@ -83,7 +83,7 @@ private[redshift] object Conversions {
     val decimalFormat = createRedshiftDecimalFormat()
     val conversionFunctions: Array[String => Any] = schema.fields.map { field =>
       field.dataType match {
-        case ByteType => (data: String) => data.toByte
+        case ByteType => (data: String) => java.lang.Byte.parseByte(data)
         case BooleanType => (data: String) => parseBoolean(data)
         case DateType => (data: String) => new java.sql.Date(dateFormat.parse(data).getTime)
         case DoubleType => (data: String) => data.toLowerCase match {
@@ -100,9 +100,9 @@ private[redshift] object Conversions {
         }
         case dt: DecimalType =>
           (data: String) => decimalFormat.parse(data).asInstanceOf[java.math.BigDecimal]
-        case IntegerType => (data: String) => data.toInt
-        case LongType => (data: String) => data.toLong
-        case ShortType => (data: String) => data.toShort
+        case IntegerType => (data: String) => java.lang.Integer.parseInt(data)
+        case LongType => (data: String) => java.lang.Long.parseLong(data)
+        case ShortType => (data: String) => java.lang.Short.parseShort(data)
         case StringType => (data: String) => data
         case TimestampType => (data: String) => Timestamp.valueOf(data)
         case _ => (data: String) => data
