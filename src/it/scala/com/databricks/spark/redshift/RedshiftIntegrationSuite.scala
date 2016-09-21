@@ -666,4 +666,53 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
         StructType(StructField("ts", TimestampType) :: Nil))
     )
   }
+
+  test("read special float values (regression test for #261)") {
+    val tableName = s"roundtrip_special_float_values_$randomSuffix"
+    try {
+      conn.createStatement().executeUpdate(
+        s"CREATE TABLE $tableName (x real)")
+      conn.createStatement().executeUpdate(
+        s"INSERT INTO $tableName VALUES ('NaN'), ('Infinity'), ('-Infinity')")
+      conn.commit()
+      assert(DefaultJDBCWrapper.tableExists(conn, tableName))
+      val loadedDf = sqlContext.read
+        .format("com.databricks.spark.redshift")
+        .option("url", jdbcUrl)
+        .option("dbtable", tableName)
+        .option("tempdir", tempDir)
+        .load()
+      // Due to #98, we use Double here instead of float:
+      checkAnswer(
+        loadedDf,
+        Seq(Double.NaN, Double.PositiveInfinity, Double.NegativeInfinity).map(x => Row.apply(x)))
+    } finally {
+      conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
+      conn.commit()
+    }
+  }
+
+  test("read special double values (regression test for #261)") {
+    val tableName = s"roundtrip_special_double_values_$randomSuffix"
+    try {
+      conn.createStatement().executeUpdate(
+        s"CREATE TABLE $tableName (x double precision)")
+      conn.createStatement().executeUpdate(
+        s"INSERT INTO $tableName VALUES ('NaN'), ('Infinity'), ('-Infinity')")
+      conn.commit()
+      assert(DefaultJDBCWrapper.tableExists(conn, tableName))
+      val loadedDf = sqlContext.read
+        .format("com.databricks.spark.redshift")
+        .option("url", jdbcUrl)
+        .option("dbtable", tableName)
+        .option("tempdir", tempDir)
+        .load()
+      checkAnswer(
+        loadedDf,
+        Seq(Double.NaN, Double.PositiveInfinity, Double.NegativeInfinity).map(x => Row.apply(x)))
+    } finally {
+      conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
+      conn.commit()
+    }
+  }
 }
