@@ -69,8 +69,11 @@ private[redshift] object AWSCredentialsUtils {
           }
         }.orElse {
           // Next, try to read from configuration
-          val accessKey = hadoopConfiguration.get(s"fs.$uriScheme.access.key", null)
-          val secretKey = hadoopConfiguration.get(s"fs.$uriScheme.secret.key", null)
+          val accessKeyConfig = if (uriScheme == "s3a") "access.key" else "awsAccessKeyId"
+          val secretKeyConfig = if (uriScheme == "s3a") "secret.key" else "awsSecretAccessKey"
+
+          val accessKey = hadoopConfiguration.get(s"fs.$uriScheme.$accessKeyConfig", null)
+          val secretKey = hadoopConfiguration.get(s"fs.$uriScheme.$secretKeyConfig", null)
           if (accessKey != null && secretKey != null) {
             Some(new BasicAWSCredentials(accessKey, secretKey))
           } else {
