@@ -18,7 +18,7 @@ package com.databricks.spark.redshift
 
 import java.net.URI
 
-import com.amazonaws.auth.{BasicAWSCredentials, AWSCredentials, AWSSessionCredentials, InstanceProfileCredentialsProvider}
+import com.amazonaws.auth.{BasicAWSCredentials, AWSCredentials, AWSSessionCredentials, DefaultAWSCredentialsProviderChain}
 import org.apache.hadoop.conf.Configuration
 
 import com.databricks.spark.redshift.Parameters.MergedParameters
@@ -78,7 +78,7 @@ private[redshift] object AWSCredentialsUtils {
           }
         }.getOrElse {
           // Finally, fall back on the instance profile provider
-         new InstanceProfileCredentialsProvider().getCredentials
+         new DefaultAWSCredentialsProviderChain().getCredentials
         }
       case other =>
         throw new IllegalArgumentException(s"Unrecognized scheme $other; expected s3, s3n, or s3a")
