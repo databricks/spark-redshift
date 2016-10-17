@@ -180,20 +180,22 @@ AS SELECT * FROM tabletosave;
 Note that the SQL API only supports the creation of new tables and not overwriting or appending; this corresponds to the default save mode of the other language APIs.
 
 #### R
+
+Reading data using R:
+
 **Spark 2.0**
 
-```df <- read.df(NULL, "com.databricks.spark.redshift", tempdir = "tempDir", dbtable= "diamonds_new_1", url="jdbc:redshift://<url>")
+```R
+df <- read.df(NULL, "com.databricks.spark.redshift", tempdir = "tempDir", dbtable= "diamonds_new_1", url="jdbc:redshift://<url>")
 
 ```
 
-**Scala 1.6**
+**Spark 1.6**
 
-```
+```R
 df <- read.df(sqlContext, NULL, "com.databricks.spark.redshift", tempdir = "tempDir", dbtable= "diamonds_new_1", url="jdbc:redshift://<url>")
 
 ```
-###
-
 
 ### Hadoop InputFormat
 
