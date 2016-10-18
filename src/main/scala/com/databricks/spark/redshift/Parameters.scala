@@ -234,7 +234,7 @@ private[redshift] object Parameters {
      * Temporary AWS credentials which are passed to Redshift. These only need to be supplied by
      * the user when Hadoop is configured to authenticate to S3 via IAM roles assigned to EC2
      * instances.
-     */credentials
+     */
     def temporaryAWSCredentials: Option[AWSCredentialsProvider] = {
       for (
         accessKey <- parameters.get("temporary_aws_access_key_id");
