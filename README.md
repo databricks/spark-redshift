@@ -11,7 +11,7 @@ This library is more suited to ETL than interactive queries, since large amounts
 
 - [Installation](#installation)
 - Usage:
-  - Data sources API: [Scala](#scala), [Python](#python), [SQL](#sql)
+  - Data sources API: [Scala](#scala), [Python](#python), [SQL](#sql), [R](#r)
   - [Hadoop InputFormat](#hadoop-inputformat)
 - [Configuration](#configuration)
   - [AWS Credentials](#aws-credentials)
@@ -172,6 +172,20 @@ AS SELECT * FROM tabletosave;
 ```
 
 Note that the SQL API only supports the creation of new tables and not overwriting or appending; this corresponds to the default save mode of the other language APIs.
+
+#### R
+
+Reading data using R:
+
+```R
+df <- read.df(
+   sqlContext,
+   NULL,
+   "com.databricks.spark.redshift",
+   tempdir = "s3n://path/for/temp/data",
+   dbtable = "my_table",
+   url = "jdbc:redshift://redshifthost:5439/database?user=username&password=pass")
+```
 
 ### Hadoop InputFormat
 
