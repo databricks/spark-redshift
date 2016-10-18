@@ -89,11 +89,6 @@ class AWSCredentialsUtilsSuite extends FunSuite {
       assert(creds.getAWSSecretKey === "CONFKEY")
     }
 
-    // The s3:// protocol does not work with EC2 IAM instance profiles.
-    val e = intercept[IllegalArgumentException] {
-      AWSCredentialsUtils.load("s3://bucket/path", new Configuration(false))
-    }
-    assert(e.getMessage.contains("Key must be specified"))
   }
 
   test("AWSCredentials.load() credentials precedence for s3n:// URIs") {
@@ -113,11 +108,6 @@ class AWSCredentialsUtilsSuite extends FunSuite {
       assert(creds.getAWSSecretKey === "CONFKEY")
     }
 
-    // The s3n:// protocol does not work with EC2 IAM instance profiles.
-    val e = intercept[IllegalArgumentException] {
-      AWSCredentialsUtils.load("s3n://bucket/path", new Configuration(false))
-    }
-    assert(e.getMessage.contains("Key must be specified"))
   }
 
   test("AWSCredentials.load() credentials precedence for s3a:// URIs") {
@@ -137,14 +127,5 @@ class AWSCredentialsUtilsSuite extends FunSuite {
       assert(creds.getAWSSecretKey === "CONFKEY")
     }
 
-    // The s3a:// protocol supports loading of credentials from EC2 IAM instance profiles, but
-    // our Travis integration tests will not be able to provide these credentials. In the meantime,
-    // just check that this test fails because the AWS client fails to obtain those credentials.
-    // TODO: refactor and mock to enable proper tests here.
-    val e = intercept[AmazonClientException] {
-      AWSCredentialsUtils.load("s3a://bucket/path", new Configuration(false))
-    }
-    assert(e.getMessage === "Unable to load credentials from Amazon EC2 metadata service" ||
-      e.getMessage.contains("The requested metadata is not found at"))
   }
 }

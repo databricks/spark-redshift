@@ -18,7 +18,7 @@ package com.databricks.spark.redshift
 
 import java.net.URI
 
-import com.amazonaws.auth.{BasicAWSCredentials, AWSCredentials, AWSSessionCredentials, InstanceProfileCredentialsProvider}
+import com.amazonaws.auth.{BasicAWSCredentials, AWSCredentials, AWSSessionCredentials, DefaultAWSCredentialsProviderChain}
 import org.apache.hadoop.conf.Configuration
 
 import com.databricks.spark.redshift.Parameters.MergedParameters
@@ -54,12 +54,10 @@ private[redshift] object AWSCredentialsUtils {
     // https://github.com/apache/hadoop/blob/trunk/hadoop-tools/hadoop-aws/src/site/markdown/tools/hadoop-aws/index.md
     // scalastyle:on
     val uri = new URI(tempPath)
-    uri.getScheme match {
-      case "s3" | "s3n" =>
-        val creds = new S3Credentials()
-        creds.initialize(uri, hadoopConfiguration)
-        new BasicAWSCredentials(creds.getAccessKey, creds.getSecretAccessKey)
-      case "s3a" =>
+    val uriScheme = uri.getScheme
+
+    uriScheme match {
+      case "s3" | "s3n" | "s3a" =>
         // This matches what S3A does, with one exception: we don't support anonymous credentials.
         // First, try to parse from URI:
         Option(uri.getUserInfo).flatMap { userInfo =>
@@ -71,8 +69,11 @@ private[redshift] object AWSCredentialsUtils {
           }
         }.orElse {
           // Next, try to read from configuration
-          val accessKey = hadoopConfiguration.get("fs.s3a.access.key", null)
-          val secretKey = hadoopConfiguration.get("fs.s3a.secret.key", null)
+          val accessKeyConfig = if (uriScheme == "s3a") "access.key" else "awsAccessKeyId"
+          val secretKeyConfig = if (uriScheme == "s3a") "secret.key" else "awsSecretAccessKey"
+
+          val accessKey = hadoopConfiguration.get(s"fs.$uriScheme.$accessKeyConfig", null)
+          val secretKey = hadoopConfiguration.get(s"fs.$uriScheme.$secretKeyConfig", null)
           if (accessKey != null && secretKey != null) {
             Some(new BasicAWSCredentials(accessKey, secretKey))
           } else {
@@ -80,7 +81,7 @@ private[redshift] object AWSCredentialsUtils {
           }
         }.getOrElse {
           // Finally, fall back on the instance profile provider
-         new InstanceProfileCredentialsProvider().getCredentials
+         new DefaultAWSCredentialsProviderChain().getCredentials
         }
       case other =>
         throw new IllegalArgumentException(s"Unrecognized scheme $other; expected s3, s3n, or s3a")
