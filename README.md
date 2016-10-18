@@ -11,7 +11,7 @@ This library is more suited to ETL than interactive queries, since large amounts
 
 - [Installation](#installation)
 - Usage:
-  - Data sources API: [Scala](#scala), [Python](#python), [SQL](#sql)
+  - Data sources API: [Scala](#scala), [Python](#python), [SQL](#sql), [R](#r)
   - [Hadoop InputFormat](#hadoop-inputformat)
 - [Configuration](#configuration)
   - [AWS Credentials](#aws-credentials)
