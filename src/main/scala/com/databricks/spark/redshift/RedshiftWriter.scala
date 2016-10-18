@@ -19,7 +19,7 @@ package com.databricks.spark.redshift
 import java.net.URI
 import java.sql.{Connection, Date, SQLException, Timestamp}
 
-import com.amazonaws.auth.AWSCredentials
+import com.amazonaws.auth.AWSCredentialsProvider
 import com.amazonaws.services.s3.AmazonS3Client
 import org.apache.hadoop.fs.{FileSystem, Path}
 
@@ -59,7 +59,7 @@ import org.apache.spark.sql.types._
  */
 private[redshift] class RedshiftWriter(
     jdbcWrapper: JDBCWrapper,
-    s3ClientFactory: AWSCredentials => AmazonS3Client) {
+    s3ClientFactory: AWSCredentialsProvider => AmazonS3Client) {
 
   private val log = LoggerFactory.getLogger(getClass)
 
@@ -89,9 +89,10 @@ private[redshift] class RedshiftWriter(
   private def copySql(
       sqlContext: SQLContext,
       params: MergedParameters,
-      creds: AWSCredentials,
+      creds: AWSCredentialsProvider,
       manifestUrl: String): String = {
-    val credsString: String = AWSCredentialsUtils.getRedshiftCredentialsString(params, creds)
+    val credsString: String =
+      AWSCredentialsUtils.getRedshiftCredentialsString(params, creds.getCredentials)
     val fixedUrl = Utils.fixS3Url(manifestUrl)
     s"COPY ${params.table.get} FROM '$fixedUrl' CREDENTIALS '$credsString' FORMAT AS " +
       s"AVRO 'auto' manifest ${params.extraCopyOptions}"
@@ -116,7 +117,7 @@ private[redshift] class RedshiftWriter(
       conn: Connection,
       data: DataFrame,
       params: MergedParameters,
-      creds: AWSCredentials,
+      creds: AWSCredentialsProvider,
       manifestUrl: Option[String]): Unit = {
 
     // If the table doesn't exist, we need to create it first, using JDBC to infer column types
@@ -334,7 +335,7 @@ private[redshift] class RedshiftWriter(
         "https://github.com/databricks/spark-redshift/pull/157")
     }
 
-    val creds: AWSCredentials =
+    val creds: AWSCredentialsProvider =
       AWSCredentialsUtils.load(params, sqlContext.sparkContext.hadoopConfiguration)
 
     Utils.assertThatFileSystemIsNotS3BlockFileSystem(

@@ -16,7 +16,7 @@
 
 package com.databricks.spark.redshift
 
-import com.amazonaws.auth.{AWSCredentials, BasicSessionCredentials}
+import com.amazonaws.auth.{AWSCredentialsProvider, BasicSessionCredentials}
 
 /**
  * All user-specifiable parameters for spark-redshift, along with their validation rules and
@@ -234,13 +234,16 @@ private[redshift] object Parameters {
      * Temporary AWS credentials which are passed to Redshift. These only need to be supplied by
      * the user when Hadoop is configured to authenticate to S3 via IAM roles assigned to EC2
      * instances.
-     */
-    def temporaryAWSCredentials: Option[AWSCredentials] = {
+     */credentials
+    def temporaryAWSCredentials: Option[AWSCredentialsProvider] = {
       for (
         accessKey <- parameters.get("temporary_aws_access_key_id");
         secretAccessKey <- parameters.get("temporary_aws_secret_access_key");
         sessionToken <- parameters.get("temporary_aws_session_token")
-      ) yield new BasicSessionCredentials(accessKey, secretAccessKey, sessionToken)
+      ) yield {
+        AWSCredentialsUtils.staticCredentialsProvider(
+          new BasicSessionCredentials(accessKey, secretAccessKey, sessionToken))
+      }
     }
   }
 }

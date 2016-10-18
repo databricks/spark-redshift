@@ -18,7 +18,7 @@ package com.databricks.spark.redshift
 
 import java.net.URI
 
-import com.amazonaws.auth.{BasicAWSCredentials, AWSCredentials, AWSSessionCredentials, DefaultAWSCredentialsProviderChain}
+import com.amazonaws.auth.{AWSCredentials, AWSCredentialsProvider, AWSSessionCredentials, BasicAWSCredentials, DefaultAWSCredentialsProviderChain}
 import org.apache.hadoop.conf.Configuration
 
 import com.databricks.spark.redshift.Parameters.MergedParameters
@@ -44,11 +44,20 @@ private[redshift] object AWSCredentialsUtils {
         })
   }
 
-  def load(params: MergedParameters, hadoopConfiguration: Configuration): AWSCredentials = {
+  def staticCredentialsProvider(credentials: AWSCredentials): AWSCredentialsProvider = {
+    new AWSCredentialsProvider {
+      override def getCredentials: AWSCredentials = credentials
+      override def refresh(): Unit = {}
+    }
+  }
+
+  def load(params: MergedParameters, hadoopConfiguration: Configuration): AWSCredentialsProvider = {
     params.temporaryAWSCredentials.getOrElse(loadFromURI(params.rootTempDir, hadoopConfiguration))
   }
 
-  private def loadFromURI(tempPath: String, hadoopConfiguration: Configuration): AWSCredentials = {
+  private def loadFromURI(
+      tempPath: String,
+      hadoopConfiguration: Configuration): AWSCredentialsProvider = {
     // scalastyle:off
     // A good reference on Hadoop's configuration loading / precedence is
     // https://github.com/apache/hadoop/blob/trunk/hadoop-tools/hadoop-aws/src/site/markdown/tools/hadoop-aws/index.md
@@ -63,7 +72,7 @@ private[redshift] object AWSCredentialsUtils {
         Option(uri.getUserInfo).flatMap { userInfo =>
           if (userInfo.contains(":")) {
             val Array(accessKey, secretKey) = userInfo.split(":")
-            Some(new BasicAWSCredentials(accessKey, secretKey))
+            Some(staticCredentialsProvider(new BasicAWSCredentials(accessKey, secretKey)))
           } else {
             None
           }
@@ -75,13 +84,13 @@ private[redshift] object AWSCredentialsUtils {
           val accessKey = hadoopConfiguration.get(s"fs.$uriScheme.$accessKeyConfig", null)
           val secretKey = hadoopConfiguration.get(s"fs.$uriScheme.$secretKeyConfig", null)
           if (accessKey != null && secretKey != null) {
-            Some(new BasicAWSCredentials(accessKey, secretKey))
+            Some(staticCredentialsProvider(new BasicAWSCredentials(accessKey, secretKey)))
           } else {
             None
           }
         }.getOrElse {
           // Finally, fall back on the instance profile provider
-         new DefaultAWSCredentialsProviderChain().getCredentials
+         new DefaultAWSCredentialsProviderChain()
         }
       case other =>
         throw new IllegalArgumentException(s"Unrecognized scheme $other; expected s3, s3n, or s3a")
