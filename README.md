@@ -183,8 +183,6 @@ Note that the SQL API only supports the creation of new tables and not overwriti
 
 Reading data using R:
 
-**Spark 2.0**
-
 ```R
 df <- read.df(
    NULL,
@@ -192,18 +190,6 @@ df <- read.df(
    tempdir = "s3n://path/for/temp/data",
    dbtable = "my_table",
    url = "jdbc:redshift://redshifthost:5439/database?user=username&password=pass")
-```
-
-**Spark 1.6**
-
-```R
-df <- read.df(
-    sqlContext,
-    NULL,
-    "com.databricks.spark.redshift",
-    tempdir = "s3n://path/for/temp/data",
-    dbtable = "my_table",
-    url = "jdbc:redshift://redshifthost:5439/database?user=username&password=pass")
 ```
 
 ### Hadoop InputFormat
