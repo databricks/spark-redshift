@@ -27,55 +27,17 @@ import org.apache.spark.sql.types._
 class RedshiftIntegrationSuite extends IntegrationSuiteBase {
 
   private val test_table: String = s"test_table_$randomSuffix"
-  private val test_table3: String = s"test_table3_$randomSuffix"
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-
-    conn.prepareStatement("drop table if exists test_table").executeUpdate()
-    conn.prepareStatement("drop table if exists test_table3").executeUpdate()
+    conn.prepareStatement(s"drop table if exists $test_table").executeUpdate()
     conn.commit()
-
-    def createTable(tableName: String): Unit = {
-      conn.createStatement().executeUpdate(
-        s"""
-           |create table $tableName (
-           |testbyte int2,
-           |testbool boolean,
-           |testdate date,
-           |testdouble float8,
-           |testfloat float4,
-           |testint int4,
-           |testlong int8,
-           |testshort int2,
-           |teststring varchar(256),
-           |testtimestamp timestamp
-           |)
-      """.stripMargin
-      )
-      // scalastyle:off
-      conn.createStatement().executeUpdate(
-        s"""
-           |insert into $tableName values
-           |(null, null, null, null, null, null, null, null, null, null),
-           |(0, null, '2015-07-03', 0.0, -1.0, 4141214, 1239012341823719, null, 'f', '2015-07-03 00:00:00.000'),
-           |(0, false, null, -1234152.12312498, 100000.0, null, 1239012341823719, 24, '___|_123', null),
-           |(1, false, '2015-07-02', 0.0, 0.0, 42, 1239012341823719, -13, 'asdf', '2015-07-02 00:00:00.000'),
-           |(1, true, '2015-07-01', 1234152.12312498, 1.0, 42, 1239012341823719, 23, 'Unicode''s樂趣', '2015-07-01 00:00:00.001')
-         """.stripMargin
-      )
-      // scalastyle:on
-      conn.commit()
-    }
-
-    createTable(test_table)
-    createTable(test_table3)
+    createTestDataInRedshift(test_table)
   }
 
   override def afterAll(): Unit = {
     try {
       conn.prepareStatement(s"drop table if exists $test_table").executeUpdate()
-      conn.prepareStatement(s"drop table if exists $test_table3").executeUpdate()
       conn.commit()
     } finally {
       super.afterAll()
@@ -85,26 +47,6 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
   override def beforeEach(): Unit = {
     super.beforeEach()
     read.option("dbtable", test_table).load().createOrReplaceTempView("test_table")
-    read.option("dbtable", test_table3).load().createOrReplaceTempView("test_table3")
-  }
-
-  /**
-   * Create a new DataFrameReader using common options for reading from Redshift.
-   */
-  private def read: DataFrameReader = {
-    sqlContext.read
-      .format("com.databricks.spark.redshift")
-      .option("url", jdbcUrl)
-      .option("tempdir", tempDir)
-  }
-  /**
-   * Create a new DataFrameWriter using common options for writing to Redshift.
-   */
-  private def write(df: DataFrame): DataFrameWriter[Row] = {
-    df.write
-      .format("com.databricks.spark.redshift")
-      .option("url", jdbcUrl)
-      .option("tempdir", tempDir)
   }
 
   test("DefaultSource can load Redshift UNLOAD output to a DataFrame") {
@@ -385,107 +327,6 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
       conn.commit()
     }
-  }
-
-  test("SaveMode.Overwrite with schema-qualified table name (#97)") {
-    val tableName = s"overwrite_schema_qualified_table_name$randomSuffix"
-    val df = sqlContext.createDataFrame(sc.parallelize(Seq(Row(1))),
-      StructType(StructField("a", IntegerType) :: Nil))
-    try {
-      // Ensure that the table exists:
-      write(df)
-        .option("dbtable", tableName)
-        .mode(SaveMode.ErrorIfExists)
-        .save()
-      assert(DefaultJDBCWrapper.tableExists(conn, s"PUBLIC.$tableName"))
-      // Try overwriting that table while using the schema-qualified table name:
-      write(df)
-        .option("dbtable", s"PUBLIC.$tableName")
-        .mode(SaveMode.Overwrite)
-        .save()
-    } finally {
-      conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
-      conn.commit()
-    }
-  }
-
-  test("SaveMode.Overwrite with non-existent table") {
-    testRoundtripSaveAndLoad(
-      s"overwrite_non_existent_table$randomSuffix",
-      sqlContext.createDataFrame(sc.parallelize(Seq(Row(1))),
-        StructType(StructField("a", IntegerType) :: Nil)),
-      saveMode = SaveMode.Overwrite)
-  }
-
-  test("SaveMode.Overwrite with existing table") {
-    val tableName = s"overwrite_existing_table$randomSuffix"
-    try {
-      // Create a table to overwrite
-      write(sqlContext.createDataFrame(sc.parallelize(Seq(Row(1))),
-        StructType(StructField("a", IntegerType) :: Nil)))
-        .option("dbtable", tableName)
-        .mode(SaveMode.ErrorIfExists)
-        .save()
-      assert(DefaultJDBCWrapper.tableExists(conn, tableName))
-
-      val overwritingDf =
-        sqlContext.createDataFrame(sc.parallelize(TestUtils.expectedData), TestUtils.testSchema)
-      write(overwritingDf)
-        .option("dbtable", tableName)
-        .mode(SaveMode.Overwrite)
-        .save()
-
-      assert(DefaultJDBCWrapper.tableExists(conn, tableName))
-      checkAnswer(read.option("dbtable", tableName).load(), TestUtils.expectedData)
-    } finally {
-      conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
-      conn.commit()
-    }
-  }
-
-  // TODO:test overwrite that fails.
-
-  test("Append SaveMode doesn't destroy existing data") {
-    val extraData = Seq(
-      Row(2.toByte, false, null, -1234152.12312498, 100000.0f, null, 1239012341823719L,
-        24.toShort, "___|_123", null))
-
-    write(sqlContext.createDataFrame(sc.parallelize(extraData), TestUtils.testSchema))
-      .option("dbtable", test_table3)
-      .mode(SaveMode.Append)
-      .saveAsTable(test_table3)
-
-    checkAnswer(
-      sqlContext.sql("select * from test_table3"),
-      TestUtils.expectedData ++ extraData)
-  }
-
-  test("Respect SaveMode.ErrorIfExists when table exists") {
-    val rdd = sc.parallelize(TestUtils.expectedData)
-    val df = sqlContext.createDataFrame(rdd, TestUtils.testSchema)
-    df.createOrReplaceTempView(test_table) // to ensure that the table already exists
-
-    // Check that SaveMode.ErrorIfExists throws an exception
-    intercept[AnalysisException] {
-      write(df)
-        .option("dbtable", test_table)
-        .mode(SaveMode.ErrorIfExists)
-        .saveAsTable(test_table)
-    }
-  }
-
-  test("Do nothing when table exists if SaveMode = Ignore") {
-    val rdd = sc.parallelize(TestUtils.expectedData.drop(1))
-    val df = sqlContext.createDataFrame(rdd, TestUtils.testSchema)
-    write(df)
-      .option("dbtable", test_table)
-      .mode(SaveMode.Ignore)
-      .saveAsTable(test_table)
-
-    // Check that SaveMode.Ignore does nothing
-    checkAnswer(
-      sqlContext.sql("select * from test_table"),
-      TestUtils.expectedData)
   }
 
   test("filtering based on date constants (regression test for #152)") {
