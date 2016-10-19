@@ -431,6 +431,34 @@ for other options).</p>
 at the end of the command can be used, but that should cover most possible use cases.</p>
     </td>
  </tr>
+ <tr>
+    <td><tt>tempformat</tt>  (Experimental)</td>
+    <td>No</td>
+    <td><tt>AVRO</tt></td>
+    <td>
+    <p>
+        The format in which to save temporary files in S3 when writing to Redshift.
+        Defaults to "AVRO"; the other allowed values are "CSV" and "CSV GZIP" for CSV
+        and gzipped CSV, respectively.
+    </p>
+    <p>
+        Redshift is significantly faster when loading CSV than when loading Avro files, so
+        using that <tt>tempformat</tt> may provide a large performance boost when writing
+        to Redshift.
+    </p>
+    </td>
+ </tr>
+ <tr>
+    <td><tt>csvnullstring</tt>  (Experimental)</td>
+    <td>No</td>
+    <td><tt>@NULL@</tt></td>
+    <td>
+    <p>
+        The String value to write for nulls when using the CSV <tt>tempformat</tt>.
+        This should be a value which does not appear in your actual data.
+    </p>
+    </td>
+ </tr>
 </table>
 
 ## Additional configuration options

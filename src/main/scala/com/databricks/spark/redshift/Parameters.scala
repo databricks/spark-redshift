@@ -94,14 +94,15 @@ private[redshift] object Parameters {
     def rootTempDir: String = parameters("tempdir")
 
     /**
-      * The format in which to save temporary files in S3. Defaults to "AVRO", other allowed values
-      * are "CSV" and "CSV GZIP" for CSV and gzipped CSV respectively.
-      */
+     * The format in which to save temporary files in S3. Defaults to "AVRO"; the other allowed
+     * values are "CSV" and "CSV GZIP" for CSV and gzipped CSV, respectively.
+     */
     def tempFormat: String = parameters("tempformat")
 
     /**
-      * The String value to write for nulls when using CSV.
-      */
+     * The String value to write for nulls when using CSV.
+     * This should be a value which does not appear in your actual data.
+     */
     def nullString: String = parameters("csvnullstring")
 
     /**
