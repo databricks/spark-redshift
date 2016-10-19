@@ -84,51 +84,8 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
 
   override def beforeEach(): Unit = {
     super.beforeEach()
-    sqlContext.sql(
-      s"""
-         | create temporary table test_table(
-         |   testbyte tinyint,
-         |   testbool boolean,
-         |   testdate date,
-         |   testdouble double,
-         |   testfloat float,
-         |   testint int,
-         |   testlong bigint,
-         |   testshort smallint,
-         |   teststring string,
-         |   testtimestamp timestamp
-         | )
-         | using com.databricks.spark.redshift
-         | options(
-         |   url \"$jdbcUrl\",
-         |   tempdir \"$tempDir\",
-         |   dbtable \"$test_table\"
-         | )
-       """.stripMargin
-    ).collect()
-
-    sqlContext.sql(
-      s"""
-         | create temporary table test_table3(
-         |   testbyte smallint,
-         |   testbool boolean,
-         |   testdate date,
-         |   testdouble double,
-         |   testfloat float,
-         |   testint int,
-         |   testlong bigint,
-         |   testshort smallint,
-         |   teststring string,
-         |   testtimestamp timestamp
-         | )
-         | using com.databricks.spark.redshift
-         | options(
-         |   url \"$jdbcUrl\",
-         |   tempdir \"$tempDir\",
-         |   dbtable \"$test_table3\"
-         | )
-       """.stripMargin
-    ).collect()
+    read.option("dbtable", test_table).load().createOrReplaceTempView("test_table")
+    read.option("dbtable", test_table3).load().createOrReplaceTempView("test_table3")
   }
 
   /**
