@@ -108,4 +108,18 @@ class ParametersSuite extends FunSuite with Matchers {
       "query" -> "select * from test_table",
       "url" -> "jdbc:redshift://foo/bar?user=user&password=password"))
   }
+
+  test("tempformat option is case-insensitive") {
+    val params = Map(
+      "tempdir" -> "s3://foo/bar",
+      "dbtable" -> "test_schema.test_table",
+      "url" -> "jdbc:redshift://foo/bar?user=user&password=password")
+
+    Parameters.mergeParameters(params + ("tempformat" -> "csv"))
+    Parameters.mergeParameters(params + ("tempformat" -> "CSV"))
+
+    intercept[IllegalArgumentException] {
+      Parameters.mergeParameters(params + ("tempformat" -> "invalid-temp-format"))
+    }
+  }
 }

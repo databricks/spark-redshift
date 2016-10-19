@@ -31,7 +31,7 @@ private[redshift] object Parameters {
     // * distkey has no default, but is optional unless using diststyle KEY
     // * jdbcdriver has no default, but is optional
 
-    "tempformat" -> "AVRO",
+    "tempformat" -> "avro",
     "csvnullstring" -> "@NULL@",
     "overwrite" -> "false",
     "diststyle" -> "EVEN",
@@ -40,7 +40,7 @@ private[redshift] object Parameters {
     "postactions" -> ";"
   )
 
-  val VALID_TEMP_FORMATS = Set("AVRO", "CSV", "CSV GZIP")
+  val VALID_TEMP_FORMATS = Set("avro", "csv", "csv gzip")
 
   /**
    * Merge user parameters with the defaults, preferring user parameters if specified
@@ -50,9 +50,10 @@ private[redshift] object Parameters {
       throw new IllegalArgumentException("'tempdir' is required for all Redshift loads and saves")
     }
     if (userParameters.contains("tempformat") &&
-      !(VALID_TEMP_FORMATS contains userParameters("tempformat"))) {
+        !VALID_TEMP_FORMATS.contains(userParameters("tempformat").toLowerCase)) {
       throw new IllegalArgumentException(
-        s"""Invalid temp format: ${userParameters("tempformat")}""")
+        s"""Invalid temp format: ${userParameters("tempformat")}; """ +
+          s"valid formats are: ${VALID_TEMP_FORMATS.mkString(", ")}")
     }
     if (!userParameters.contains("url")) {
       throw new IllegalArgumentException("A JDBC URL must be provided with 'url' parameter")
@@ -97,7 +98,7 @@ private[redshift] object Parameters {
      * The format in which to save temporary files in S3. Defaults to "AVRO"; the other allowed
      * values are "CSV" and "CSV GZIP" for CSV and gzipped CSV, respectively.
      */
-    def tempFormat: String = parameters("tempformat")
+    def tempFormat: String = parameters("tempformat").toLowerCase
 
     /**
      * The String value to write for nulls when using CSV.
