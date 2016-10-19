@@ -65,7 +65,7 @@ class AWSCredentialsUtilsSuite extends FunSuite {
       "temporary_aws_session_token" -> "token"
     ))
 
-    val creds = AWSCredentialsUtils.load(params, conf)
+    val creds = AWSCredentialsUtils.load(params, conf).getCredentials
     assert(creds.isInstanceOf[AWSSessionCredentials])
     assert(creds.getAWSAccessKeyId === "key_id")
     assert(creds.getAWSSecretKey === "secret")
@@ -78,13 +78,13 @@ class AWSCredentialsUtilsSuite extends FunSuite {
     conf.set("fs.s3.awsSecretAccessKey", "CONFKEY")
 
     {
-      val creds = AWSCredentialsUtils.load("s3://URIID:URIKEY@bucket/path", conf)
+      val creds = AWSCredentialsUtils.load("s3://URIID:URIKEY@bucket/path", conf).getCredentials
       assert(creds.getAWSAccessKeyId === "URIID")
       assert(creds.getAWSSecretKey === "URIKEY")
     }
 
     {
-      val creds = AWSCredentialsUtils.load("s3://bucket/path", conf)
+      val creds = AWSCredentialsUtils.load("s3://bucket/path", conf).getCredentials
       assert(creds.getAWSAccessKeyId === "CONFID")
       assert(creds.getAWSSecretKey === "CONFKEY")
     }
@@ -97,13 +97,13 @@ class AWSCredentialsUtilsSuite extends FunSuite {
     conf.set("fs.s3n.awsSecretAccessKey", "CONFKEY")
 
     {
-      val creds = AWSCredentialsUtils.load("s3n://URIID:URIKEY@bucket/path", conf)
+      val creds = AWSCredentialsUtils.load("s3n://URIID:URIKEY@bucket/path", conf).getCredentials
       assert(creds.getAWSAccessKeyId === "URIID")
       assert(creds.getAWSSecretKey === "URIKEY")
     }
 
     {
-      val creds = AWSCredentialsUtils.load("s3n://bucket/path", conf)
+      val creds = AWSCredentialsUtils.load("s3n://bucket/path", conf).getCredentials
       assert(creds.getAWSAccessKeyId === "CONFID")
       assert(creds.getAWSSecretKey === "CONFKEY")
     }
@@ -116,13 +116,13 @@ class AWSCredentialsUtilsSuite extends FunSuite {
     conf.set("fs.s3a.secret.key", "CONFKEY")
 
     {
-      val creds = AWSCredentialsUtils.load("s3a://URIID:URIKEY@bucket/path", conf)
+      val creds = AWSCredentialsUtils.load("s3a://URIID:URIKEY@bucket/path", conf).getCredentials
       assert(creds.getAWSAccessKeyId === "URIID")
       assert(creds.getAWSSecretKey === "URIKEY")
     }
 
     {
-      val creds = AWSCredentialsUtils.load("s3a://bucket/path", conf)
+      val creds = AWSCredentialsUtils.load("s3a://bucket/path", conf).getCredentials
       assert(creds.getAWSAccessKeyId === "CONFID")
       assert(creds.getAWSSecretKey === "CONFKEY")
     }

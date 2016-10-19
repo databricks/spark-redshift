@@ -22,7 +22,7 @@ import java.net.URI
 
 import scala.collection.JavaConverters._
 
-import com.amazonaws.auth.AWSCredentials
+import com.amazonaws.auth.AWSCredentialsProvider
 import com.amazonaws.services.s3.AmazonS3Client
 import com.eclipsesource.json.Json
 import org.apache.spark.rdd.RDD
@@ -38,7 +38,7 @@ import com.databricks.spark.redshift.Parameters.MergedParameters
  */
 private[redshift] case class RedshiftRelation(
     jdbcWrapper: JDBCWrapper,
-    s3ClientFactory: AWSCredentials => AmazonS3Client,
+    s3ClientFactory: AWSCredentialsProvider => AmazonS3Client,
     params: MergedParameters,
     userSchema: Option[StructType])
     (@transient val sqlContext: SQLContext)
@@ -111,7 +111,7 @@ private[redshift] case class RedshiftRelation(
     } else {
       // Unload data from Redshift into a temporary directory in S3:
       val tempDir = params.createPerQueryTempDir()
-      val unloadSql = buildUnloadStmt(requiredColumns, filters, tempDir)
+      val unloadSql = buildUnloadStmt(requiredColumns, filters, tempDir, creds)
       log.info(unloadSql)
       val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, params.credentials)
       try {
@@ -162,13 +162,14 @@ private[redshift] case class RedshiftRelation(
   private def buildUnloadStmt(
       requiredColumns: Array[String],
       filters: Array[Filter],
-      tempDir: String): String = {
+      tempDir: String,
+      creds: AWSCredentialsProvider): String = {
     assert(!requiredColumns.isEmpty)
     // Always quote column names:
     val columnList = requiredColumns.map(col => s""""$col"""").mkString(", ")
     val whereClause = FilterPushdown.buildWhereClause(schema, filters)
-    val creds = AWSCredentialsUtils.load(params, sqlContext.sparkContext.hadoopConfiguration)
-    val credsString: String = AWSCredentialsUtils.getRedshiftCredentialsString(params, creds)
+    val credsString: String =
+      AWSCredentialsUtils.getRedshiftCredentialsString(params, creds.getCredentials)
     val query = {
       // Since the query passed to UNLOAD will be enclosed in single quotes, we need to escape
       // any backslashes and single quotes that appear in the query itself
