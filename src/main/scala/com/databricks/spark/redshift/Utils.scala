@@ -164,4 +164,38 @@ private[redshift] object Utils {
         "use a s3n:// or s3a:// scheme.")
     }
   }
+
+  /**
+   * Attempts to retrieve the region of the S3 bucket.
+   */
+  def getRegionForS3Bucket(tempDir: String, s3Client: AmazonS3Client): Option[String] = {
+    try {
+      val s3URI = createS3URI(Utils.fixS3Url(tempDir))
+      val bucket = s3URI.getBucket
+      assert(bucket != null, "Could not get bucket from S3 URI")
+      val region = s3Client.getBucketLocation(bucket) match {
+        // Map "US Standard" to us-east-1
+        case null | "US" => "us-east-1"
+        case other => other
+      }
+      Some(region)
+    } catch {
+      case NonFatal(e) =>
+        log.warn("An error occurred while trying to determine the S3 bucket's region", e)
+        None
+    }
+  }
+
+  /**
+   * Attempts to determine the region of a Redshift cluster based on its URL. It may not be possible
+   * to determine the region in some cases, such as when the Redshift cluster is placed behind a
+   * proxy.
+   */
+  def getRegionForRedshiftCluster(url: String): Option[String] = {
+    val regionRegex = """.*\.([^.]+)\.redshift.amazonaws.com.*""".r
+    url match {
+      case regionRegex(region) => Some(region)
+      case _ => None
+    }
+  }
 }

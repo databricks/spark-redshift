@@ -338,6 +338,20 @@ private[redshift] class RedshiftWriter(
     val creds: AWSCredentialsProvider =
       AWSCredentialsUtils.load(params, sqlContext.sparkContext.hadoopConfiguration)
 
+    for (
+      redshiftRegion <- Utils.getRegionForRedshiftCluster(params.jdbcUrl);
+      s3Region <- Utils.getRegionForS3Bucket(params.rootTempDir, s3ClientFactory(creds))
+    ) {
+     val regionIsSetInExtraCopyOptions =
+       params.extraCopyOptions.contains(s3Region) && params.extraCopyOptions.contains("region")
+     if (redshiftRegion != s3Region && !regionIsSetInExtraCopyOptions) {
+       log.error("The Redshift cluster and S3 bucket are in different regions " +
+         s"($redshiftRegion and $s3Region, respectively). In order to perform this cross-region " +
+         s"""write, you must add "region '$s3Region'" to the extracopyoptions parameter. """ +
+         "For more details on cross-region usage, see the README.")
+     }
+    }
+
     Utils.assertThatFileSystemIsNotS3BlockFileSystem(
       new URI(params.rootTempDir), sqlContext.sparkContext.hadoopConfiguration)
 

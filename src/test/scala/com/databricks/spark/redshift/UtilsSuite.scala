@@ -66,4 +66,11 @@ class UtilsSuite extends FunSuite with Matchers {
       removeCreds("s3n://ACCESSKEY:SECRETKEY@bucket/path/to/temp/dir") ===
       "s3n://bucket/path/to/temp/dir")
   }
+
+  test("getRegionForRedshiftCluster") {
+    val redshiftUrl =
+      "jdbc:redshift://example.secret.us-west-2.redshift.amazonaws.com:5439/database"
+    assert(Utils.getRegionForRedshiftCluster("mycluster.example.com") === None)
+    assert(Utils.getRegionForRedshiftCluster(redshiftUrl) === Some("us-west-2"))
+  }
 }
