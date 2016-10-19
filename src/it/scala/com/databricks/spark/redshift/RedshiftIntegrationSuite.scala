@@ -27,14 +27,12 @@ import org.apache.spark.sql.types._
 class RedshiftIntegrationSuite extends IntegrationSuiteBase {
 
   private val test_table: String = s"test_table_$randomSuffix"
-  private val test_table2: String = s"test_table2_$randomSuffix"
   private val test_table3: String = s"test_table3_$randomSuffix"
 
   override def beforeAll(): Unit = {
     super.beforeAll()
 
     conn.prepareStatement("drop table if exists test_table").executeUpdate()
-    conn.prepareStatement("drop table if exists test_table2").executeUpdate()
     conn.prepareStatement("drop table if exists test_table3").executeUpdate()
     conn.commit()
 
@@ -71,14 +69,12 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
     }
 
     createTable(test_table)
-    createTable(test_table2)
     createTable(test_table3)
   }
 
   override def afterAll(): Unit = {
     try {
       conn.prepareStatement(s"drop table if exists $test_table").executeUpdate()
-      conn.prepareStatement(s"drop table if exists $test_table2").executeUpdate()
       conn.prepareStatement(s"drop table if exists $test_table3").executeUpdate()
       conn.commit()
     } finally {
@@ -107,29 +103,6 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
          |   url \"$jdbcUrl\",
          |   tempdir \"$tempDir\",
          |   dbtable \"$test_table\"
-         | )
-       """.stripMargin
-    ).collect()
-
-    sqlContext.sql(
-      s"""
-         | create temporary table test_table2(
-         |   testbyte smallint,
-         |   testbool boolean,
-         |   testdate date,
-         |   testdouble double,
-         |   testfloat float,
-         |   testint int,
-         |   testlong bigint,
-         |   testshort smallint,
-         |   teststring string,
-         |   testtimestamp timestamp
-         | )
-         | using com.databricks.spark.redshift
-         | options(
-         |   url \"$jdbcUrl\",
-         |   tempdir \"$tempDir\",
-         |   dbtable \"$test_table2\"
          | )
        """.stripMargin
     ).collect()
