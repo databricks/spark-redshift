@@ -22,6 +22,8 @@ This library is more suited to ETL than interactive queries, since large amounts
     - [Configuring column encoding](#configuring-column-encoding)
     - [Setting descriptions on columns](#setting-descriptions-on-columns)
 - [Transactional Guarantees](#transactional-guarantees)
+- [Common problems and solutions](#common-problems-and-solutions)
+ - [S3 bucket and Redshift cluster are in different AWS regions](#s3-bucket-and-redshift-cluster-are-in-different-aws-regions)
 - [Migration Guide](#migration-guide)
 
 ## Installation
@@ -526,6 +528,44 @@ When reading from / writing to Redshift, this library reads and writes data in S
 If the deprecated `usestagingtable` setting is set to `false` then this library will commit the `DELETE TABLE` command before appending rows to the new table, sacrificing the atomicity of the overwrite operation but reducing the amount of staging space that Redshift needs during the overwrite.
 
 **Querying Redshift tables**: Queries use Redshift's [`UNLOAD`](https://docs.aws.amazon.com/redshift/latest/dg/r_UNLOAD.html) command to execute a query and save its results to S3 and use [manifests](https://docs.aws.amazon.com/redshift/latest/dg/loading-data-files-using-manifest.html) to guard against certain eventually-consistent S3 operations. As a result, queries from Redshift data source for Spark should have the same consistency properties as regular Redshift queries.
+
+## Common problems and solutions
+
+### S3 bucket and Redshift cluster are in different AWS regions
+
+By default, S3 <-> Redshift copies will not work if the S3 bucket and Redshift cluster are in different AWS regions.
+
+If you attempt to perform a read of a Redshift table and the regions are mismatched then you may see a confusing error, such as
+
+```
+java.sql.SQLException: [Amazon](500310) Invalid operation: S3ServiceException:The bucket you are attempting to access must be addressed using the specified endpoint. Please send all future requests to this endpoint.
+```
+
+Similarly, attempting to write to Redshift using a S3 bucket in a different region may cause the following error:
+
+```
+error:  Problem reading manifest file - S3ServiceException:The bucket you are attempting to access must be addressed using the specified endpoint. Please send all future requests to this endpoint.,Status 301,Error PermanentRedirect
+```
+
+**For writes:** Redshift's `COPY` command allows the S3 bucket's region to be explicitly specified, so you can make writes to Redshift work properly in these cases by adding
+
+```
+region 'the-region-name'
+```
+
+to the `extracopyoptions` setting. For example, with a bucket in the US East (Virginia) region and the Scala API, use
+
+```
+.option("extracopyoptions", "region 'us-east-1'")
+```
+
+**For reads:** According to [its documentation](http://docs.aws.amazon.com/redshift/latest/dg/r_UNLOAD.html), the Redshift `UNLOAD` command does not support writing to a bucket in a different region:
+
+> **Important**
+>
+> The Amazon S3 bucket where Amazon Redshift will write the output files must reside in the same region as your cluster.
+
+As a result, this use-case is not supported by this library. The only workaround is to use a new bucket in the same region as your Redshift cluster.
 
 ## Migration Guide
 
