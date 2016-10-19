@@ -18,7 +18,7 @@ package com.databricks.spark.redshift
 
 import java.sql.SQLException
 
-import org.apache.spark.sql.{execution, AnalysisException, Row, SaveMode}
+import org.apache.spark.sql._
 import org.apache.spark.sql.types._
 
 /**
@@ -158,6 +158,16 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
     ).collect()
   }
 
+  /**
+   * Create a new DataFrameReader using common options for reading from Redshift.
+   */
+  private def read: DataFrameReader = {
+    sqlContext.read
+      .format("com.databricks.spark.redshift")
+      .option("url", jdbcUrl)
+      .option("tempdir", tempDir)
+  }
+
   test("DefaultSource can load Redshift UNLOAD output to a DataFrame") {
     checkAnswer(
       sqlContext.sql("select * from test_table"),
@@ -172,14 +182,10 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
   }
 
   test("count() on DataFrame created from a Redshift query") {
-    val loadedDf = sqlContext.read
-      .format("com.databricks.spark.redshift")
-      .option("url", jdbcUrl)
+    val loadedDf =
       // scalastyle:off
-      .option("query", s"select * from $test_table where teststring = 'Unicode''s樂趣'")
+      read.option("query", s"select * from $test_table where teststring = 'Unicode''s樂趣'").load()
       // scalastyle:on
-      .option("tempdir", tempDir)
-      .load()
     checkAnswer(
       loadedDf.selectExpr("count(*)"),
       Seq(Row(1))
@@ -187,12 +193,8 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
   }
 
   test("backslashes in queries/subqueries are escaped (regression test for #215)") {
-    val loadedDf = sqlContext.read
-      .format("com.databricks.spark.redshift")
-      .option("url", jdbcUrl)
-      .option("query", s"select replace(teststring, '\\\\', '') as col from $test_table")
-      .option("tempdir", tempDir)
-      .load()
+    val loadedDf =
+      read.option("query", s"select replace(teststring, '\\\\', '') as col from $test_table").load()
     checkAnswer(
       loadedDf.filter("col = 'asdf'"),
       Seq(Row("asdf"))
@@ -212,13 +214,7 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
         | and testint = 42)
       """.stripMargin
     // scalastyle:on
-    val loadedDf = sqlContext.read
-      .format("com.databricks.spark.redshift")
-      .option("url", jdbcUrl)
-      .option("dbtable", query)
-      .option("tempdir", tempDir)
-      .load()
-    checkAnswer(loadedDf, Seq(Row(1, true)))
+    checkAnswer(read.option("dbtable", query).load(), Seq(Row(1, true)))
   }
 
   test("Can load output when 'query' is specified instead of 'dbtable'") {
@@ -234,23 +230,13 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
         | and testint = 42
       """.stripMargin
     // scalastyle:on
-    val loadedDf = sqlContext.read
-      .format("com.databricks.spark.redshift")
-      .option("url", jdbcUrl)
-      .option("query", query)
-      .option("tempdir", tempDir)
-      .load()
-    checkAnswer(loadedDf, Seq(Row(1, true)))
+    checkAnswer(read.option("query", query).load(), Seq(Row(1, true)))
   }
 
   test("Can load output of Redshift aggregation queries") {
-    val loadedDf = sqlContext.read
-      .format("com.databricks.spark.redshift")
-      .option("url", jdbcUrl)
-      .option("query", s"select testbool, count(*) from $test_table group by testbool")
-      .option("tempdir", tempDir)
-      .load()
-    checkAnswer(loadedDf, Seq(Row(true, 1), Row(false, 2), Row(null, 2)))
+    checkAnswer(
+      read.option("query", s"select testbool, count(*) from $test_table group by testbool").load(),
+      Seq(Row(true, 1), Row(false, 2), Row(null, 2)))
   }
 
   test("DefaultSource supports simple column filtering") {
@@ -304,13 +290,7 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
         .save()
 
       assert(DefaultJDBCWrapper.tableExists(conn, tableName))
-      val loadedDf = sqlContext.read
-        .format("com.databricks.spark.redshift")
-        .option("url", jdbcUrl)
-        .option("dbtable", tableName)
-        .option("tempdir", tempDir)
-        .load()
-      checkAnswer(loadedDf, TestUtils.expectedData)
+      checkAnswer(read.option("dbtable", tableName).load(), TestUtils.expectedData)
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
       conn.commit()
@@ -376,13 +356,7 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
         .mode(SaveMode.ErrorIfExists)
         .save()
       assert(DefaultJDBCWrapper.tableExists(conn, tableName))
-      val loadedDf = sqlContext.read
-        .format("com.databricks.spark.redshift")
-        .option("url", jdbcUrl)
-        .option("dbtable", tableName)
-        .option("tempdir", tempDir)
-        .load()
-      checkAnswer(loadedDf, Seq(Row("a" * 512)))
+      checkAnswer(read.option("dbtable", tableName).load(), Seq(Row("a" * 512)))
       // This append should fail due to the string being longer than the maxlength
       intercept[SQLException] {
         sqlContext.createDataFrame(sc.parallelize(Seq(Row("a" * 513))), schema).write
@@ -413,13 +387,7 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
         .mode(SaveMode.ErrorIfExists)
         .save()
       assert(DefaultJDBCWrapper.tableExists(conn, tableName))
-      val loadedDf = sqlContext.read
-        .format("com.databricks.spark.redshift")
-        .option("url", jdbcUrl)
-        .option("dbtable", tableName)
-        .option("tempdir", tempDir)
-        .load()
-      checkAnswer(loadedDf, Seq(Row("a" * 128)))
+      checkAnswer(read.option("dbtable", tableName).load(), Seq(Row("a" * 128)))
       val encodingDF = sqlContext.read
         .format("jdbc")
         .option("url", jdbcUrl)
@@ -448,13 +416,7 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
         .mode(SaveMode.ErrorIfExists)
         .save()
       assert(DefaultJDBCWrapper.tableExists(conn, tableName))
-      val loadedDf = sqlContext.read
-        .format("com.databricks.spark.redshift")
-        .option("url", jdbcUrl)
-        .option("dbtable", tableName)
-        .option("tempdir", tempDir)
-        .load()
-      checkAnswer(loadedDf, Seq(Row("a" * 128)))
+      checkAnswer(read.option("dbtable", tableName).load(), Seq(Row("a" * 128)))
       val tableDF = sqlContext.read
         .format("jdbc")
         .option("url", jdbcUrl)
@@ -565,13 +527,7 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
         .save()
 
       assert(DefaultJDBCWrapper.tableExists(conn, tableName))
-      val loadedDf = sqlContext.read
-        .format("com.databricks.spark.redshift")
-        .option("url", jdbcUrl)
-        .option("dbtable", tableName)
-        .option("tempdir", tempDir)
-        .load()
-      checkAnswer(loadedDf, TestUtils.expectedData)
+      checkAnswer(read.option("dbtable", tableName).load(), TestUtils.expectedData)
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
       conn.commit()
@@ -676,15 +632,9 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
         s"INSERT INTO $tableName VALUES ('NaN'), ('Infinity'), ('-Infinity')")
       conn.commit()
       assert(DefaultJDBCWrapper.tableExists(conn, tableName))
-      val loadedDf = sqlContext.read
-        .format("com.databricks.spark.redshift")
-        .option("url", jdbcUrl)
-        .option("dbtable", tableName)
-        .option("tempdir", tempDir)
-        .load()
       // Due to #98, we use Double here instead of float:
       checkAnswer(
-        loadedDf,
+        read.option("dbtable", tableName).load(),
         Seq(Double.NaN, Double.PositiveInfinity, Double.NegativeInfinity).map(x => Row.apply(x)))
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
@@ -701,14 +651,8 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
         s"INSERT INTO $tableName VALUES ('NaN'), ('Infinity'), ('-Infinity')")
       conn.commit()
       assert(DefaultJDBCWrapper.tableExists(conn, tableName))
-      val loadedDf = sqlContext.read
-        .format("com.databricks.spark.redshift")
-        .option("url", jdbcUrl)
-        .option("dbtable", tableName)
-        .option("tempdir", tempDir)
-        .load()
       checkAnswer(
-        loadedDf,
+        read.option("dbtable", tableName).load(),
         Seq(Double.NaN, Double.PositiveInfinity, Double.NegativeInfinity).map(x => Row.apply(x)))
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
