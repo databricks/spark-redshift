@@ -167,6 +167,15 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
       .option("url", jdbcUrl)
       .option("tempdir", tempDir)
   }
+  /**
+   * Create a new DataFrameWriter using common options for writing to Redshift.
+   */
+  private def write(df: DataFrame): DataFrameWriter[Row] = {
+    df.write
+      .format("com.databricks.spark.redshift")
+      .option("url", jdbcUrl)
+      .option("tempdir", tempDir)
+  }
 
   test("DefaultSource can load Redshift UNLOAD output to a DataFrame") {
     checkAnswer(
@@ -280,12 +289,9 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
     // This test can be simplified once #98 is fixed.
     val tableName = s"roundtrip_save_and_load_$randomSuffix"
     try {
-      sqlContext.createDataFrame(sc.parallelize(TestUtils.expectedData), TestUtils.testSchema)
-        .write
-        .format("com.databricks.spark.redshift")
-        .option("url", jdbcUrl)
+      write(
+        sqlContext.createDataFrame(sc.parallelize(TestUtils.expectedData), TestUtils.testSchema))
         .option("dbtable", tableName)
-        .option("tempdir", tempDir)
         .mode(SaveMode.ErrorIfExists)
         .save()
 
@@ -348,22 +354,16 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
       val metadata = new MetadataBuilder().putLong("maxlength", 512).build()
       val schema = StructType(
         StructField("x", StringType, metadata = metadata) :: Nil)
-      sqlContext.createDataFrame(sc.parallelize(Seq(Row("a" * 512))), schema).write
-        .format("com.databricks.spark.redshift")
-        .option("url", jdbcUrl)
+      write(sqlContext.createDataFrame(sc.parallelize(Seq(Row("a" * 512))), schema))
         .option("dbtable", tableName)
-        .option("tempdir", tempDir)
         .mode(SaveMode.ErrorIfExists)
         .save()
       assert(DefaultJDBCWrapper.tableExists(conn, tableName))
       checkAnswer(read.option("dbtable", tableName).load(), Seq(Row("a" * 512)))
       // This append should fail due to the string being longer than the maxlength
       intercept[SQLException] {
-        sqlContext.createDataFrame(sc.parallelize(Seq(Row("a" * 513))), schema).write
-          .format("com.databricks.spark.redshift")
-          .option("url", jdbcUrl)
+        write(sqlContext.createDataFrame(sc.parallelize(Seq(Row("a" * 513))), schema))
           .option("dbtable", tableName)
-          .option("tempdir", tempDir)
           .mode(SaveMode.Append)
           .save()
       }
@@ -379,11 +379,8 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
       val metadata = new MetadataBuilder().putString("encoding", "LZO").build()
       val schema = StructType(
         StructField("x", StringType, metadata = metadata) :: Nil)
-      sqlContext.createDataFrame(sc.parallelize(Seq(Row("a" * 128))), schema).write
-        .format("com.databricks.spark.redshift")
-        .option("url", jdbcUrl)
+      write(sqlContext.createDataFrame(sc.parallelize(Seq(Row("a" * 128))), schema))
         .option("dbtable", tableName)
-        .option("tempdir", tempDir)
         .mode(SaveMode.ErrorIfExists)
         .save()
       assert(DefaultJDBCWrapper.tableExists(conn, tableName))
@@ -407,12 +404,9 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
       val metadata = new MetadataBuilder().putString("description", "Hello Column").build()
       val schema = StructType(
         StructField("x", StringType, metadata = metadata) :: Nil)
-      sqlContext.createDataFrame(sc.parallelize(Seq(Row("a" * 128))), schema).write
-        .format("com.databricks.spark.redshift")
-        .option("url", jdbcUrl)
+      write(sqlContext.createDataFrame(sc.parallelize(Seq(Row("a" * 128))), schema))
         .option("dbtable", tableName)
         .option("description", "Hello Table")
-        .option("tempdir", tempDir)
         .mode(SaveMode.ErrorIfExists)
         .save()
       assert(DefaultJDBCWrapper.tableExists(conn, tableName))
@@ -451,11 +445,8 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
       val df = sqlContext.createDataFrame(sc.parallelize(Seq(Row("a" * 512))),
         StructType(StructField("A", StringType) :: Nil))
       val e = intercept[SQLException] {
-        df.write
-          .format("com.databricks.spark.redshift")
-          .option("url", jdbcUrl)
+        write(df)
           .option("dbtable", tableName)
-          .option("tempdir", tempDir)
           .mode(SaveMode.ErrorIfExists)
           .save()
       }
@@ -472,20 +463,14 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
       StructType(StructField("a", IntegerType) :: Nil))
     try {
       // Ensure that the table exists:
-      df.write
-        .format("com.databricks.spark.redshift")
-        .option("url", jdbcUrl)
+      write(df)
         .option("dbtable", tableName)
-        .option("tempdir", tempDir)
         .mode(SaveMode.ErrorIfExists)
         .save()
       assert(DefaultJDBCWrapper.tableExists(conn, s"PUBLIC.$tableName"))
       // Try overwriting that table while using the schema-qualified table name:
-      df.write
-        .format("com.databricks.spark.redshift")
-        .option("url", jdbcUrl)
+      write(df)
         .option("dbtable", s"PUBLIC.$tableName")
-        .option("tempdir", tempDir)
         .mode(SaveMode.Overwrite)
         .save()
     } finally {
@@ -506,23 +491,17 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
     val tableName = s"overwrite_existing_table$randomSuffix"
     try {
       // Create a table to overwrite
-      sqlContext.createDataFrame(sc.parallelize(Seq(Row(1))),
-        StructType(StructField("a", IntegerType) :: Nil))
-        .write
-        .format("com.databricks.spark.redshift")
-        .option("url", jdbcUrl)
+      write(sqlContext.createDataFrame(sc.parallelize(Seq(Row(1))),
+        StructType(StructField("a", IntegerType) :: Nil)))
         .option("dbtable", tableName)
-        .option("tempdir", tempDir)
         .mode(SaveMode.ErrorIfExists)
         .save()
       assert(DefaultJDBCWrapper.tableExists(conn, tableName))
 
-      sqlContext.createDataFrame(sc.parallelize(TestUtils.expectedData), TestUtils.testSchema)
-        .write
-        .format("com.databricks.spark.redshift")
-        .option("url", jdbcUrl)
+      val overwritingDf =
+        sqlContext.createDataFrame(sc.parallelize(TestUtils.expectedData), TestUtils.testSchema)
+      write(overwritingDf)
         .option("dbtable", tableName)
-        .option("tempdir", tempDir)
         .mode(SaveMode.Overwrite)
         .save()
 
@@ -541,11 +520,8 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
       Row(2.toByte, false, null, -1234152.12312498, 100000.0f, null, 1239012341823719L,
         24.toShort, "___|_123", null))
 
-    sqlContext.createDataFrame(sc.parallelize(extraData), TestUtils.testSchema).write
-      .format("com.databricks.spark.redshift")
-      .option("url", jdbcUrl)
+    write(sqlContext.createDataFrame(sc.parallelize(extraData), TestUtils.testSchema))
       .option("dbtable", test_table3)
-      .option("tempdir", tempDir)
       .mode(SaveMode.Append)
       .saveAsTable(test_table3)
 
@@ -561,11 +537,8 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
 
     // Check that SaveMode.ErrorIfExists throws an exception
     intercept[AnalysisException] {
-      df.write
-        .format("com.databricks.spark.redshift")
-        .option("url", jdbcUrl)
+      write(df)
         .option("dbtable", test_table)
-        .option("tempdir", tempDir)
         .mode(SaveMode.ErrorIfExists)
         .saveAsTable(test_table)
     }
@@ -574,11 +547,8 @@ class RedshiftIntegrationSuite extends IntegrationSuiteBase {
   test("Do nothing when table exists if SaveMode = Ignore") {
     val rdd = sc.parallelize(TestUtils.expectedData.drop(1))
     val df = sqlContext.createDataFrame(rdd, TestUtils.testSchema)
-    df.write
-      .format("com.databricks.spark.redshift")
-      .option("url", jdbcUrl)
+    write(df)
       .option("dbtable", test_table)
-      .option("tempdir", tempDir)
       .mode(SaveMode.Ignore)
       .saveAsTable(test_table)
 
