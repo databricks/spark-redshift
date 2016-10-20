@@ -87,6 +87,21 @@ private[redshift] case class RedshiftRelation(
 
   override def buildScan(requiredColumns: Array[String], filters: Array[Filter]): RDD[Row] = {
     val creds = AWSCredentialsUtils.load(params, sqlContext.sparkContext.hadoopConfiguration)
+    for (
+      redshiftRegion <- Utils.getRegionForRedshiftCluster(params.jdbcUrl);
+      s3Region <- Utils.getRegionForS3Bucket(params.rootTempDir, s3ClientFactory(creds))
+    ) {
+      if (redshiftRegion != s3Region) {
+        // We don't currently support `extraunloadoptions`, so even if Amazon _did_ add a `region`
+        // option for this we wouldn't be able to pass in the new option. However, we choose to
+        // err on the side of caution and don't throw an exception because we don't want to break
+        // existing workloads in case the region detection logic is wrong.
+        log.error("The Redshift cluster and S3 bucket are in different regions " +
+          s"($redshiftRegion and $s3Region, respectively). Redshift's UNLOAD command requires " +
+          s"that the Redshift cluster and Amazon S3 bucket be located in the same region, so " +
+          s"this read will fail.")
+      }
+    }
     Utils.checkThatBucketHasObjectLifecycleConfiguration(params.rootTempDir, s3ClientFactory(creds))
     if (requiredColumns.isEmpty) {
       // In the special case where no columns were requested, issue a `count(*)` against Redshift

@@ -35,6 +35,8 @@ env:
     - secure: "cuyemI1bqPkWBD5B1FqIKDJb5g/SX5x8lrzkO0J/jkyGY0VLbHxrl5j/9PrKFuvraBK3HC56HEP1Zg+IMvh+uv0D+p5y14C97fAzE33uNgR2aVkamOo92zHvxvXe7zBtqc8rztWsJb1pgkrY7SdgSXgQc88ohey+XecDh4TahTY="
     # AWS_S3_SCRATCH_SPACE
     - secure: "LvndQIW6dHs6nyaMHtblGI/oL+s460lOezFs2BoD0Isenb/O/IM+nY5K9HepTXjJIcq8qvUYnojZX1FCrxxOXX2/+/Iihiq7GzJYdmdMC6hLg9bJYeAFk0dWYT88/AwadrJCBOa3ockRLhiO3dkai7Ki5+M1erfaFiAHHMpJxYQ="
+    # AWS_S3_CROSS_REGION_SCRATCH_SPACE
+    - secure: "esYmBqt256Dc77HT68zoaE/vtsFGk2N+Kt+52RlR0cjHPY1q5801vxLbeOlpYb2On3x8YckE++HadjL40gwSBsca0ffoogq6zTlfbJYDSQkQG1evxXWJZLcafB0igfBs/UbEUo7EaxoAJQcLgiWWwUdO0a0iU1ciSVyogZPagL0="
 
 script:
   - ./dev/run-tests-travis.sh
