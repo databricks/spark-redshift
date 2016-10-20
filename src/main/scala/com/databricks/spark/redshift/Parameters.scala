@@ -40,7 +40,7 @@ private[redshift] object Parameters {
     "postactions" -> ";"
   )
 
-  val VALID_TEMP_FORMATS = Set("avro", "csv", "csv gzip")
+  val VALID_TEMP_FORMATS = Set("AVRO", "CSV", "CSV GZIP")
 
   /**
    * Merge user parameters with the defaults, preferring user parameters if specified
@@ -50,7 +50,7 @@ private[redshift] object Parameters {
       throw new IllegalArgumentException("'tempdir' is required for all Redshift loads and saves")
     }
     if (userParameters.contains("tempformat") &&
-        !VALID_TEMP_FORMATS.contains(userParameters("tempformat").toLowerCase)) {
+        !VALID_TEMP_FORMATS.contains(userParameters("tempformat").toUpperCase)) {
       throw new IllegalArgumentException(
         s"""Invalid temp format: ${userParameters("tempformat")}; """ +
           s"valid formats are: ${VALID_TEMP_FORMATS.mkString(", ")}")
@@ -98,7 +98,7 @@ private[redshift] object Parameters {
      * The format in which to save temporary files in S3. Defaults to "AVRO"; the other allowed
      * values are "CSV" and "CSV GZIP" for CSV and gzipped CSV, respectively.
      */
-    def tempFormat: String = parameters("tempformat").toLowerCase
+    def tempFormat: String = parameters("tempformat").toUpperCase
 
     /**
      * The String value to write for nulls when using CSV.

@@ -95,8 +95,8 @@ private[redshift] class RedshiftWriter(
       AWSCredentialsUtils.getRedshiftCredentialsString(params, creds.getCredentials)
     val fixedUrl = Utils.fixS3Url(manifestUrl)
     val format = params.tempFormat match {
-      case "avro" => "AVRO 'auto'"
-      case csv if csv == "csv" || csv == "csv gzip" => csv + s" NULL AS '${params.nullString}'"
+      case "AVRO" => "AVRO 'auto'"
+      case csv if csv == "CSV" || csv == "CSV GZIP" => csv + s" NULL AS '${params.nullString}'"
     }
     s"COPY ${params.table.get} FROM '$fixedUrl' CREDENTIALS '$credsString' FORMAT AS " +
       s"${format} manifest ${params.extraCopyOptions}"
@@ -281,13 +281,13 @@ private[redshift] class RedshiftWriter(
 
     val writer = sqlContext.createDataFrame(convertedRows, convertedSchema).write
     (tempFormat match {
-      case "avro" =>
+      case "AVRO" =>
         writer.format("com.databricks.spark.avro")
-      case "csv" =>
+      case "CSV" =>
         writer.format("csv")
           .option("escape", "\"")
           .option("nullValue", nullString)
-      case "csv gzip" =>
+      case "CSV GZIP" =>
         writer.format("csv")
           .option("escape", "\"")
           .option("nullValue", nullString)
