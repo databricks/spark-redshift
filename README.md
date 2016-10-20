@@ -431,6 +431,19 @@ for other options).</p>
 at the end of the command can be used, but that should cover most possible use cases.</p>
     </td>
  </tr>
+ <tr>
+    <td><tt>extraunloadoptions</tt></td>
+    <td>No</td>
+    <td>No Default</td>
+    <td>
+<p>A list extra unload options to append to the Redshift <tt>UNLOAD</tt> command when writing data to S3, e.g. <tt>DELIMITER</tt>
+or <TT>FIXEDWIDTH</tt> (see the <a href="http://docs.aws.amazon.com/redshift/latest/dg/r_UNLOAD.html#unload-parameters">Redshift docs</a>
+for other options). Parameters <tt>ESCAPE</tt> and <tt>MANIFEST</tt> are always append.</p>
+
+<p>Note that since these options are appended to the end of the <tt>UNLOAD</tt> command, only options that make sense
+at the end of the command can be used, but that should cover most possible use cases.</p>
+    </td>
+ </tr>
 </table>
 
 ## Additional configuration options
