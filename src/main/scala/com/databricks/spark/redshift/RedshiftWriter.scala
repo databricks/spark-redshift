@@ -368,6 +368,24 @@ private[redshift] class RedshiftWriter(
      }
     }
 
+    // When using the Avro tempformat, log an informative error message in case any column names
+    // are unsupported by Avro's schema validation:
+    if (params.tempFormat == "AVRO") {
+      for (fieldName <- data.schema.fieldNames) {
+        // The following logic is based on Avro's Schema.validateName() method:
+        val firstChar = fieldName.charAt(0)
+        val isValid = (firstChar.isLetter || firstChar == '_') && fieldName.tail.forall { c =>
+          c.isLetterOrDigit || c == '_'
+        }
+        if (!isValid) {
+          throw new IllegalArgumentException(
+            s"The field name '$fieldName' is not supported when using the Avro tempformat. " +
+              "Try using the CSV tempformat  instead. For more details, see " +
+              "https://github.com/databricks/spark-redshift/issues/84")
+        }
+      }
+    }
+
     Utils.assertThatFileSystemIsNotS3BlockFileSystem(
       new URI(params.rootTempDir), sqlContext.sparkContext.hadoopConfiguration)
 

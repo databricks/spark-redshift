@@ -117,10 +117,26 @@ abstract class BaseRedshiftWriteSuite extends IntegrationSuiteBase {
 
 class AvroRedshiftWriteSuite extends BaseRedshiftWriteSuite {
   override protected val tempformat: String = "AVRO"
+
+  test("informative error message when saving with column names that contain spaces (#84)") {
+    intercept[IllegalArgumentException] {
+      testRoundtripSaveAndLoad(
+        s"error_when_saving_column_name_with_spaces_$randomSuffix",
+        sqlContext.createDataFrame(sc.parallelize(Seq(Row(1))),
+          StructType(StructField("column name with spaces", IntegerType) :: Nil)))
+    }
+  }
 }
 
 class CSVRedshiftWriteSuite extends BaseRedshiftWriteSuite {
   override protected val tempformat: String = "CSV"
+
+  test("save with column names that contain spaces (#84)") {
+    testRoundtripSaveAndLoad(
+      s"save_with_column_names_that_contain_spaces_$randomSuffix",
+      sqlContext.createDataFrame(sc.parallelize(Seq(Row(1))),
+        StructType(StructField("column name with spaces", IntegerType) :: Nil)))
+  }
 }
 
 class CSVGZIPRedshiftWriteSuite extends IntegrationSuiteBase {
