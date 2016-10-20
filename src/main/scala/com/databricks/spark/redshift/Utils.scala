@@ -192,7 +192,7 @@ private[redshift] object Utils {
    * proxy.
    */
   def getRegionForRedshiftCluster(url: String): Option[String] = {
-    val regionRegex = """.*\.([^.]+)\.redshift.amazonaws.com.*""".r
+    val regionRegex = """.*\.([^.]+)\.redshift\.amazonaws\.com.*""".r
     url match {
       case regionRegex(region) => Some(region)
       case _ => None
