@@ -78,7 +78,7 @@ private[redshift] object Conversions {
    *
    * Note that instances of this function are NOT thread-safe.
    */
-  def createRowConverter(schema: StructType): (Array[String]) => Row = {
+  def createRowConverter(schema: StructType): Row => Row = {
     val dateFormat = createRedshiftDateFormat()
     val decimalFormat = createRedshiftDecimalFormat()
     val conversionFunctions: Array[String => Any] = schema.fields.map { field =>
@@ -110,10 +110,10 @@ private[redshift] object Conversions {
     }
     // As a performance optimization, re-use the same mutable Seq:
     val converted: mutable.IndexedSeq[Any] = mutable.IndexedSeq.fill(schema.length)(null)
-    (fields: Array[String]) => {
+    (inputRow: Row) => {
       var i = 0
       while (i < schema.length) {
-        val data = fields(i)
+        val data = inputRow.getString(i)
         converted(i) = if (data == null || data.isEmpty) null else conversionFunctions(i)(data)
         i += 1
       }

@@ -16,7 +16,7 @@
 
 package com.databricks.spark.redshift
 
-import java.io.{ByteArrayInputStream, File}
+import java.io.{OutputStreamWriter, ByteArrayInputStream}
 import java.net.URI
 
 import com.amazonaws.services.s3.AmazonS3Client
@@ -26,8 +26,6 @@ import org.apache.http.client.methods.HttpRequestBase
 import org.mockito.Matchers._
 import org.mockito.Mockito
 import org.mockito.Mockito.when
-import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.mapreduce.InputFormat
 import org.apache.hadoop.fs.{Path, FileSystem}
 import org.apache.hadoop.fs.s3native.S3NInMemoryFileSystem
 import org.mockito.invocation.InvocationOnMock
@@ -35,29 +33,11 @@ import org.mockito.stubbing.Answer
 import org.scalatest.{BeforeAndAfterEach, BeforeAndAfterAll, Matchers}
 
 import org.apache.spark.SparkContext
-import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql._
 import org.apache.spark.sql.types._
 
 import com.databricks.spark.redshift.Parameters.MergedParameters
-
-private class TestContext extends SparkContext("local", "RedshiftSourceSuite") {
-
-  /**
-   * A text file containing fake unloaded Redshift data of all supported types
-   */
-  val testData = new File("src/test/resources/redshift_unload_data.txt").toURI.toString
-
-  override def newAPIHadoopFile[K, V, F <: InputFormat[K, V]](
-      path: String,
-      fClass: Class[F],
-      kClass: Class[K],
-      vClass: Class[V],
-      conf: Configuration = hadoopConfiguration): RDD[(K, V)] = {
-    super.newAPIHadoopFile[K, V, F](testData, fClass, kClass, vClass, conf)
-  }
-}
 
 /**
  * Tests main DataFrame loading and writing functionality
@@ -84,6 +64,8 @@ class RedshiftSourceSuite
 
   private val s3TempDir: String = "s3n://test-bucket/temp-dir/"
 
+  private var unloadedData: String = ""
+
   // Parameters common to most tests. Some parameters are overridden in specific tests.
   private def defaultParams: Map[String, String] = Map(
     "url" -> "jdbc:redshift://foo/bar?user=user&password=password",
@@ -92,7 +74,7 @@ class RedshiftSourceSuite
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    sc = new TestContext
+    sc = new SparkContext("local", "RedshiftSourceSuite")
     sc.hadoopConfiguration.set("fs.s3n.impl", classOf[S3NInMemoryFileSystem].getName)
     // We need to use a DirectOutputCommitter to work around an issue which occurs with renames
     // while using the mocked S3 filesystem.
@@ -123,13 +105,19 @@ class RedshiftSourceSuite
       new Answer[S3ObjectInputStream] {
         override def answer(invocationOnMock: InvocationOnMock): S3ObjectInputStream = {
           val manifest =
-            """
+            s"""
               | {
               |   "entries": [
-              |     { "url": "s3://test-bucket/some-uuid(a-hack-for-mocking)/part-00000" }
+              |     { "url": "${Utils.fixS3Url(Utils.lastTempPathGenerated)}/part-00000" }
               |    ]
               | }
             """.stripMargin
+          // Write the data to the output file specified in the manifest:
+          val out = s3FileSystem.create(new Path(s"${Utils.lastTempPathGenerated}/part-00000"))
+          val ow = new OutputStreamWriter(out.getWrappedStream)
+          ow.write(unloadedData)
+          ow.close()
+          out.close()
           val is = new ByteArrayInputStream(manifest.getBytes("UTF-8"))
           new S3ObjectInputStream(
             is,
@@ -154,6 +142,16 @@ class RedshiftSourceSuite
   }
 
   test("DefaultSource can load Redshift UNLOAD output to a DataFrame") {
+    // scalastyle:off
+    unloadedData =
+      """
+        |1|t|2015-07-01|1234152.12312498|1.0|42|1239012341823719|23|Unicode's樂趣|2015-07-01 00:00:00.001
+        |1|f|2015-07-02|0|0.0|42|1239012341823719|-13|asdf|2015-07-02 00:00:00.0
+        |0||2015-07-03|0.0|-1.0|4141214|1239012341823719||f|2015-07-03 00:00:00
+        |0|f||-1234152.12312498|100000.0||1239012341823719|24|"___|_123"|
+        ||||||||||
+      """.stripMargin.trim
+    // scalastyle:on
     val expectedQuery = (
       "UNLOAD \\('SELECT \"testbyte\", \"testbool\", \"testdate\", \"testdouble\"," +
       " \"testfloat\", \"testint\", \"testlong\", \"testshort\", \"teststring\", " +
@@ -186,9 +184,12 @@ class RedshiftSourceSuite
       """.stripMargin.lines.map(_.trim).mkString(" ").trim.r
     val query =
       """select testbyte, testbool from test_table where teststring = '\\Unicode''s樂趣'"""
+    unloadedData = "1|t"
     // scalastyle:on
     val querySchema =
       StructType(Seq(StructField("testbyte", ByteType), StructField("testbool", BooleanType)))
+
+    val expectedValues = Array(Row(1.toByte, true))
 
     // Test with dbtable parameter that wraps the query in parens:
     {
@@ -197,7 +198,7 @@ class RedshiftSourceSuite
         new MockRedshift(defaultParams("url"), Map(params("dbtable") -> querySchema))
       val relation = new DefaultSource(
         mockRedshift.jdbcWrapper, _ => mockS3Client).createRelation(testSqlContext, params)
-      testSqlContext.baseRelationToDataFrame(relation).collect()
+      assert(testSqlContext.baseRelationToDataFrame(relation).collect() === expectedValues)
       mockRedshift.verifyThatConnectionsWereClosed()
       mockRedshift.verifyThatExpectedQueriesWereIssued(Seq(expectedJDBCQuery))
     }
@@ -208,13 +209,23 @@ class RedshiftSourceSuite
       val mockRedshift = new MockRedshift(defaultParams("url"), Map(s"($query)" -> querySchema))
       val relation = new DefaultSource(
         mockRedshift.jdbcWrapper, _ => mockS3Client).createRelation(testSqlContext, params)
-      testSqlContext.baseRelationToDataFrame(relation).collect()
+      assert(testSqlContext.baseRelationToDataFrame(relation).collect() === expectedValues)
       mockRedshift.verifyThatConnectionsWereClosed()
       mockRedshift.verifyThatExpectedQueriesWereIssued(Seq(expectedJDBCQuery))
     }
   }
 
   test("DefaultSource supports simple column filtering") {
+    // scalastyle:off
+    unloadedData =
+      """
+        |1|t
+        |1|f
+        |0|
+        |0|f
+        ||
+      """.stripMargin.trim
+    // scalastyle:on
     val expectedQuery = (
       "UNLOAD \\('SELECT \"testbyte\", \"testbool\" FROM \"PUBLIC\".\"test_table\" '\\) " +
       "TO '.*' " +
@@ -241,6 +252,7 @@ class RedshiftSourceSuite
 
   test("DefaultSource supports user schema, pruned and filtered scans") {
     // scalastyle:off
+    unloadedData = "1|t"
     val expectedQuery = (
       "UNLOAD \\('SELECT \"testbyte\", \"testbool\" " +
         "FROM \"PUBLIC\".\"test_table\" " +
@@ -277,7 +289,7 @@ class RedshiftSourceSuite
 
     // Technically this assertion should check that the RDD only returns a single row, but
     // since we've mocked out Redshift our WHERE clause won't have had any effect.
-    assert(rdd.collect().contains(Row(1, true)))
+    assert(rdd.collect() === Array(Row(1, true)))
     mockRedshift.verifyThatConnectionsWereClosed()
     mockRedshift.verifyThatExpectedQueriesWereIssued(Seq(expectedQuery))
   }
