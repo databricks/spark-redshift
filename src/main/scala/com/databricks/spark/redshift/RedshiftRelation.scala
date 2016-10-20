@@ -17,7 +17,6 @@
 package com.databricks.spark.redshift
 
 import java.io.InputStreamReader
-import java.lang
 import java.net.URI
 
 import scala.collection.JavaConverters._
@@ -26,6 +25,7 @@ import com.amazonaws.auth.AWSCredentialsProvider
 import com.amazonaws.services.s3.AmazonS3Client
 import com.eclipsesource.json.Json
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.catalyst.encoders.RowEncoder
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SaveMode, SQLContext}
@@ -155,22 +155,27 @@ private[redshift] case class RedshiftRelation(
           tempDir.stripSuffix("/") + '/' + file.stripPrefix(cleanedTempDirUri).stripPrefix("/")
         }
       }
-      // Create a DataFrame to read the unloaded data:
-      val rdd: RDD[(lang.Long, Array[String])] = {
-        val rdds = filesToRead.map { file =>
-          sqlContext.sparkContext.newAPIHadoopFile(
-            file,
-            classOf[RedshiftInputFormat],
-            classOf[java.lang.Long],
-            classOf[Array[String]])
-        }.toArray
-        sqlContext.sparkContext.union(rdds)
-      }
+
       val prunedSchema = pruneSchema(schema, requiredColumns)
-      rdd.values.mapPartitions { iter =>
-        val converter: Array[String] => Row = Conversions.createRowConverter(prunedSchema)
+
+      val df: DataFrame = sqlContext.read
+        .option("sep", "|")
+        .option("comment", "")
+        .option("maxColumns", prunedSchema.length + 1)
+        .option("maxCharsPerColumn", 65535 * 2)
+        .option("inferSchema", "false")
+        .option("ignoreLeadingWhiteSpace", "false")
+        .option("ignoreTrailingWhiteSpace", "false")
+        .option("header", "false")
+        .option("mode", "FAILFAST")
+        .schema(StructType(prunedSchema.map(_.copy(dataType = StringType))))
+        .csv(filesToRead: _*)
+
+      // Create a DataFrame to read the unloaded data:
+      df.mapPartitions { iter =>
+        val converter: Row => Row = Conversions.createRowConverter(prunedSchema)
         iter.map(converter)
-      }
+      }(RowEncoder(prunedSchema)).rdd
     }
   }
 
@@ -195,7 +200,7 @@ private[redshift] case class RedshiftRelation(
     // the credentials passed via `credsString`.
     val fixedUrl = Utils.fixS3Url(Utils.removeCredentialsFromURI(new URI(tempDir)).toString)
 
-    s"UNLOAD ('$query') TO '$fixedUrl' WITH CREDENTIALS '$credsString' ESCAPE MANIFEST"
+    s"UNLOAD ('$query') TO '$fixedUrl' WITH CREDENTIALS '$credsString' ESCAPE MANIFEST ADDQUOTES"
   }
 
   private def pruneSchema(schema: StructType, columns: Array[String]): StructType = {

@@ -105,10 +105,16 @@ private[redshift] object Utils {
       uri.getFragment)
   }
 
+  // Visible for testing
+  private[redshift] var lastTempPathGenerated: String = null
+
   /**
    * Creates a randomly named temp directory path for intermediate data
    */
-  def makeTempPath(tempRoot: String): String = Utils.joinUrls(tempRoot, UUID.randomUUID().toString)
+  def makeTempPath(tempRoot: String): String = {
+    lastTempPathGenerated = Utils.joinUrls(tempRoot, UUID.randomUUID().toString)
+    lastTempPathGenerated
+  }
 
   /**
    * Checks whether the S3 bucket for the given UI has an object lifecycle configuration to

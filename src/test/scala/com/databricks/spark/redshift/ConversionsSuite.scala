@@ -43,7 +43,7 @@ class ConversionsSuite extends FunSuite {
     val expectedTimestampMillis = TestUtils.toMillis(2014, 2, 1, 0, 0, 1, 123)
 
     val convertedRow = convertRow(
-      Array("1", "t", "2015-07-01", doubleMin, "1.0", "42",
+      Row("1", "t", "2015-07-01", doubleMin, "1.0", "42",
         longMax, "23", unicodeString, timestampWithMillis))
 
     val expectedRow = Row(1.asInstanceOf[Byte], true, new Timestamp(expectedDateMillis),
@@ -55,17 +55,17 @@ class ConversionsSuite extends FunSuite {
 
   test("Row conversion handles null values") {
     val convertRow = Conversions.createRowConverter(TestUtils.testSchema)
-    val emptyRow = List.fill(TestUtils.testSchema.length)(null).toArray[String]
-    assert(convertRow(emptyRow) === Row(emptyRow: _*))
+    val emptyRow = Row.fromSeq(List.fill(TestUtils.testSchema.length)(null))
+    assert(convertRow(emptyRow) === emptyRow)
   }
 
   test("Booleans are correctly converted") {
     val convertRow = Conversions.createRowConverter(StructType(Seq(StructField("a", BooleanType))))
-    assert(convertRow(Array("t")) === Row(true))
-    assert(convertRow(Array("f")) === Row(false))
-    assert(convertRow(Array(null)) === Row(null))
+    assert(convertRow(Row("t")) === Row(true))
+    assert(convertRow(Row("f")) === Row(false))
+    assert(convertRow(Row(null)) === Row(null))
     intercept[IllegalArgumentException] {
-      convertRow(Array("not-a-boolean"))
+      convertRow(Row("not-a-boolean"))
     }
   }
 
@@ -83,7 +83,7 @@ class ConversionsSuite extends FunSuite {
       "2014-03-01 00:00:00.001" -> TestUtils.toMillis(2014, 2, 1, 0, 0, 0, millis = 1)
     ).foreach { case (timestampString, expectedTime) =>
       withClue(s"timestamp string is '$timestampString'") {
-        val convertedTimestamp = convertRow(Array(timestampString)).get(0).asInstanceOf[Timestamp]
+        val convertedTimestamp = convertRow(Row(timestampString)).get(0).asInstanceOf[Timestamp]
         assert(convertedTimestamp === new Timestamp(expectedTime))
       }
     }
@@ -103,15 +103,15 @@ class ConversionsSuite extends FunSuite {
 
   test("Row conversion properly handles NaN and Inf float values (regression test for #261)") {
     val convertRow = Conversions.createRowConverter(StructType(Seq(StructField("a", FloatType))))
-    assert(java.lang.Float.isNaN(convertRow(Array("nan")).getFloat(0)))
-    assert(convertRow(Array("inf")) === Row(Float.PositiveInfinity))
-    assert(convertRow(Array("-inf")) === Row(Float.NegativeInfinity))
+    assert(java.lang.Float.isNaN(convertRow(Row("nan")).getFloat(0)))
+    assert(convertRow(Row("inf")) === Row(Float.PositiveInfinity))
+    assert(convertRow(Row("-inf")) === Row(Float.NegativeInfinity))
   }
 
   test("Row conversion properly handles NaN and Inf double values (regression test for #261)") {
     val convertRow = Conversions.createRowConverter(StructType(Seq(StructField("a", DoubleType))))
-    assert(java.lang.Double.isNaN(convertRow(Array("nan")).getDouble(0)))
-    assert(convertRow(Array("inf")) === Row(Double.PositiveInfinity))
-    assert(convertRow(Array("-inf")) === Row(Double.NegativeInfinity))
+    assert(java.lang.Double.isNaN(convertRow(Row("nan")).getDouble(0)))
+    assert(convertRow(Row("inf")) === Row(Double.PositiveInfinity))
+    assert(convertRow(Row("-inf")) === Row(Double.NegativeInfinity))
   }
 }
