@@ -20,10 +20,10 @@ import java.sql.Timestamp
 import java.text.{DecimalFormat, DecimalFormatSymbols, SimpleDateFormat}
 import java.util.Locale
 
-import scala.collection.mutable
-
+import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.encoders.RowEncoder
+import org.apache.spark.sql.catalyst.expressions.GenericRow
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.Row
 
 /**
  * Data type conversions for Redshift unloaded data
@@ -78,7 +78,7 @@ private[redshift] object Conversions {
    *
    * Note that instances of this function are NOT thread-safe.
    */
-  def createRowConverter(schema: StructType): Row => Row = {
+  def createRowConverter(schema: StructType): Array[String] => InternalRow = {
     val dateFormat = createRedshiftDateFormat()
     val decimalFormat = createRedshiftDecimalFormat()
     val conversionFunctions: Array[String => Any] = schema.fields.map { field =>
@@ -108,16 +108,18 @@ private[redshift] object Conversions {
         case _ => (data: String) => data
       }
     }
-    // As a performance optimization, re-use the same mutable Seq:
-    val converted: mutable.IndexedSeq[Any] = mutable.IndexedSeq.fill(schema.length)(null)
-    (inputRow: Row) => {
+    // As a performance optimization, re-use the same mutable row / array:
+    val converted: Array[Any] = Array.fill(schema.length)(null)
+    val externalRow = new GenericRow(converted)
+    val encoder = RowEncoder(schema)
+    (inputRow: Array[String]) => {
       var i = 0
       while (i < schema.length) {
-        val data = inputRow.getString(i)
+        val data = inputRow(i)
         converted(i) = if (data == null || data.isEmpty) null else conversionFunctions(i)(data)
         i += 1
       }
-      Row.fromSeq(converted)
+      encoder.toRow(externalRow)
     }
   }
 }

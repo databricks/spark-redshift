@@ -27,7 +27,7 @@ import scala.util.control.NonFatal
 
 class SerializableConfiguration(@transient var value: Configuration)
     extends Serializable with KryoSerializable {
-  @transient private[avro] lazy val log = LoggerFactory.getLogger(getClass)
+  @transient private[redshift] lazy val log = LoggerFactory.getLogger(getClass)
 
   private def writeObject(out: ObjectOutputStream): Unit = tryOrIOException {
     out.defaultWriteObject()

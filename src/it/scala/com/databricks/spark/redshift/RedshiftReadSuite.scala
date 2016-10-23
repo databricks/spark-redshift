@@ -46,7 +46,8 @@ class RedshiftReadSuite extends IntegrationSuiteBase {
     read.option("dbtable", test_table).load().createOrReplaceTempView("test_table")
   }
 
-  test("DefaultSource can load Redshift UNLOAD output to a DataFrame") {
+  test("DefaultSource can load Redshift UNLOAD output to a DataFrame 111") {
+    sqlContext.sparkContext.setLogLevel("DEBUG")
     checkAnswer(
       sqlContext.sql("select * from test_table"),
       TestUtils.expectedData)
@@ -221,6 +222,21 @@ class RedshiftReadSuite extends IntegrationSuiteBase {
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
       conn.commit()
+    }
+  }
+
+  test("read records containing escaped characters") {
+    withTempRedshiftTable("records_with_escaped_characters") { tableName =>
+      conn.createStatement().executeUpdate(
+        s"CREATE TABLE $tableName (x text)")
+      conn.createStatement().executeUpdate(
+        s"""INSERT INTO $tableName VALUES ('a\\nb'), ('\\\\'), ('"')""")
+      conn.commit()
+      assert(DefaultJDBCWrapper.tableExists(conn, tableName))
+      checkAnswer(
+        read.option("dbtable", tableName).load(),
+        Seq("a\nb", "\\", "\"").map(x => Row.apply(x)))
+      Thread.sleep(1000 * 60)
     }
   }
 }

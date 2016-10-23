@@ -19,13 +19,14 @@ package com.databricks.spark.redshift
 import java.io.InputStreamReader
 import java.net.URI
 
+import org.apache.spark.sql.catalyst.encoders.RowEncoder
+
 import scala.collection.JavaConverters._
 
 import com.amazonaws.auth.AWSCredentialsProvider
 import com.amazonaws.services.s3.AmazonS3Client
 import com.eclipsesource.json.Json
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.catalyst.encoders.RowEncoder
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SaveMode, SQLContext}
@@ -115,8 +116,11 @@ private[redshift] case class RedshiftRelation(
         if (results.next()) {
           val numRows = results.getLong(1)
           val parallelism = sqlContext.getConf("spark.sql.shuffle.partitions", "200").toInt
-          val emptyRow = Row.empty
-          sqlContext.sparkContext.parallelize(1L to numRows, parallelism).map(_ => emptyRow)
+          val emptyRow = RowEncoder(StructType(Seq.empty)).toRow(Row(Seq.empty))
+          sqlContext.sparkContext
+            .parallelize(1L to numRows, parallelism)
+            .map(_ => emptyRow)
+            .asInstanceOf[RDD[Row]]
         } else {
           throw new IllegalStateException("Could not read count from Redshift")
         }
@@ -158,26 +162,15 @@ private[redshift] case class RedshiftRelation(
 
       val prunedSchema = pruneSchema(schema, requiredColumns)
 
-      val df: DataFrame = sqlContext.read
-        .option("sep", "|")
-        .option("comment", "")
-        .option("maxColumns", prunedSchema.length + 1)
-        .option("maxCharsPerColumn", 65535 * 2)
-        .option("inferSchema", "false")
-        .option("ignoreLeadingWhiteSpace", "false")
-        .option("ignoreTrailingWhiteSpace", "false")
-        .option("header", "false")
-        .option("mode", "FAILFAST")
-        .schema(StructType(prunedSchema.map(_.copy(dataType = StringType))))
-        .csv(filesToRead: _*)
-
-      // Create a DataFrame to read the unloaded data:
-      df.mapPartitions { iter =>
-        val converter: Row => Row = Conversions.createRowConverter(prunedSchema)
-        iter.map(converter)
-      }(RowEncoder(prunedSchema)).rdd
+      sqlContext.read
+        .format(classOf[RedshiftFileFormat].getName)
+        .schema(prunedSchema)
+        .load(filesToRead: _*)
+        .queryExecution.executedPlan.execute().asInstanceOf[RDD[Row]]
     }
   }
+
+  override def needConversion: Boolean = false
 
   private def buildUnloadStmt(
       requiredColumns: Array[String],
@@ -200,7 +193,7 @@ private[redshift] case class RedshiftRelation(
     // the credentials passed via `credsString`.
     val fixedUrl = Utils.fixS3Url(Utils.removeCredentialsFromURI(new URI(tempDir)).toString)
 
-    s"UNLOAD ('$query') TO '$fixedUrl' WITH CREDENTIALS '$credsString' ESCAPE MANIFEST ADDQUOTES"
+    s"UNLOAD ('$query') TO '$fixedUrl' WITH CREDENTIALS '$credsString' ESCAPE MANIFEST"
   }
 
   private def pruneSchema(schema: StructType, columns: Array[String]): StructType = {
