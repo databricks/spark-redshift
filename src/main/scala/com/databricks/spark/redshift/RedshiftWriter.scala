@@ -301,12 +301,9 @@ private[redshift] class RedshiftWriter(
       // for a description of the manifest file format. The URLs in this manifest must be absolute
       // and complete.
 
-      // The saved filenames depend on the spark-avro/csv version. In spark-avro 1.0.0, the write
-      // path uses SparkContext.saveAsHadoopFile(), which produces filenames of the form
-      // part-XXXXX.avro. In spark-avro 2.0.0+, the partition filenames are of the form
-      // part-r-XXXXX-UUID.avro. In spark-csv, the partition filenames are of the form part-XXXXX.
+      // The partition filenames are of the form part-r-XXXXX-UUID.fileExtension.
       val fs = FileSystem.get(URI.create(tempDir), sqlContext.sparkContext.hadoopConfiguration)
-      val partitionIdRegex = "^part-(?:r-)?(\\d+)(?:[.-].*)?$".r
+      val partitionIdRegex = "^part-(?:r-)?(\\d+)[^\\d+].*$".r
       val filesToLoad: Seq[String] = {
         val nonEmptyPartitionIds = nonEmptyPartitions.value.toSet
         fs.listStatus(new Path(tempDir)).map(_.getPath.getName).collect {
