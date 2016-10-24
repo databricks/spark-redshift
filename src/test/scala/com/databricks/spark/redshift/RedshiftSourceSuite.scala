@@ -16,28 +16,28 @@
 
 package com.databricks.spark.redshift
 
-import java.io.{OutputStreamWriter, ByteArrayInputStream}
+import java.io.{ByteArrayInputStream, OutputStreamWriter}
 import java.net.URI
 
 import com.amazonaws.services.s3.AmazonS3Client
-import com.amazonaws.services.s3.model.{S3ObjectInputStream, S3Object, BucketLifecycleConfiguration}
+import com.amazonaws.services.s3.model.{BucketLifecycleConfiguration, S3Object, S3ObjectInputStream}
 import com.amazonaws.services.s3.model.BucketLifecycleConfiguration.Rule
 import org.apache.http.client.methods.HttpRequestBase
 import org.mockito.Matchers._
 import org.mockito.Mockito
 import org.mockito.Mockito.when
-import org.apache.hadoop.fs.{Path, FileSystem}
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.fs.s3native.S3NInMemoryFileSystem
 import org.mockito.invocation.InvocationOnMock
 import org.mockito.stubbing.Answer
-import org.scalatest.{BeforeAndAfterEach, BeforeAndAfterAll, Matchers}
-
+import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers}
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql._
 import org.apache.spark.sql.types._
-
 import com.databricks.spark.redshift.Parameters.MergedParameters
+import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.encoders.RowEncoder
 
 /**
  * Tests main DataFrame loading and writing functionality
@@ -148,7 +148,7 @@ class RedshiftSourceSuite
         |1|t|2015-07-01|1234152.12312498|1.0|42|1239012341823719|23|Unicode's樂趣|2015-07-01 00:00:00.001
         |1|f|2015-07-02|0|0.0|42|1239012341823719|-13|asdf|2015-07-02 00:00:00.0
         |0||2015-07-03|0.0|-1.0|4141214|1239012341823719||f|2015-07-03 00:00:00
-        |0|f||-1234152.12312498|100000.0||1239012341823719|24|"___|_123"|
+        |0|f||-1234152.12312498|100000.0||1239012341823719|24|___\|_123|
         ||||||||||
       """.stripMargin.trim
     // scalastyle:on
@@ -236,9 +236,15 @@ class RedshiftSourceSuite
     // Construct the source with a custom schema
     val source = new DefaultSource(mockRedshift.jdbcWrapper, _ => mockS3Client)
     val relation = source.createRelation(testSqlContext, defaultParams, TestUtils.testSchema)
+    val resultSchema =
+      StructType(Seq(StructField("testbyte", ByteType), StructField("testbool", BooleanType)))
 
     val rdd = relation.asInstanceOf[PrunedFilteredScan]
       .buildScan(Array("testbyte", "testbool"), Array.empty[Filter])
+      .mapPartitions { iter =>
+        val fromRow = RowEncoder(resultSchema).resolveAndBind().fromRow _
+        iter.asInstanceOf[Iterator[InternalRow]].map(fromRow)
+      }
     val prunedExpectedValues = Array(
       Row(1.toByte, true),
       Row(1.toByte, false),
@@ -273,6 +279,8 @@ class RedshiftSourceSuite
     // Construct the source with a custom schema
     val source = new DefaultSource(mockRedshift.jdbcWrapper, _ => mockS3Client)
     val relation = source.createRelation(testSqlContext, defaultParams, TestUtils.testSchema)
+    val resultSchema =
+      StructType(Seq(StructField("testbyte", ByteType), StructField("testbool", BooleanType)))
 
     // Define a simple filter to only include a subset of rows
     val filters: Array[Filter] = Array(
@@ -286,9 +294,11 @@ class RedshiftSourceSuite
       LessThanOrEqual("testint", 43))
     val rdd = relation.asInstanceOf[PrunedFilteredScan]
       .buildScan(Array("testbyte", "testbool"), filters)
+      .mapPartitions { iter =>
+        val fromRow = RowEncoder(resultSchema).resolveAndBind().fromRow _
+        iter.asInstanceOf[Iterator[InternalRow]].map(fromRow)
+      }
 
-    // Technically this assertion should check that the RDD only returns a single row, but
-    // since we've mocked out Redshift our WHERE clause won't have had any effect.
     assert(rdd.collect() === Array(Row(1, true)))
     mockRedshift.verifyThatConnectionsWereClosed()
     mockRedshift.verifyThatExpectedQueriesWereIssued(Seq(expectedQuery))
