@@ -20,13 +20,9 @@ package com.databricks.spark.redshift
 import java.io.Closeable
 
 import org.apache.hadoop.mapreduce.RecordReader
-import org.apache.spark.sql.catalyst.InternalRow
 
 /**
  * An adaptor from a Hadoop [[RecordReader]] to an [[Iterator]] over the values returned.
- *
- * Note that this returns [[Object]]s instead of [[InternalRow]] because we rely on erasure to pass
- * column batches by pretending they are rows.
  *
  * This is copied from Apache Spark and is inlined here to avoid depending on Spark internals
  * in this external library.
