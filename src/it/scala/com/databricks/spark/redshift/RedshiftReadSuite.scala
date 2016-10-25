@@ -46,8 +46,7 @@ class RedshiftReadSuite extends IntegrationSuiteBase {
     read.option("dbtable", test_table).load().createOrReplaceTempView("test_table")
   }
 
-  test("DefaultSource can load Redshift UNLOAD output to a DataFrame 111") {
-    sqlContext.sparkContext.setLogLevel("DEBUG")
+  test("DefaultSource can load Redshift UNLOAD output to a DataFrame") {
     checkAnswer(
       sqlContext.sql("select * from test_table"),
       TestUtils.expectedData)
@@ -236,7 +235,6 @@ class RedshiftReadSuite extends IntegrationSuiteBase {
       checkAnswer(
         read.option("dbtable", tableName).load(),
         Seq("a\nb", "\\", "\"").map(x => Row.apply(x)))
-      Thread.sleep(1000 * 60)
     }
   }
 }
