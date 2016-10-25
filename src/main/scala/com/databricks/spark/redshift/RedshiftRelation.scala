@@ -17,8 +17,9 @@
 package com.databricks.spark.redshift
 
 import java.io.InputStreamReader
-import java.lang
 import java.net.URI
+
+import org.apache.spark.sql.catalyst.encoders.RowEncoder
 
 import scala.collection.JavaConverters._
 
@@ -115,8 +116,11 @@ private[redshift] case class RedshiftRelation(
         if (results.next()) {
           val numRows = results.getLong(1)
           val parallelism = sqlContext.getConf("spark.sql.shuffle.partitions", "200").toInt
-          val emptyRow = Row.empty
-          sqlContext.sparkContext.parallelize(1L to numRows, parallelism).map(_ => emptyRow)
+          val emptyRow = RowEncoder(StructType(Seq.empty)).toRow(Row(Seq.empty))
+          sqlContext.sparkContext
+            .parallelize(1L to numRows, parallelism)
+            .map(_ => emptyRow)
+            .asInstanceOf[RDD[Row]]
         } else {
           throw new IllegalStateException("Could not read count from Redshift")
         }
@@ -155,24 +159,18 @@ private[redshift] case class RedshiftRelation(
           tempDir.stripSuffix("/") + '/' + file.stripPrefix(cleanedTempDirUri).stripPrefix("/")
         }
       }
-      // Create a DataFrame to read the unloaded data:
-      val rdd: RDD[(lang.Long, Array[String])] = {
-        val rdds = filesToRead.map { file =>
-          sqlContext.sparkContext.newAPIHadoopFile(
-            file,
-            classOf[RedshiftInputFormat],
-            classOf[java.lang.Long],
-            classOf[Array[String]])
-        }.toArray
-        sqlContext.sparkContext.union(rdds)
-      }
+
       val prunedSchema = pruneSchema(schema, requiredColumns)
-      rdd.values.mapPartitions { iter =>
-        val converter: Array[String] => Row = Conversions.createRowConverter(prunedSchema)
-        iter.map(converter)
-      }
+
+      sqlContext.read
+        .format(classOf[RedshiftFileFormat].getName)
+        .schema(prunedSchema)
+        .load(filesToRead: _*)
+        .queryExecution.executedPlan.execute().asInstanceOf[RDD[Row]]
     }
   }
+
+  override def needConversion: Boolean = false
 
   private def buildUnloadStmt(
       requiredColumns: Array[String],

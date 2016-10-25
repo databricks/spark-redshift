@@ -70,6 +70,8 @@ object SparkRedshiftBuild extends Build {
         } else {
           "org.apache.avro" % "avro-mapred" % "1.7.7" % "provided" classifier "hadoop2" exclude("org.mortbay.jetty", "servlet-api")
         },
+        // Kryo is provided by Spark, but we need this here in order to be able to import KryoSerializable
+        "com.esotericsoftware" % "kryo-shaded" % "3.0.3" % "provided",
         // A Redshift-compatible JDBC driver must be present on the classpath for spark-redshift to work.
         // For testing, we use an Amazon driver, which is available from
         // http://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-connection.html

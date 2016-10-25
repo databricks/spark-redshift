@@ -223,4 +223,18 @@ class RedshiftReadSuite extends IntegrationSuiteBase {
       conn.commit()
     }
   }
+
+  test("read records containing escaped characters") {
+    withTempRedshiftTable("records_with_escaped_characters") { tableName =>
+      conn.createStatement().executeUpdate(
+        s"CREATE TABLE $tableName (x text)")
+      conn.createStatement().executeUpdate(
+        s"""INSERT INTO $tableName VALUES ('a\\nb'), ('\\\\'), ('"')""")
+      conn.commit()
+      assert(DefaultJDBCWrapper.tableExists(conn, tableName))
+      checkAnswer(
+        read.option("dbtable", tableName).load(),
+        Seq("a\nb", "\\", "\"").map(x => Row.apply(x)))
+    }
+  }
 }
