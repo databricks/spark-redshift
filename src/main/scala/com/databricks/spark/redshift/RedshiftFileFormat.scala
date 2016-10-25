@@ -57,11 +57,8 @@ private[redshift] class RedshiftFileFormat extends FileFormat {
       sparkSession: SparkSession,
       options: Map[String, String],
       path: Path): Boolean = {
-    // Redshift unload files are not splittable because records containing newline characters may
-    // span multiple lines. This is true even if the ESCAPE unload option is used, since that option
-    // causes Redshift to simply prepend the '\' character rather than replacing newlines with
-    // escape sequences.
-    false
+    // Our custom InputFormat handles split records properly
+    true
   }
 
   override def buildReader(
