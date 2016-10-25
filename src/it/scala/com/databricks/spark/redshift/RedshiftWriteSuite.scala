@@ -24,7 +24,12 @@ import org.apache.spark.sql.types._
 /**
  * End-to-end tests of functionality which involves writing to Redshift via the connector.
  */
-class RedshiftWriteSuite extends IntegrationSuiteBase {
+abstract class BaseRedshiftWriteSuite extends IntegrationSuiteBase {
+
+  protected val tempformat: String
+
+  override protected def write(df: DataFrame): DataFrameWriter[Row] =
+    super.write(df).option("tempformat", tempformat)
 
   test("roundtrip save and load") {
     // This test can be simplified once #98 is fixed.
@@ -107,5 +112,56 @@ class RedshiftWriteSuite extends IntegrationSuiteBase {
       sqlContext.createDataFrame(sc.parallelize(timestamps.map(Row(_))),
         StructType(StructField("ts", TimestampType) :: Nil))
     )
+  }
+}
+
+class AvroRedshiftWriteSuite extends BaseRedshiftWriteSuite {
+  override protected val tempformat: String = "AVRO"
+
+  test("informative error message when saving with column names that contain spaces (#84)") {
+    intercept[IllegalArgumentException] {
+      testRoundtripSaveAndLoad(
+        s"error_when_saving_column_name_with_spaces_$randomSuffix",
+        sqlContext.createDataFrame(sc.parallelize(Seq(Row(1))),
+          StructType(StructField("column name with spaces", IntegerType) :: Nil)))
+    }
+  }
+}
+
+class CSVRedshiftWriteSuite extends BaseRedshiftWriteSuite {
+  override protected val tempformat: String = "CSV"
+
+  test("save with column names that contain spaces (#84)") {
+    testRoundtripSaveAndLoad(
+      s"save_with_column_names_that_contain_spaces_$randomSuffix",
+      sqlContext.createDataFrame(sc.parallelize(Seq(Row(1))),
+        StructType(StructField("column name with spaces", IntegerType) :: Nil)))
+  }
+}
+
+class CSVGZIPRedshiftWriteSuite extends IntegrationSuiteBase {
+  // Note: we purposely don't inherit from BaseRedshiftWriteSuite because we're only interested in
+  // testing basic functionality of the GZIP code; the rest of the write path should be unaffected
+  // by compression here.
+
+  override protected def write(df: DataFrame): DataFrameWriter[Row] =
+    super.write(df).option("tempformat", "CSV GZIP")
+
+  test("roundtrip save and load") {
+    // This test can be simplified once #98 is fixed.
+    val tableName = s"roundtrip_save_and_load_$randomSuffix"
+    try {
+      write(
+        sqlContext.createDataFrame(sc.parallelize(TestUtils.expectedData), TestUtils.testSchema))
+        .option("dbtable", tableName)
+        .mode(SaveMode.ErrorIfExists)
+        .save()
+
+      assert(DefaultJDBCWrapper.tableExists(conn, tableName))
+      checkAnswer(read.option("dbtable", tableName).load(), TestUtils.expectedData)
+    } finally {
+      conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
+      conn.commit()
+    }
   }
 }

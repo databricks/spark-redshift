@@ -200,11 +200,8 @@ trait IntegrationSuiteBase
       expectedSchemaAfterLoad: Option[StructType] = None,
       saveMode: SaveMode = SaveMode.ErrorIfExists): Unit = {
     try {
-      df.write
-        .format("com.databricks.spark.redshift")
-        .option("url", jdbcUrl)
+      write(df)
         .option("dbtable", tableName)
-        .option("tempdir", tempDir)
         .mode(saveMode)
         .save()
       // Check that the table exists. It appears that creating a table in one connection then
@@ -215,12 +212,7 @@ trait IntegrationSuiteBase
         Thread.sleep(1000)
         assert(DefaultJDBCWrapper.tableExists(conn, tableName))
       }
-      val loadedDf = sqlContext.read
-        .format("com.databricks.spark.redshift")
-        .option("url", jdbcUrl)
-        .option("dbtable", tableName)
-        .option("tempdir", tempDir)
-        .load()
+      val loadedDf = read.option("dbtable", tableName).load()
       assert(loadedDf.schema === expectedSchemaAfterLoad.getOrElse(df.schema))
       checkAnswer(loadedDf, df.collect())
     } finally {

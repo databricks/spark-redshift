@@ -94,8 +94,12 @@ private[redshift] class RedshiftWriter(
     val credsString: String =
       AWSCredentialsUtils.getRedshiftCredentialsString(params, creds.getCredentials)
     val fixedUrl = Utils.fixS3Url(manifestUrl)
+    val format = params.tempFormat match {
+      case "AVRO" => "AVRO 'auto'"
+      case csv if csv == "CSV" || csv == "CSV GZIP" => csv + s" NULL AS '${params.nullString}'"
+    }
     s"COPY ${params.table.get} FROM '$fixedUrl' CREDENTIALS '$credsString' FORMAT AS " +
-      s"AVRO 'auto' manifest ${params.extraCopyOptions}"
+      s"${format} manifest ${params.extraCopyOptions}"
   }
 
   /**
@@ -205,7 +209,9 @@ private[redshift] class RedshiftWriter(
   private def unloadData(
       sqlContext: SQLContext,
       data: DataFrame,
-      tempDir: String): Option[String] = {
+      tempDir: String,
+      tempFormat: String,
+      nullString: String): Option[String] = {
     // spark-avro does not support Date types. In addition, it converts Timestamps into longs
     // (milliseconds since the Unix epoch). Redshift is capable of loading timestamps in
     // 'epochmillisecs' format but there's no equivalent format for dates. To work around this, we
@@ -273,10 +279,20 @@ private[redshift] class RedshiftWriter(
       }
     )
 
-    sqlContext.createDataFrame(convertedRows, convertedSchema)
-      .write
-      .format("com.databricks.spark.avro")
-      .save(tempDir)
+    val writer = sqlContext.createDataFrame(convertedRows, convertedSchema).write
+    (tempFormat match {
+      case "AVRO" =>
+        writer.format("com.databricks.spark.avro")
+      case "CSV" =>
+        writer.format("csv")
+          .option("escape", "\"")
+          .option("nullValue", nullString)
+      case "CSV GZIP" =>
+        writer.format("csv")
+          .option("escape", "\"")
+          .option("nullValue", nullString)
+          .option("compression", "gzip")
+    }).save(tempDir)
 
     if (nonEmptyPartitions.value.isEmpty) {
       None
@@ -285,10 +301,7 @@ private[redshift] class RedshiftWriter(
       // for a description of the manifest file format. The URLs in this manifest must be absolute
       // and complete.
 
-      // The saved filenames depend on the spark-avro version. In spark-avro 1.0.0, the write
-      // path uses SparkContext.saveAsHadoopFile(), which produces filenames of the form
-      // part-XXXXX.avro. In spark-avro 2.0.0+, the partition filenames are of the form
-      // part-r-XXXXX-UUID.avro.
+      // The partition filenames are of the form part-r-XXXXX-UUID.fileExtension.
       val fs = FileSystem.get(URI.create(tempDir), sqlContext.sparkContext.hadoopConfiguration)
       val partitionIdRegex = "^part-(?:r-)?(\\d+)[^\\d+].*$".r
       val filesToLoad: Seq[String] = {
@@ -317,7 +330,7 @@ private[redshift] class RedshiftWriter(
   }
 
   /**
-   * Write a DataFrame to a Redshift table, using S3 and Avro serialization
+   * Write a DataFrame to a Redshift table, using S3 and Avro or CSV serialization
    */
   def saveToRedshift(
       sqlContext: SQLContext,
@@ -352,13 +365,36 @@ private[redshift] class RedshiftWriter(
      }
     }
 
+    // When using the Avro tempformat, log an informative error message in case any column names
+    // are unsupported by Avro's schema validation:
+    if (params.tempFormat == "AVRO") {
+      for (fieldName <- data.schema.fieldNames) {
+        // The following logic is based on Avro's Schema.validateName() method:
+        val firstChar = fieldName.charAt(0)
+        val isValid = (firstChar.isLetter || firstChar == '_') && fieldName.tail.forall { c =>
+          c.isLetterOrDigit || c == '_'
+        }
+        if (!isValid) {
+          throw new IllegalArgumentException(
+            s"The field name '$fieldName' is not supported when using the Avro tempformat. " +
+              "Try using the CSV tempformat  instead. For more details, see " +
+              "https://github.com/databricks/spark-redshift/issues/84")
+        }
+      }
+    }
+
     Utils.assertThatFileSystemIsNotS3BlockFileSystem(
       new URI(params.rootTempDir), sqlContext.sparkContext.hadoopConfiguration)
 
     Utils.checkThatBucketHasObjectLifecycleConfiguration(params.rootTempDir, s3ClientFactory(creds))
 
     // Save the table's rows to S3:
-    val manifestUrl = unloadData(sqlContext, data, params.createPerQueryTempDir())
+    val manifestUrl = unloadData(
+      sqlContext,
+      data,
+      tempDir = params.createPerQueryTempDir(),
+      tempFormat = params.tempFormat,
+      nullString = params.nullString)
     val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, params.credentials)
     conn.setAutoCommit(false)
     try {
