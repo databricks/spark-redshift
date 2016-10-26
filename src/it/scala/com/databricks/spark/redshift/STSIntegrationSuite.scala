@@ -52,11 +52,9 @@ class STSIntegrationSuite extends IntegrationSuiteBase {
     val df = sqlContext.createDataFrame(sc.parallelize(Seq(Row(1))),
       StructType(StructField("a", IntegerType) :: Nil))
     try {
-      df.write
-        .format("com.databricks.spark.redshift")
-        .option("url", jdbcUrl)
+      write(df)
         .option("dbtable", tableName)
-        .option("tempdir", tempDir)
+        .option("forward_spark_s3_credentials", "false")
         .option("temporary_aws_access_key_id", STS_ACCESS_KEY_ID)
         .option("temporary_aws_secret_access_key", STS_SECRET_ACCESS_KEY)
         .option("temporary_aws_session_token", STS_SESSION_TOKEN)
@@ -64,11 +62,9 @@ class STSIntegrationSuite extends IntegrationSuiteBase {
         .save()
 
       assert(DefaultJDBCWrapper.tableExists(conn, tableName))
-      val loadedDf = sqlContext.read
-        .format("com.databricks.spark.redshift")
-        .option("url", jdbcUrl)
+      val loadedDf = read
         .option("dbtable", tableName)
-        .option("tempdir", tempDir)
+        .option("forward_spark_s3_credentials", "false")
         .option("temporary_aws_access_key_id", STS_ACCESS_KEY_ID)
         .option("temporary_aws_secret_access_key", STS_SECRET_ACCESS_KEY)
         .option("temporary_aws_session_token", STS_SESSION_TOKEN)

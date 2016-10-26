@@ -18,7 +18,6 @@ package com.databricks.spark.redshift
 
 import scala.language.implicitConversions
 
-import com.amazonaws.AmazonClientException
 import com.amazonaws.auth.{AWSSessionCredentials, BasicSessionCredentials, BasicAWSCredentials}
 import org.apache.hadoop.conf.Configuration
 import org.scalatest.FunSuite
@@ -27,29 +26,39 @@ import com.databricks.spark.redshift.Parameters.MergedParameters
 
 class AWSCredentialsUtilsSuite extends FunSuite {
 
+  val baseParams = Map(
+    "tempdir" -> "s3://foo/bar",
+    "dbtable" -> "test_schema.test_table",
+    "url" -> "jdbc:redshift://foo/bar?user=user&password=password")
+
   private implicit def string2Params(tempdir: String): MergedParameters = {
-    MergedParameters(Map("tempdir" -> tempdir))
+    Parameters.mergeParameters(baseParams ++ Map(
+      "tempdir" -> tempdir,
+      "forward_spark_s3_credentials" -> "true"))
   }
 
   test("credentialsString with regular keys") {
     val creds = new BasicAWSCredentials("ACCESSKEYID", "SECRET/KEY/WITH/SLASHES")
-    val params = MergedParameters(Map.empty)
+    val params =
+      Parameters.mergeParameters(baseParams ++ Map("forward_spark_s3_credentials" -> "true"))
     assert(AWSCredentialsUtils.getRedshiftCredentialsString(params, creds) ===
       "aws_access_key_id=ACCESSKEYID;aws_secret_access_key=SECRET/KEY/WITH/SLASHES")
   }
 
   test("credentialsString with STS temporary keys") {
-    val creds = new BasicSessionCredentials("ACCESSKEYID", "SECRET/KEY", "SESSION/Token")
-    val params = MergedParameters(Map.empty)
-    assert(AWSCredentialsUtils.getRedshiftCredentialsString(params, creds) ===
+    val params = Parameters.mergeParameters(baseParams ++ Map(
+      "temporary_aws_access_key_id" -> "ACCESSKEYID",
+      "temporary_aws_secret_access_key" -> "SECRET/KEY",
+      "temporary_aws_session_token" -> "SESSION/Token"))
+    assert(AWSCredentialsUtils.getRedshiftCredentialsString(params, null) ===
       "aws_access_key_id=ACCESSKEYID;aws_secret_access_key=SECRET/KEY;token=SESSION/Token")
   }
 
   test("Configured IAM roles should take precedence") {
     val creds = new BasicSessionCredentials("ACCESSKEYID", "SECRET/KEY", "SESSION/Token")
     val iamRole = "arn:aws:iam::123456789000:role/redshift_iam_role"
-    val params = MergedParameters(Map("aws_iam_role" -> iamRole))
-    assert(AWSCredentialsUtils.getRedshiftCredentialsString(params, creds) ===
+    val params = Parameters.mergeParameters(baseParams ++ Map("aws_iam_role" -> iamRole))
+    assert(AWSCredentialsUtils.getRedshiftCredentialsString(params, null) ===
       s"aws_iam_role=$iamRole")
   }
 
@@ -58,7 +67,7 @@ class AWSCredentialsUtilsSuite extends FunSuite {
     conf.set("fs.s3.awsAccessKeyId", "CONFID")
     conf.set("fs.s3.awsSecretAccessKey", "CONFKEY")
 
-    val params = MergedParameters(Map(
+    val params = Parameters.mergeParameters(baseParams ++ Map(
       "tempdir" -> "s3://URIID:URIKEY@bucket/path",
       "temporary_aws_access_key_id" -> "key_id",
       "temporary_aws_secret_access_key" -> "secret",

@@ -70,7 +70,8 @@ class RedshiftSourceSuite
   private def defaultParams: Map[String, String] = Map(
     "url" -> "jdbc:redshift://foo/bar?user=user&password=password",
     "tempdir" -> s3TempDir,
-    "dbtable" -> "test_table")
+    "dbtable" -> "test_table",
+    "forward_spark_s3_credentials" -> "true")
 
   override def beforeAll(): Unit = {
     super.beforeAll()
@@ -532,7 +533,8 @@ class RedshiftSourceSuite
     val invalidParams = Map(
       "url" -> "jdbc:redshift://foo/bar?user=user&password=password",
       "tempdir" -> s3TempDir,
-      "query" -> "select * from test_table")
+      "query" -> "select * from test_table",
+      "forward_spark_s3_credentials" -> "true")
 
     val e1 = intercept[IllegalArgumentException] {
       expectedDataDF.write.format("com.databricks.spark.redshift").options(invalidParams).save()
