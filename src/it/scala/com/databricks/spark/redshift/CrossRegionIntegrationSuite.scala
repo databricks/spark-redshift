@@ -40,11 +40,8 @@ class CrossRegionIntegrationSuite extends IntegrationSuiteBase {
       StructType(StructField("foo", IntegerType) :: Nil))
     val tableName = s"roundtrip_save_and_load_$randomSuffix"
     try {
-      df.write
-        .format("com.databricks.spark.redshift")
-        .option("url", jdbcUrl)
+      write(df)
         .option("dbtable", tableName)
-        .option("tempdir", tempDir)
         .option("extracopyoptions", s"region '$bucketRegion'")
         .save()
       // Check that the table exists. It appears that creating a table in one connection then
