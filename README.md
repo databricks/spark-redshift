@@ -321,12 +321,12 @@ The following describes how each connection can be authenticated:
         [_Authorizing COPY and UNLOAD Operations Using IAM Roles_](http://docs.aws.amazon.com/redshift/latest/mgmt/copy-unload-iam-role.html)
         guide to associate that IAM role with your Redshift cluster.
         4. Set this library's `aws_iam_role` option to the role's ARN.
-    2. **Forward Spark's S3 credentials to Redshift**: if the `use_spark_s3_credentials` option is
+    2. **Forward Spark's S3 credentials to Redshift**: if the `forward_spark_s3_credentials` option is
         set to `true` then this library will automatically discover the credentials that Spark is
         using to connect to S3 and will forward those credentials to Redshift over JDBC. If Spark
         is authenticating to S3 using an IAM instance role then a set of temporary STS credentials
         will be passed to Redshift; otherwise, AWS keys will be passed. These credentials are
-        sent as part of the JDBC query, so therefore it is strongly recommended to enable SSL
+        sent as part of the JDBC query, so therefore it is **strongly recommended** to enable SSL
         encryption of the JDBC connection when using this authentication method.
     3. **Use Security Token Service (STS) credentials**: You may configure the
         `temporary_aws_access_key_id`, `temporary_aws_secret_access_key`, and
@@ -430,21 +430,32 @@ need to be configured to allow access from your driver application.
    <td>No default</td>
    <td>Fully specified ARN of the <a href="http://docs.aws.amazon.com/redshift/latest/mgmt/copy-unload-iam-role.html">IAM Role</a> attached to the Redshift cluster, ex: arn:aws:iam::123456789000:role/redshift_iam_role</td>
  </tr>
+  <tr>
+    <td><tt>forward_spark_s3_credentials</tt></td>
+    <td>No</td>
+    <td>false</td>
+    <td>
+        If <tt>true</tt> then this library will automatically discover the credentials that Spark is
+        using to connect to S3 and will forward those credentials to Redshift over JDBC.
+        These credentials are sent as part of the JDBC query, so therefore it is strongly
+        recommended to enable SSL encryption of the JDBC connection when using this option.
+    </td>
+  </tr>
  <tr>
     <td><tt>temporary_aws_access_key_id</tt></td>
-    <td>No, unless using EC2 instance profile authentication</td>
+    <td>No</td>
     <td>No default</td>
     <td>AWS access key, must have write permissions to the S3 bucket.</td>
  </tr>
  <tr>
     <td><tt>temporary_aws_secret_access_key</tt></td>
-    <td>No, unless using EC2 instance profile authentication</td>
+    <td>No</td>
     <td>No default</td>
     <td>AWS secret access key corresponding to provided access key.</td>
  </tr>
  <tr>
     <td><tt>temporary_aws_session_token</tt></td>
-    <td>No, unless using EC2 instance profile authentication</td>
+    <td>No</td>
     <td>No default</td>
     <td>AWS session token corresponding to provided access key.</td>
  </tr>
