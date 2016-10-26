@@ -730,4 +730,10 @@ As a result, this use-case is not supported by this library. The only workaround
 
 ## Migration Guide
 
-- Version 2.0 removed a number of deprecated APIs; for details, see https://github.com/databricks/spark-redshift/pull/239
+- Version 3.0 now requires `forward_spark_s3_credentials` to be explicitly set before Spark S3
+  credentials will be forwarded to Redshift. Users who use the `aws_iam_role` or `temporary_aws_*`
+  authentication mechanisms will be unaffected by this change. Users who relied on the old default
+  behavior will now need to explicitly set `forward_spark_s3_credentials` to `true` to continue
+  using their previous Redshift to S3 authentication mechanism. For a discussion of the three
+  authentication mechanisms and their security trade-offs, see the [_Authenticating to S3 and
+  Redshift_](#authenticating-to-s3-and-redshift) section of this README.
