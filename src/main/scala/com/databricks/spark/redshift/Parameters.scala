@@ -31,6 +31,7 @@ private[redshift] object Parameters {
     // * distkey has no default, but is optional unless using diststyle KEY
     // * jdbcdriver has no default, but is optional
 
+    "forward_spark_s3_credentials" -> "false",
     "tempformat" -> "AVRO",
     "csvnullstring" -> "@NULL@",
     "overwrite" -> "false",
@@ -86,6 +87,18 @@ private[redshift] object Parameters {
    * Adds validators and accessors to string map
    */
   case class MergedParameters(parameters: Map[String, String]) {
+
+    require(temporaryAWSCredentials.isDefined || iamRole.isDefined || forwardSparkS3Credentials,
+      "You must specify a method for authenticating Redshift's connection to S3 (aws_iam_role," +
+        " forward_spark_s3_credentials, or temporary_aws_*. For a discussion of the differences" +
+        " between these options, please see the README.")
+
+    require(Seq(
+        temporaryAWSCredentials.isDefined,
+        iamRole.isDefined,
+        forwardSparkS3Credentials).count(_ == true) == 1,
+      "The aws_iam_role, forward_spark_s3_credentials, and temporary_aws_*. options are " +
+        "mutually-exclusive; please specify only one.")
 
     /**
      * A root directory to be used for intermediate data exchange, expected to be on S3, or
@@ -247,10 +260,15 @@ private[redshift] object Parameters {
     def postActions: Array[String] = parameters("postactions").split(";")
 
     /**
-      * The IAM role to assume for Redshift COPY/UNLOAD operations.  This takes precedence over
-      * other forms of authentication.
+      * The IAM role that Redshift should assume for COPY/UNLOAD operations.
       */
     def iamRole: Option[String] = parameters.get("aws_iam_role")
+
+    /**
+     * If true then this library will automatically discover the credentials that Spark is
+     * using to connect to S3 and will forward those credentials to Redshift over JDBC.
+     */
+    def forwardSparkS3Credentials: Boolean = parameters("forward_spark_s3_credentials").toBoolean
 
     /**
      * Temporary AWS credentials which are passed to Redshift. These only need to be supplied by

@@ -14,7 +14,8 @@ This library is more suited to ETL than interactive queries, since large amounts
   - Data sources API: [Scala](#scala), [Python](#python), [SQL](#sql), [R](#r)
   - [Hadoop InputFormat](#hadoop-inputformat)
 - [Configuration](#configuration)
-  - [AWS Credentials](#aws-credentials)
+  - [Authenticating to S3 and Redshift](#authenticating-to-s3-and-redshift)
+  - [Encryption](#encryption)
   - [Parameters](#parameters)
 - [Additional configuration options](#additional-configuration-options)
     - [Configuring the maximum size of string columns](#configuring-the-maximum-size-of-string-columns)
@@ -39,14 +40,14 @@ You may use this library in your applications with the following dependency info
 ```
 groupId: com.databricks
 artifactId: spark-redshift_2.10
-version: 2.0.1
+version: 3.0.0-preview1-SNAPSHOT
 ```
 
 **Scala 2.11**
 ```
 groupId: com.databricks
 artifactId: spark-redshift_2.11
-version: 2.0.1
+version: 3.0.0-preview1-SNAPSHOT
 ```
 
 You will also need to provide a JDBC driver that is compatible with Redshift. Amazon recommend that you use [their driver](http://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-connection.html), which is distributed as a JAR that is hosted on Amazon's website. This library has also been successfully tested using the Postgres JDBC driver.
@@ -211,42 +212,169 @@ val records = sc.newAPIHadoopFile(
 
 ## Configuration
 
-### AWS Credentials
+### Authenticating to S3 and Redshift
 
-This library reads and writes data to S3 when transferring data to/from Redshift. As a result, it requires AWS credentials with read and write access to a S3 bucket (specified using the `tempdir` configuration parameter). Assuming that Spark has been configured to access S3, it should automatically discover the proper credentials to pass to Redshift.
+The use of this library involves several connections which must be authenticated / secured, all of
+which are illustrated in the following diagram:
 
-There are five ways of configuring AWS credentials for use by this library:
+```
+                            ┌───────┐
+       ┌───────────────────▶│  S3   │◀─────────────────┐
+       │    IAM or keys     └───────┘    IAM or keys   │
+       │                        ▲                      │
+       │                        │ IAM or keys          │
+       ▼                        ▼               ┌──────▼────┐
+┌────────────┐            ┌───────────┐         │┌──────────┴┐
+│  Redshift  │            │   Spark   │         ││   Spark   │
+│            │◀──────────▶│  Driver   │◀────────▶┤ Executors │
+└────────────┘            └───────────┘          └───────────┘
+               JDBC with                  Configured
+               username /                     in
+                password                    Spark
+            (can enable SSL)
+```
 
-1. **Default Credential Provider Chain(Best option for most users):** If the spark cluster is going to be running on AWS EMR or EC2 instances, then AWS credentials are automatically retrieved through [DefaultAWSCredentialsProviderChain](http://docs.aws.amazon.com/sdk-for-java/v1/developer-guide/credentials.html#id6). If another method of providing credentials is used (methods 2-5), then those methods will take precedence.
+This library reads and writes data to S3 when transferring data to/from Redshift. As a result, it
+requires AWS credentials with read and write access to a S3 bucket (specified using the `tempdir`
+configuration parameter).
 
-2. **Set keys in Hadoop conf:** You can specify AWS keys via [Hadoop configuration properties](https://github.com/apache/hadoop/blob/trunk/hadoop-tools/hadoop-aws/src/site/markdown/tools/hadoop-aws/index.md). For example, if your `tempdir` configuration points to a `s3n://` filesystem then you can set the `fs.s3n.awsAccessKeyId` and `fs.s3n.awsSecretAccessKey` properties in a Hadoop XML configuration file or call `sc.hadoopConfiguration.set()` to mutate Spark's global Hadoop configuration.
+> **:warning: Note**: This library does not clean up the temporary files that it creates in S3.
+> As a result, we recommend that you use a dedicated temporary S3 bucket with an
+> [object lifecycle configuration](http://docs.aws.amazon.com/AmazonS3/latest/dev/object-lifecycle-mgmt.html)
+> to ensure that temporary files are automatically deleted after a specified expiration period.
+> See the [_Encryption_](#encryption) section of this document for a discussion of how these files
+> may be encrypted.
 
- For example, if you are using the `s3n` filesystem then add
+The following describes how each connection can be authenticated:
 
- ```scala
- sc.hadoopConfiguration.set("fs.s3n.awsAccessKeyId", "YOUR_KEY_ID")
- sc.hadoopConfiguration.set("fs.s3n.awsSecretAccessKey", "YOUR_SECRET_ACCESS_KEY")
- ```
+- **Spark driver to Redshift**: The Spark driver connects to Redshift via JDBC using a username and password.
+    Redshift does not support the use of IAM roles to authenticate this connection.
+    This connection can be secured using SSL; for more details, see the Encryption section below.
 
- and for the `s3a` filesystem add
+- **Spark to S3**: S3 acts as a middleman to store bulk data when reading from or writing to Redshift.
+    Spark connects to S3 using both the Hadoop FileSystem interfaces and directly using the Amazon
+    Java SDK's S3 client.
 
- ```scala
- sc.hadoopConfiguration.set("fs.s3a.access.key", "YOUR_KEY_ID")
- sc.hadoopConfiguration.set("fs.s3a.secret.key", "YOUR_SECRET_ACCESS_KEY")
- ```
+    This connection can be authenticated using either AWS keys or IAM roles (DBFS mountpoints are
+    not currently supported, so Databricks users who do not want to rely on AWS keys should use
+    cluster IAM roles instead).
 
- Python users will have to use a slightly different method to modify the `hadoopConfiguration`, since this field is not exposed in all versions of PySpark. Although the following command relies on some Spark internals, it should work with all PySpark versions and is unlikely to break or change in the future:
+    There are multiple ways of providing these credentials:
 
- ```python
- sc._jsc.hadoopConfiguration().set("fs.s3n.awsAccessKeyId", "YOUR_KEY_ID")
- sc._jsc.hadoopConfiguration().set("fs.s3n.awsSecretAccessKey", "YOUR_SECRET_ACCESS_KEY")
- ```
+    1. **Default Credential Provider Chain (best option for most users):**
+        AWS credentials will automatically be retrieved through the [DefaultAWSCredentialsProviderChain](http://docs.aws.amazon.com/sdk-for-java/v1/developer-guide/credentials.html#id6).
 
-3. **Encode keys in `tempdir` URI**: For example, the URI `s3n://ACCESSKEY:SECRETKEY@bucket/path/to/temp/dir` encodes the key pair (`ACCESSKEY`, `SECRETKEY`). Due to [Hadoop limitations](https://issues.apache.org/jira/browse/HADOOP-3733), this approach will not work for secret keys which contain forward slash (`/`) characters.
-4. **Set the `aws_iam_role` parameter:** If set, this takes precedence over any other authentication option.  You will need to have this IAM role attached to the Redshift cluster which allows read/write access to your `tempdir` bucket.  More info [here](http://docs.aws.amazon.com/redshift/latest/mgmt/copy-unload-iam-role.html)
-5. **IAM instance profiles:** If you are running on EC2 and authenticate to S3 using IAM and [instance profiles](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html), then you must must configure the `temporary_aws_access_key_id`, `temporary_aws_secret_access_key`, and `temporary_aws_session_token` configuration properties to point to temporary keys created via the AWS [Security Token Service](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp.html). These temporary keys will then be passed to Redshift via `LOAD` and `UNLOAD` commands.
+        If you use IAM instance roles to authenticate to S3 (e.g. on Databricks, EMR, or EC2), then
+        you should probably use this method.
 
-> **:warning: Note**: This library does not clean up the temporary files that it creates in S3. As a result, we recommend that you use a dedicated temporary S3 bucket with an [object lifecycle configuration](http://docs.aws.amazon.com/AmazonS3/latest/dev/object-lifecycle-mgmt.html) to ensure that temporary files are automatically deleted after a specified expiration period.
+        If another method of providing credentials is used (methods 2 or 3), then that will take
+        precedence over this default.
+
+    2. **Set keys in Hadoop conf:** You can specify AWS keys via
+        [Hadoop configuration properties](https://github.com/apache/hadoop/blob/trunk/hadoop-tools/hadoop-aws/src/site/markdown/tools/hadoop-aws/index.md).
+        For example, if your `tempdir` configuration points to a `s3n://` filesystem then you can
+        set the `fs.s3n.awsAccessKeyId` and `fs.s3n.awsSecretAccessKey` properties in a Hadoop XML
+        configuration file or call `sc.hadoopConfiguration.set()` to mutate Spark's global Hadoop
+        configuration.
+
+        For example, if you are using the `s3n` filesystem then add
+
+        ```scala
+        sc.hadoopConfiguration.set("fs.s3n.awsAccessKeyId", "YOUR_KEY_ID")
+        sc.hadoopConfiguration.set("fs.s3n.awsSecretAccessKey", "YOUR_SECRET_ACCESS_KEY")
+        ```
+
+        and for the `s3a` filesystem add
+
+        ```scala
+        sc.hadoopConfiguration.set("fs.s3a.access.key", "YOUR_KEY_ID")
+        sc.hadoopConfiguration.set("fs.s3a.secret.key", "YOUR_SECRET_ACCESS_KEY")
+        ```
+
+        Python users will have to use a slightly different method to modify the `hadoopConfiguration`,
+        since this field is not exposed in all versions of PySpark. Although the following command
+        relies on some Spark internals, it should work with all PySpark versions and is unlikely to
+        break or change in the future:
+
+        ```python
+        sc._jsc.hadoopConfiguration().set("fs.s3n.awsAccessKeyId", "YOUR_KEY_ID")
+        sc._jsc.hadoopConfiguration().set("fs.s3n.awsSecretAccessKey", "YOUR_SECRET_ACCESS_KEY")
+        ```
+
+    3. **Encode keys in `tempdir` URI**:
+     For example, the URI `s3n://ACCESSKEY:SECRETKEY@bucket/path/to/temp/dir` encodes the key pair
+      (`ACCESSKEY`, `SECRETKEY`).
+
+      Due to [Hadoop limitations](https://issues.apache.org/jira/browse/HADOOP-3733), this
+      approach will not work for secret keys which contain forward slash (`/`) characters, even if
+      those characters are urlencoded.
+
+- **Redshift to S3**: Redshift also connects to S3 during `COPY` and `UNLOAD` queries. There are
+    three methods of authenticating this connection:
+
+    1. **Have Redshift assume an IAM role (most secure)**: You can grant Redshift permission to assume
+        an IAM role during `COPY` or `UNLOAD` operations and then configure this library to instruct
+        Redshift to use that role:
+
+        1. Create an IAM role granting appropriate S3 permissions to your bucket.
+        2. Follow the guide
+        [_Authorizing Amazon Redshift to Access Other AWS Services On Your Behalf_](http://docs.aws.amazon.com/redshift/latest/mgmt/authorizing-redshift-service.html)
+        to configure this role's trust policy in order to allow Redshift to assume this role.
+        3. Follow the steps in the
+        [_Authorizing COPY and UNLOAD Operations Using IAM Roles_](http://docs.aws.amazon.com/redshift/latest/mgmt/copy-unload-iam-role.html)
+        guide to associate that IAM role with your Redshift cluster.
+        4. Set this library's `aws_iam_role` option to the role's ARN.
+    2. **Forward Spark's S3 credentials to Redshift**: if the `forward_spark_s3_credentials` option is
+        set to `true` then this library will automatically discover the credentials that Spark is
+        using to connect to S3 and will forward those credentials to Redshift over JDBC. If Spark
+        is authenticating to S3 using an IAM instance role then a set of temporary STS credentials
+        will be passed to Redshift; otherwise, AWS keys will be passed. These credentials are
+        sent as part of the JDBC query, so therefore it is **strongly recommended** to enable SSL
+        encryption of the JDBC connection when using this authentication method.
+    3. **Use Security Token Service (STS) credentials**: You may configure the
+        `temporary_aws_access_key_id`, `temporary_aws_secret_access_key`, and
+        `temporary_aws_session_token` configuration properties to point to temporary keys created
+        via the AWS
+        [Security Token Service](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp.html).
+        These credentials are sent as part of the JDBC query, so therefore it is
+        **strongly recommended** to enable SSL encryption of the JDBC connection when using this
+        authentication method.
+        If you choose this option then please be aware of the risk that the credentials expire before
+        the read / write operation succeeds.
+
+    These three options are mutually-exclusive and you must explicitly choose which one to use.
+
+
+### Encryption
+
+- **Securing JDBC**: The Redshift and Postgres JDBC drivers both support SSL. To enable SSL support,
+    first configure Java to add the required certificates by following the
+    [_Using SSL and Server Certificates in Java_](http://docs.aws.amazon.com/redshift/latest/mgmt/connecting-ssl-support.html#connecting-ssl-support-java)
+    instructions in the Redshift documentation. Then, follow the instructions in
+    [_JDBC Driver Configuration Options_](http://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-options.html) to add the appropriate SSL options
+    to the JDBC `url` used with this library.
+
+- **Encrypting `UNLOAD` data stored in S3 (data stored when reading from Redshift)**: According to the Redshift documentation
+    on [_Unloading Data to S3_](http://docs.aws.amazon.com/redshift/latest/dg/t_Unloading_tables.html),
+    "UNLOAD automatically encrypts data files using Amazon S3 server-side encryption (SSE-S3)."
+
+    Redshift also supports client-side encryption with a custom key
+    (see: [_Unloading Encrypted Data Files_](http://docs.aws.amazon.com/redshift/latest/dg/t_unloading_encrypted_files.html))
+    but this library currently lacks the capability to specify the required symmetric key.
+
+- **Encrypting `COPY` data stored in S3 (data stored when writing to Redshift)**:
+    According to the Redshift documentation on
+    [_Loading Encrypted Data Files from Amazon S3_](http://docs.aws.amazon.com/redshift/latest/dg/c_loading-encrypted-files.html):
+
+    > You can use the COPY command to load data files that were uploaded to Amazon S3 using
+    > server-side encryption with AWS-managed encryption keys (SSE-S3 or SSE-KMS), client-side
+    > encryption, or both. COPY does not support Amazon S3 server-side encryption with a customer-supplied key (SSE-C)
+
+    To use this capability, you should configure your Hadoop S3 FileSystem to use encryption by
+    setting the appropriate configuration properties (which will vary depending on whether you
+    are using `s3a`, `s3n`, EMRFS, etc.).
+    Note that the `MANIFEST` file (a list of all files written) will not be encrypted.
+
 
 ### Parameters
 
@@ -308,21 +436,32 @@ need to be configured to allow access from your driver application.
    <td>No default</td>
    <td>Fully specified ARN of the <a href="http://docs.aws.amazon.com/redshift/latest/mgmt/copy-unload-iam-role.html">IAM Role</a> attached to the Redshift cluster, ex: arn:aws:iam::123456789000:role/redshift_iam_role</td>
  </tr>
+  <tr>
+    <td><tt>forward_spark_s3_credentials</tt></td>
+    <td>No</td>
+    <td>false</td>
+    <td>
+        If <tt>true</tt> then this library will automatically discover the credentials that Spark is
+        using to connect to S3 and will forward those credentials to Redshift over JDBC.
+        These credentials are sent as part of the JDBC query, so therefore it is strongly
+        recommended to enable SSL encryption of the JDBC connection when using this option.
+    </td>
+  </tr>
  <tr>
     <td><tt>temporary_aws_access_key_id</tt></td>
-    <td>No, unless using EC2 instance profile authentication</td>
+    <td>No</td>
     <td>No default</td>
     <td>AWS access key, must have write permissions to the S3 bucket.</td>
  </tr>
  <tr>
     <td><tt>temporary_aws_secret_access_key</tt></td>
-    <td>No, unless using EC2 instance profile authentication</td>
+    <td>No</td>
     <td>No default</td>
     <td>AWS secret access key corresponding to provided access key.</td>
  </tr>
  <tr>
     <td><tt>temporary_aws_session_token</tt></td>
-    <td>No, unless using EC2 instance profile authentication</td>
+    <td>No</td>
     <td>No default</td>
     <td>AWS session token corresponding to provided access key.</td>
  </tr>
@@ -597,4 +736,10 @@ As a result, this use-case is not supported by this library. The only workaround
 
 ## Migration Guide
 
-- Version 2.0 removed a number of deprecated APIs; for details, see https://github.com/databricks/spark-redshift/pull/239
+- Version 3.0 now requires `forward_spark_s3_credentials` to be explicitly set before Spark S3
+  credentials will be forwarded to Redshift. Users who use the `aws_iam_role` or `temporary_aws_*`
+  authentication mechanisms will be unaffected by this change. Users who relied on the old default
+  behavior will now need to explicitly set `forward_spark_s3_credentials` to `true` to continue
+  using their previous Redshift to S3 authentication mechanism. For a discussion of the three
+  authentication mechanisms and their security trade-offs, see the [_Authenticating to S3 and
+  Redshift_](#authenticating-to-s3-and-redshift) section of this README.

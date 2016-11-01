@@ -130,6 +130,7 @@ trait IntegrationSuiteBase
       .format("com.databricks.spark.redshift")
       .option("url", jdbcUrl)
       .option("tempdir", tempDir)
+      .option("forward_spark_s3_credentials", "true")
   }
   /**
    * Create a new DataFrameWriter using common options for writing to Redshift.
@@ -139,6 +140,7 @@ trait IntegrationSuiteBase
       .format("com.databricks.spark.redshift")
       .option("url", jdbcUrl)
       .option("tempdir", tempDir)
+      .option("forward_spark_s3_credentials", "true")
   }
 
   protected def createTestDataInRedshift(tableName: String): Unit = {

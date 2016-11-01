@@ -29,19 +29,29 @@ private[redshift] object AWSCredentialsUtils {
     * Generates a credentials string for use in Redshift COPY and UNLOAD statements.
     * Favors a configured `aws_iam_role` if available in the parameters.
     */
-  def getRedshiftCredentialsString(params: MergedParameters,
-                                   awsCredentials: AWSCredentials): String = {
-    params.iamRole
-      .map { role => s"aws_iam_role=$role" }
-      .getOrElse(
-        awsCredentials match {
-          case creds: AWSSessionCredentials =>
-            s"aws_access_key_id=${creds.getAWSAccessKeyId};" +
-              s"aws_secret_access_key=${creds.getAWSSecretKey};token=${creds.getSessionToken}"
-          case creds =>
-            s"aws_access_key_id=${creds.getAWSAccessKeyId};" +
-              s"aws_secret_access_key=${creds.getAWSSecretKey}"
-        })
+  def getRedshiftCredentialsString(
+      params: MergedParameters,
+      sparkAwsCredentials: AWSCredentials): String = {
+
+    def awsCredsToString(credentials: AWSCredentials): String = {
+      credentials match {
+        case creds: AWSSessionCredentials =>
+          s"aws_access_key_id=${creds.getAWSAccessKeyId};" +
+            s"aws_secret_access_key=${creds.getAWSSecretKey};token=${creds.getSessionToken}"
+        case creds =>
+          s"aws_access_key_id=${creds.getAWSAccessKeyId};" +
+            s"aws_secret_access_key=${creds.getAWSSecretKey}"
+      }
+    }
+    if (params.iamRole.isDefined) {
+      s"aws_iam_role=${params.iamRole.get}"
+    } else if (params.temporaryAWSCredentials.isDefined) {
+      awsCredsToString(params.temporaryAWSCredentials.get.getCredentials)
+    } else if (params.forwardSparkS3Credentials) {
+      awsCredsToString(sparkAwsCredentials)
+    } else {
+      throw new IllegalStateException("No Redshift S3 authentication mechanism was specified")
+    }
   }
 
   def staticCredentialsProvider(credentials: AWSCredentials): AWSCredentialsProvider = {

@@ -33,21 +33,17 @@ class IAMIntegrationSuite extends IntegrationSuiteBase {
     val df = sqlContext.createDataFrame(sc.parallelize(Seq(Row(1))),
       StructType(StructField("a", IntegerType) :: Nil))
     try {
-      df.write
-        .format("com.databricks.spark.redshift")
-        .option("url", jdbcUrl)
+      write(df)
         .option("dbtable", tableName)
-        .option("tempdir", tempDir)
+        .option("forward_spark_s3_credentials", "false")
         .option("aws_iam_role", IAM_ROLE_ARN)
         .mode(SaveMode.ErrorIfExists)
         .save()
 
       assert(DefaultJDBCWrapper.tableExists(conn, tableName))
-      val loadedDf = sqlContext.read
-        .format("com.databricks.spark.redshift")
-        .option("url", jdbcUrl)
+      val loadedDf = read
         .option("dbtable", tableName)
-        .option("tempdir", tempDir)
+        .option("forward_spark_s3_credentials", "false")
         .option("aws_iam_role", IAM_ROLE_ARN)
         .load()
       assert(loadedDf.schema.length === 1)
@@ -65,11 +61,9 @@ class IAMIntegrationSuite extends IntegrationSuiteBase {
       val df = sqlContext.createDataFrame(sc.parallelize(Seq(Row(1))),
         StructType(StructField("a", IntegerType) :: Nil))
       val err = intercept[SQLException] {
-        df.write
-          .format("com.databricks.spark.redshift")
-          .option("url", jdbcUrl)
+        write(df)
           .option("dbtable", tableName)
-          .option("tempdir", tempDir)
+          .option("forward_spark_s3_credentials", "false")
           .option("aws_iam_role", IAM_ROLE_ARN + "-some-bogus-suffix")
           .mode(SaveMode.ErrorIfExists)
           .save()

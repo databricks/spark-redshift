@@ -30,22 +30,18 @@ class RedshiftCredentialsInConfIntegrationSuite extends IntegrationSuiteBase {
       StructType(StructField("foo", IntegerType) :: Nil))
     val tableName = s"roundtrip_save_and_load_$randomSuffix"
     try {
-      df.write
-        .format("com.databricks.spark.redshift")
+      write(df)
         .option("url", AWS_REDSHIFT_JDBC_URL)
         .option("user", AWS_REDSHIFT_USER)
         .option("password", AWS_REDSHIFT_PASSWORD)
         .option("dbtable", tableName)
-        .option("tempdir", tempDir)
         .save()
       assert(DefaultJDBCWrapper.tableExists(conn, tableName))
-      val loadedDf = sqlContext.read
-        .format("com.databricks.spark.redshift")
+      val loadedDf = read
         .option("url", AWS_REDSHIFT_JDBC_URL)
         .option("user", AWS_REDSHIFT_USER)
         .option("password", AWS_REDSHIFT_PASSWORD)
         .option("dbtable", tableName)
-        .option("tempdir", tempDir)
         .load()
       assert(loadedDf.schema === df.schema)
       checkAnswer(loadedDf, df.collect())
