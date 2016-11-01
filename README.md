@@ -304,7 +304,8 @@ The following describes how each connection can be authenticated:
       (`ACCESSKEY`, `SECRETKEY`).
 
       Due to [Hadoop limitations](https://issues.apache.org/jira/browse/HADOOP-3733), this
-      approach will not work for secret keys which contain forward slash (`/`) characters.
+      approach will not work for secret keys which contain forward slash (`/`) characters, even if
+      those characters are urlencoded.
 
 - **Redshift to S3**: Redshift also connects to S3 during `COPY` and `UNLOAD` queries. There are
     three methods of authenticating this connection:
