@@ -242,6 +242,8 @@ configuration parameter).
 > As a result, we recommend that you use a dedicated temporary S3 bucket with an
 > [object lifecycle configuration](http://docs.aws.amazon.com/AmazonS3/latest/dev/object-lifecycle-mgmt.html)
 > to ensure that temporary files are automatically deleted after a specified expiration period.
+> See the [_Encryption_](#encryption) section of this document for a discussion of how these files
+> may be encrypted.
 
 The following describes how each connection can be authenticated:
 
