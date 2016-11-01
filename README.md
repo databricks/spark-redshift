@@ -333,6 +333,9 @@ The following describes how each connection can be authenticated:
         `temporary_aws_session_token` configuration properties to point to temporary keys created
         via the AWS
         [Security Token Service](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp.html).
+        These credentials are sent as part of the JDBC query, so therefore it is
+        **strongly recommended** to enable SSL encryption of the JDBC connection when using this
+        authentication method.
         If you choose this option then please be aware of the risk that the credentials expire before
         the read / write operation succeeds.
 
