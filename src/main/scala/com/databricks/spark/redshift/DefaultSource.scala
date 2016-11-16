@@ -16,7 +16,7 @@
 
 package com.databricks.spark.redshift
 
-import com.amazonaws.auth.AWSCredentials
+import com.amazonaws.auth.AWSCredentialsProvider
 import com.amazonaws.services.s3.AmazonS3Client
 import org.apache.spark.sql.sources.{BaseRelation, CreatableRelationProvider, RelationProvider, SchemaRelationProvider}
 import org.apache.spark.sql.types.StructType
@@ -26,7 +26,9 @@ import org.slf4j.LoggerFactory
 /**
  * Redshift Source implementation for Spark SQL
  */
-class DefaultSource(jdbcWrapper: JDBCWrapper, s3ClientFactory: AWSCredentials => AmazonS3Client)
+class DefaultSource(
+    jdbcWrapper: JDBCWrapper,
+    s3ClientFactory: AWSCredentialsProvider => AmazonS3Client)
   extends RelationProvider
   with SchemaRelationProvider
   with CreatableRelationProvider {

@@ -25,7 +25,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{Path, FileSystem}
 import org.apache.hadoop.fs.s3native.NativeS3FileSystem
 import org.apache.spark.SparkContext
-import org.apache.spark.sql.{DataFrame, SaveMode, SQLContext}
+import org.apache.spark.sql._
 import org.apache.spark.sql.hive.test.TestHiveContext
 import org.apache.spark.sql.types.StructType
 import org.scalatest.{BeforeAndAfterEach, BeforeAndAfterAll, Matchers}
@@ -119,7 +119,70 @@ trait IntegrationSuiteBase
 
   override protected def beforeEach(): Unit = {
     super.beforeEach()
-    sqlContext = new TestHiveContext(sc)
+    sqlContext = new TestHiveContext(sc, loadTestTables = false)
+  }
+
+  /**
+   * Create a new DataFrameReader using common options for reading from Redshift.
+   */
+  protected def read: DataFrameReader = {
+    sqlContext.read
+      .format("com.databricks.spark.redshift")
+      .option("url", jdbcUrl)
+      .option("tempdir", tempDir)
+      .option("forward_spark_s3_credentials", "true")
+  }
+  /**
+   * Create a new DataFrameWriter using common options for writing to Redshift.
+   */
+  protected def write(df: DataFrame): DataFrameWriter[Row] = {
+    df.write
+      .format("com.databricks.spark.redshift")
+      .option("url", jdbcUrl)
+      .option("tempdir", tempDir)
+      .option("forward_spark_s3_credentials", "true")
+  }
+
+  protected def createTestDataInRedshift(tableName: String): Unit = {
+    conn.createStatement().executeUpdate(
+      s"""
+         |create table $tableName (
+         |testbyte int2,
+         |testbool boolean,
+         |testdate date,
+         |testdouble float8,
+         |testfloat float4,
+         |testint int4,
+         |testlong int8,
+         |testshort int2,
+         |teststring varchar(256),
+         |testtimestamp timestamp
+         |)
+      """.stripMargin
+    )
+    // scalastyle:off
+    conn.createStatement().executeUpdate(
+      s"""
+         |insert into $tableName values
+         |(null, null, null, null, null, null, null, null, null, null),
+         |(0, null, '2015-07-03', 0.0, -1.0, 4141214, 1239012341823719, null, 'f', '2015-07-03 00:00:00.000'),
+         |(0, false, null, -1234152.12312498, 100000.0, null, 1239012341823719, 24, '___|_123', null),
+         |(1, false, '2015-07-02', 0.0, 0.0, 42, 1239012341823719, -13, 'asdf', '2015-07-02 00:00:00.000'),
+         |(1, true, '2015-07-01', 1234152.12312498, 1.0, 42, 1239012341823719, 23, 'Unicode''s樂趣', '2015-07-01 00:00:00.001')
+         """.stripMargin
+    )
+    // scalastyle:on
+    conn.commit()
+  }
+
+  protected def withTempRedshiftTable[T](namePrefix: String)(body: String => T): T = {
+    val tableName = s"$namePrefix$randomSuffix"
+    try {
+      body(tableName)
+    } finally {
+      conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
+      conn.commit()
+    }
   }
 
   /**
@@ -139,20 +202,19 @@ trait IntegrationSuiteBase
       expectedSchemaAfterLoad: Option[StructType] = None,
       saveMode: SaveMode = SaveMode.ErrorIfExists): Unit = {
     try {
-      df.write
-        .format("com.databricks.spark.redshift")
-        .option("url", jdbcUrl)
+      write(df)
         .option("dbtable", tableName)
-        .option("tempdir", tempDir)
         .mode(saveMode)
         .save()
-      assert(DefaultJDBCWrapper.tableExists(conn, tableName))
-      val loadedDf = sqlContext.read
-        .format("com.databricks.spark.redshift")
-        .option("url", jdbcUrl)
-        .option("dbtable", tableName)
-        .option("tempdir", tempDir)
-        .load()
+      // Check that the table exists. It appears that creating a table in one connection then
+      // immediately querying for existence from another connection may result in spurious "table
+      // doesn't exist" errors; this caused the "save with all empty partitions" test to become
+      // flaky (see #146). To work around this, add a small sleep and check again:
+      if (!DefaultJDBCWrapper.tableExists(conn, tableName)) {
+        Thread.sleep(1000)
+        assert(DefaultJDBCWrapper.tableExists(conn, tableName))
+      }
+      val loadedDf = read.option("dbtable", tableName).load()
       assert(loadedDf.schema === expectedSchemaAfterLoad.getOrElse(df.schema))
       checkAnswer(loadedDf, df.collect())
     } finally {

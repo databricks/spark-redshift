@@ -17,7 +17,7 @@
 package com.databricks.spark.redshift
 
 import java.sql.{Date, Timestamp}
-import java.util.Calendar
+import java.util.{Calendar, Locale}
 
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.types._
@@ -68,8 +68,8 @@ object TestUtils {
    */
   val expectedDataWithConvertedTimesAndDates: Seq[Row] = expectedData.map { row =>
     Row.fromSeq(row.toSeq.map {
-      case t: Timestamp => new RedshiftTimestampFormat().format(t)
-      case d: Date => new RedshiftDateFormat().format(d)
+      case t: Timestamp => Conversions.createRedshiftTimestampFormat().format(t)
+      case d: Date => Conversions.createRedshiftDateFormat().format(d)
       case other => other
     })
   }
@@ -110,5 +110,15 @@ object TestUtils {
    */
   def toDate(year: Int, zeroBasedMonth: Int, date: Int): Date = {
     new Date(toTimestamp(year, zeroBasedMonth, date, 0, 0, 0).getTime)
+  }
+
+  def withDefaultLocale[T](newDefaultLocale: Locale)(block: => T): T = {
+    val originalDefaultLocale = Locale.getDefault
+    try {
+      Locale.setDefault(newDefaultLocale)
+      block
+    } finally {
+      Locale.setDefault(originalDefaultLocale)
+    }
   }
 }

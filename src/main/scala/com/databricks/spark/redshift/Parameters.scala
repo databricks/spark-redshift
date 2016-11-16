@@ -16,7 +16,7 @@
 
 package com.databricks.spark.redshift
 
-import com.amazonaws.auth.{AWSCredentials, BasicSessionCredentials}
+import com.amazonaws.auth.{AWSCredentialsProvider, BasicSessionCredentials}
 
 /**
  * All user-specifiable parameters for spark-redshift, along with their validation rules and
@@ -31,6 +31,9 @@ private[redshift] object Parameters {
     // * distkey has no default, but is optional unless using diststyle KEY
     // * jdbcdriver has no default, but is optional
 
+    "forward_spark_s3_credentials" -> "false",
+    "tempformat" -> "AVRO",
+    "csvnullstring" -> "@NULL@",
     "overwrite" -> "false",
     "diststyle" -> "EVEN",
     "usestagingtable" -> "true",
@@ -38,12 +41,20 @@ private[redshift] object Parameters {
     "postactions" -> ";"
   )
 
+  val VALID_TEMP_FORMATS = Set("AVRO", "CSV", "CSV GZIP")
+
   /**
    * Merge user parameters with the defaults, preferring user parameters if specified
    */
   def mergeParameters(userParameters: Map[String, String]): MergedParameters = {
     if (!userParameters.contains("tempdir")) {
       throw new IllegalArgumentException("'tempdir' is required for all Redshift loads and saves")
+    }
+    if (userParameters.contains("tempformat") &&
+        !VALID_TEMP_FORMATS.contains(userParameters("tempformat").toUpperCase)) {
+      throw new IllegalArgumentException(
+        s"""Invalid temp format: ${userParameters("tempformat")}; """ +
+          s"valid formats are: ${VALID_TEMP_FORMATS.mkString(", ")}")
     }
     if (!userParameters.contains("url")) {
       throw new IllegalArgumentException("A JDBC URL must be provided with 'url' parameter")
@@ -77,12 +88,36 @@ private[redshift] object Parameters {
    */
   case class MergedParameters(parameters: Map[String, String]) {
 
+    require(temporaryAWSCredentials.isDefined || iamRole.isDefined || forwardSparkS3Credentials,
+      "You must specify a method for authenticating Redshift's connection to S3 (aws_iam_role," +
+        " forward_spark_s3_credentials, or temporary_aws_*. For a discussion of the differences" +
+        " between these options, please see the README.")
+
+    require(Seq(
+        temporaryAWSCredentials.isDefined,
+        iamRole.isDefined,
+        forwardSparkS3Credentials).count(_ == true) == 1,
+      "The aws_iam_role, forward_spark_s3_credentials, and temporary_aws_*. options are " +
+        "mutually-exclusive; please specify only one.")
+
     /**
      * A root directory to be used for intermediate data exchange, expected to be on S3, or
      * somewhere that can be written to and read from by Redshift. Make sure that AWS credentials
      * are available for S3.
      */
     def rootTempDir: String = parameters("tempdir")
+
+    /**
+     * The format in which to save temporary files in S3. Defaults to "AVRO"; the other allowed
+     * values are "CSV" and "CSV GZIP" for CSV and gzipped CSV, respectively.
+     */
+    def tempFormat: String = parameters("tempformat").toUpperCase
+
+    /**
+     * The String value to write for nulls when using CSV.
+     * This should be a value which does not appear in your actual data.
+     */
+    def nullString: String = parameters("csvnullstring")
 
     /**
      * Creates a per-query subdirectory in the [[rootTempDir]], with a random UUID.
@@ -148,17 +183,6 @@ private[redshift] object Parameters {
     def jdbcDriver: Option[String] = parameters.get("jdbcdriver")
 
     /**
-     * If true, when writing, replace any existing data. When false, append to the table instead.
-     * Note that the table schema will need to be compatible with whatever you have in the DataFrame
-     * you're writing. spark-redshift makes no attempt to enforce that - you'll just see Redshift
-     * errors if they don't match.
-     *
-     * Defaults to false.
-     */
-    @deprecated("Use SaveMode instead", "0.5.0")
-    def overwrite: Boolean = parameters("overwrite").toBoolean
-
-    /**
      * Set the Redshift table distribution style, which can be one of: EVEN, KEY or ALL. If you set
      * it to KEY, you'll also need to use the distkey parameter to set the distribution key.
      *
@@ -191,6 +215,8 @@ private[redshift] object Parameters {
     def sortKeySpec: Option[String] = parameters.get("sortkeyspec")
 
     /**
+     * DEPRECATED: see PR #157.
+     *
      * When true, data is always loaded into a new temporary table when performing an overwrite.
      * This is to ensure that the whole load process succeeds before dropping any data from
      * Redshift, which can be useful if, in the event of failures, stale data is better than no data
@@ -204,6 +230,11 @@ private[redshift] object Parameters {
      * Extra options to append to the Redshift COPY command (e.g. "MAXERROR 100").
      */
     def extraCopyOptions: String = parameters.get("extracopyoptions").getOrElse("")
+
+    /**
+      * Description of the table, set using the SQL COMMENT command.
+      */
+    def description: Option[String] = parameters.get("description")
 
     /**
       * List of semi-colon separated SQL statements to run before write operations.
@@ -229,16 +260,30 @@ private[redshift] object Parameters {
     def postActions: Array[String] = parameters("postactions").split(";")
 
     /**
+      * The IAM role that Redshift should assume for COPY/UNLOAD operations.
+      */
+    def iamRole: Option[String] = parameters.get("aws_iam_role")
+
+    /**
+     * If true then this library will automatically discover the credentials that Spark is
+     * using to connect to S3 and will forward those credentials to Redshift over JDBC.
+     */
+    def forwardSparkS3Credentials: Boolean = parameters("forward_spark_s3_credentials").toBoolean
+
+    /**
      * Temporary AWS credentials which are passed to Redshift. These only need to be supplied by
      * the user when Hadoop is configured to authenticate to S3 via IAM roles assigned to EC2
      * instances.
      */
-    def temporaryAWSCredentials: Option[AWSCredentials] = {
+    def temporaryAWSCredentials: Option[AWSCredentialsProvider] = {
       for (
         accessKey <- parameters.get("temporary_aws_access_key_id");
         secretAccessKey <- parameters.get("temporary_aws_secret_access_key");
         sessionToken <- parameters.get("temporary_aws_session_token")
-      ) yield new BasicSessionCredentials(accessKey, secretAccessKey, sessionToken)
+      ) yield {
+        AWSCredentialsUtils.staticCredentialsProvider(
+          new BasicSessionCredentials(accessKey, secretAccessKey, sessionToken))
+      }
     }
   }
 }

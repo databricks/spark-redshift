@@ -16,48 +16,28 @@
 
 package com.databricks.spark.redshift
 
-import java.io.{ByteArrayInputStream, File}
+import java.io.{ByteArrayInputStream, OutputStreamWriter}
 import java.net.URI
 
 import com.amazonaws.services.s3.AmazonS3Client
-import com.amazonaws.services.s3.model.{S3ObjectInputStream, S3Object, BucketLifecycleConfiguration}
+import com.amazonaws.services.s3.model.{BucketLifecycleConfiguration, S3Object, S3ObjectInputStream}
 import com.amazonaws.services.s3.model.BucketLifecycleConfiguration.Rule
 import org.apache.http.client.methods.HttpRequestBase
 import org.mockito.Matchers._
 import org.mockito.Mockito
 import org.mockito.Mockito.when
-import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.mapreduce.InputFormat
-import org.apache.hadoop.fs.{Path, FileSystem}
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.fs.s3native.S3NInMemoryFileSystem
 import org.mockito.invocation.InvocationOnMock
 import org.mockito.stubbing.Answer
-import org.scalatest.{BeforeAndAfterEach, BeforeAndAfterAll, Matchers}
-
+import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers}
 import org.apache.spark.SparkContext
-import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql._
 import org.apache.spark.sql.types._
-
 import com.databricks.spark.redshift.Parameters.MergedParameters
-
-private class TestContext extends SparkContext("local", "RedshiftSourceSuite") {
-
-  /**
-   * A text file containing fake unloaded Redshift data of all supported types
-   */
-  val testData = new File("src/test/resources/redshift_unload_data.txt").toURI.toString
-
-  override def newAPIHadoopFile[K, V, F <: InputFormat[K, V]](
-      path: String,
-      fClass: Class[F],
-      kClass: Class[K],
-      vClass: Class[V],
-      conf: Configuration = hadoopConfiguration): RDD[(K, V)] = {
-    super.newAPIHadoopFile[K, V, F](testData, fClass, kClass, vClass, conf)
-  }
-}
+import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.encoders.RowEncoder
 
 /**
  * Tests main DataFrame loading and writing functionality
@@ -84,15 +64,18 @@ class RedshiftSourceSuite
 
   private val s3TempDir: String = "s3n://test-bucket/temp-dir/"
 
+  private var unloadedData: String = ""
+
   // Parameters common to most tests. Some parameters are overridden in specific tests.
   private def defaultParams: Map[String, String] = Map(
     "url" -> "jdbc:redshift://foo/bar?user=user&password=password",
     "tempdir" -> s3TempDir,
-    "dbtable" -> "test_table")
+    "dbtable" -> "test_table",
+    "forward_spark_s3_credentials" -> "true")
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    sc = new TestContext
+    sc = new SparkContext("local", "RedshiftSourceSuite")
     sc.hadoopConfiguration.set("fs.s3n.impl", classOf[S3NInMemoryFileSystem].getName)
     // We need to use a DirectOutputCommitter to work around an issue which occurs with renames
     // while using the mocked S3 filesystem.
@@ -123,13 +106,19 @@ class RedshiftSourceSuite
       new Answer[S3ObjectInputStream] {
         override def answer(invocationOnMock: InvocationOnMock): S3ObjectInputStream = {
           val manifest =
-            """
+            s"""
               | {
               |   "entries": [
-              |     { "url": "s3://test-bucket/some-uuid(a-hack-for-mocking)/part-00000" }
+              |     { "url": "${Utils.fixS3Url(Utils.lastTempPathGenerated)}/part-00000" }
               |    ]
               | }
             """.stripMargin
+          // Write the data to the output file specified in the manifest:
+          val out = s3FileSystem.create(new Path(s"${Utils.lastTempPathGenerated}/part-00000"))
+          val ow = new OutputStreamWriter(out.getWrappedStream)
+          ow.write(unloadedData)
+          ow.close()
+          out.close()
           val is = new ByteArrayInputStream(manifest.getBytes("UTF-8"))
           new S3ObjectInputStream(
             is,
@@ -154,6 +143,16 @@ class RedshiftSourceSuite
   }
 
   test("DefaultSource can load Redshift UNLOAD output to a DataFrame") {
+    // scalastyle:off
+    unloadedData =
+      """
+        |1|t|2015-07-01|1234152.12312498|1.0|42|1239012341823719|23|Unicode's樂趣|2015-07-01 00:00:00.001
+        |1|f|2015-07-02|0|0.0|42|1239012341823719|-13|asdf|2015-07-02 00:00:00.0
+        |0||2015-07-03|0.0|-1.0|4141214|1239012341823719||f|2015-07-03 00:00:00
+        |0|f||-1234152.12312498|100000.0||1239012341823719|24|___\|_123|
+        ||||||||||
+      """.stripMargin.trim
+    // scalastyle:on
     val expectedQuery = (
       "UNLOAD \\('SELECT \"testbyte\", \"testbool\", \"testdate\", \"testdouble\"," +
       " \"testfloat\", \"testint\", \"testlong\", \"testshort\", \"teststring\", " +
@@ -182,13 +181,16 @@ class RedshiftSourceSuite
         |UNLOAD \('SELECT "testbyte", "testbool" FROM
         |  \(select testbyte, testbool
         |    from test_table
-        |    where teststring = \\'Unicode\\'\\'s樂趣\\'\) '\)
+        |    where teststring = \\'\\\\\\\\Unicode\\'\\'s樂趣\\'\) '\)
       """.stripMargin.lines.map(_.trim).mkString(" ").trim.r
     val query =
-      """select testbyte, testbool from test_table where teststring = 'Unicode''s樂趣'"""
+      """select testbyte, testbool from test_table where teststring = '\\Unicode''s樂趣'"""
+    unloadedData = "1|t"
     // scalastyle:on
     val querySchema =
       StructType(Seq(StructField("testbyte", ByteType), StructField("testbool", BooleanType)))
+
+    val expectedValues = Array(Row(1.toByte, true))
 
     // Test with dbtable parameter that wraps the query in parens:
     {
@@ -197,7 +199,7 @@ class RedshiftSourceSuite
         new MockRedshift(defaultParams("url"), Map(params("dbtable") -> querySchema))
       val relation = new DefaultSource(
         mockRedshift.jdbcWrapper, _ => mockS3Client).createRelation(testSqlContext, params)
-      testSqlContext.baseRelationToDataFrame(relation).collect()
+      assert(testSqlContext.baseRelationToDataFrame(relation).collect() === expectedValues)
       mockRedshift.verifyThatConnectionsWereClosed()
       mockRedshift.verifyThatExpectedQueriesWereIssued(Seq(expectedJDBCQuery))
     }
@@ -208,13 +210,23 @@ class RedshiftSourceSuite
       val mockRedshift = new MockRedshift(defaultParams("url"), Map(s"($query)" -> querySchema))
       val relation = new DefaultSource(
         mockRedshift.jdbcWrapper, _ => mockS3Client).createRelation(testSqlContext, params)
-      testSqlContext.baseRelationToDataFrame(relation).collect()
+      assert(testSqlContext.baseRelationToDataFrame(relation).collect() === expectedValues)
       mockRedshift.verifyThatConnectionsWereClosed()
       mockRedshift.verifyThatExpectedQueriesWereIssued(Seq(expectedJDBCQuery))
     }
   }
 
   test("DefaultSource supports simple column filtering") {
+    // scalastyle:off
+    unloadedData =
+      """
+        |1|t
+        |1|f
+        |0|
+        |0|f
+        ||
+      """.stripMargin.trim
+    // scalastyle:on
     val expectedQuery = (
       "UNLOAD \\('SELECT \"testbyte\", \"testbool\" FROM \"PUBLIC\".\"test_table\" '\\) " +
       "TO '.*' " +
@@ -225,9 +237,15 @@ class RedshiftSourceSuite
     // Construct the source with a custom schema
     val source = new DefaultSource(mockRedshift.jdbcWrapper, _ => mockS3Client)
     val relation = source.createRelation(testSqlContext, defaultParams, TestUtils.testSchema)
+    val resultSchema =
+      StructType(Seq(StructField("testbyte", ByteType), StructField("testbool", BooleanType)))
 
     val rdd = relation.asInstanceOf[PrunedFilteredScan]
       .buildScan(Array("testbyte", "testbool"), Array.empty[Filter])
+      .mapPartitions { iter =>
+        val fromRow = RowEncoder(resultSchema).resolveAndBind().fromRow _
+        iter.asInstanceOf[Iterator[InternalRow]].map(fromRow)
+      }
     val prunedExpectedValues = Array(
       Row(1.toByte, true),
       Row(1.toByte, false),
@@ -241,6 +259,7 @@ class RedshiftSourceSuite
 
   test("DefaultSource supports user schema, pruned and filtered scans") {
     // scalastyle:off
+    unloadedData = "1|t"
     val expectedQuery = (
       "UNLOAD \\('SELECT \"testbyte\", \"testbool\" " +
         "FROM \"PUBLIC\".\"test_table\" " +
@@ -261,6 +280,8 @@ class RedshiftSourceSuite
     // Construct the source with a custom schema
     val source = new DefaultSource(mockRedshift.jdbcWrapper, _ => mockS3Client)
     val relation = source.createRelation(testSqlContext, defaultParams, TestUtils.testSchema)
+    val resultSchema =
+      StructType(Seq(StructField("testbyte", ByteType), StructField("testbool", BooleanType)))
 
     // Define a simple filter to only include a subset of rows
     val filters: Array[Filter] = Array(
@@ -274,10 +295,12 @@ class RedshiftSourceSuite
       LessThanOrEqual("testint", 43))
     val rdd = relation.asInstanceOf[PrunedFilteredScan]
       .buildScan(Array("testbyte", "testbool"), filters)
+      .mapPartitions { iter =>
+        val fromRow = RowEncoder(resultSchema).resolveAndBind().fromRow _
+        iter.asInstanceOf[Iterator[InternalRow]].map(fromRow)
+      }
 
-    // Technically this assertion should check that the RDD only returns a single row, but
-    // since we've mocked out Redshift our WHERE clause won't have had any effect.
-    assert(rdd.collect().contains(Row(1, true)))
+    assert(rdd.collect() === Array(Row(1, true)))
     mockRedshift.verifyThatConnectionsWereClosed()
     mockRedshift.verifyThatExpectedQueriesWereIssued(Seq(expectedQuery))
   }
@@ -297,20 +320,12 @@ class RedshiftSourceSuite
       "usestagingtable" -> "true")
 
     val expectedCommands = Seq(
-      "DROP TABLE IF EXISTS \"PUBLIC\".\"test_table_staging_.*\"".r,
-      "CREATE TABLE IF NOT EXISTS \"PUBLIC\".\"test_table_staging_.*\"".r,
-      "DELETE FROM \"PUBLIC\".\"test_table_staging_.*\" WHERE id < 100".r,
-      "DELETE FROM \"PUBLIC\".\"test_table_staging_.*\" WHERE id > 100".r,
-      "DELETE FROM \"PUBLIC\".\"test_table_staging_.*\" WHERE id = -1".r,
-      "COPY \"PUBLIC\".\"test_table_staging_.*\"".r,
-      """
-        | BEGIN;
-        | ALTER TABLE "PUBLIC"\."test_table" RENAME TO "test_table_backup_.*";
-        | ALTER TABLE "PUBLIC"\."test_table_staging_.*" RENAME TO "test_table";
-        | DROP TABLE "PUBLIC"\."test_table_backup_.*";
-        | END;
-      """.stripMargin.trim.r,
-      "DROP TABLE IF EXISTS \"PUBLIC\"\\.\"test_table_staging_.*\"".r)
+      "DROP TABLE IF EXISTS \"PUBLIC\".\"test_table.*\"".r,
+      "CREATE TABLE IF NOT EXISTS \"PUBLIC\".\"test_table.*\"".r,
+      "DELETE FROM \"PUBLIC\".\"test_table.*\" WHERE id < 100".r,
+      "DELETE FROM \"PUBLIC\".\"test_table.*\" WHERE id > 100".r,
+      "DELETE FROM \"PUBLIC\".\"test_table.*\" WHERE id = -1".r,
+      "COPY \"PUBLIC\".\"test_table.*\"".r)
 
     source.createRelation(testSqlContext, SaveMode.Overwrite, params, expectedDataDF)
     mockRedshift.verifyThatExpectedQueriesWereIssued(expectedCommands)
@@ -324,19 +339,11 @@ class RedshiftSourceSuite
       "distkey" -> "testint")
 
     val expectedCommands = Seq(
-      "DROP TABLE IF EXISTS \"PUBLIC\"\\.\"test_table_staging_.*\"".r,
-      ("CREATE TABLE IF NOT EXISTS \"PUBLIC\"\\.\"test_table_staging.*" +
+      "DROP TABLE IF EXISTS \"PUBLIC\"\\.\"test_table.*\"".r,
+      ("CREATE TABLE IF NOT EXISTS \"PUBLIC\"\\.\"test_table.*" +
         " DISTSTYLE KEY DISTKEY \\(testint\\).*").r,
-      "COPY \"PUBLIC\"\\.\"test_table_staging_.*\"".r,
-      "GRANT SELECT ON \"PUBLIC\"\\.\"test_table_staging.+\" TO jeremy".r,
-      """
-        | BEGIN;
-        | ALTER TABLE "PUBLIC"\."test_table" RENAME TO "test_table_backup_.*";
-        | ALTER TABLE "PUBLIC"\."test_table_staging_.*" RENAME TO "test_table";
-        | DROP TABLE "PUBLIC"\."test_table_backup_.*";
-        | END;
-      """.stripMargin.trim.r,
-      "DROP TABLE IF EXISTS \"PUBLIC\"\\.\"test_table_staging_.*\"".r)
+      "COPY \"PUBLIC\"\\.\"test_table.*\"".r,
+      "GRANT SELECT ON \"PUBLIC\"\\.\"test_table\" TO jeremy".r)
 
     val mockRedshift = new MockRedshift(
       defaultParams("url"),
@@ -374,6 +381,8 @@ class RedshiftSourceSuite
         testSqlContext, df, SaveMode.Append, Parameters.mergeParameters(defaultParams))
     }
     mockRedshift.verifyThatConnectionsWereClosed()
+    mockRedshift.verifyThatCommitWasNotCalled()
+    mockRedshift.verifyThatRollbackWasCalled()
     mockRedshift.verifyThatExpectedQueriesWereIssued(Seq.empty)
   }
 
@@ -383,23 +392,22 @@ class RedshiftSourceSuite
     val mockRedshift = new MockRedshift(
       defaultParams("url"),
       Map(TableName.parseFromEscaped("test_table").toString -> TestUtils.testSchema),
-      jdbcQueriesThatShouldFail = Seq("COPY \"PUBLIC\".\"test_table_staging_.*\"".r))
+      jdbcQueriesThatShouldFail = Seq("COPY \"PUBLIC\".\"test_table.*\"".r))
 
     val expectedCommands = Seq(
-      "DROP TABLE IF EXISTS \"PUBLIC\".\"test_table_staging_.*\"".r,
-      "CREATE TABLE IF NOT EXISTS \"PUBLIC\".\"test_table_staging_.*\"".r,
-      "COPY \"PUBLIC\".\"test_table_staging_.*\"".r,
-      ".*FROM stl_load_errors.*".r,
-      "DROP TABLE IF EXISTS \"PUBLIC\".\"test_table_staging_.*\"".r
+      "DROP TABLE IF EXISTS \"PUBLIC\".\"test_table.*\"".r,
+      "CREATE TABLE IF NOT EXISTS \"PUBLIC\".\"test_table.*\"".r,
+      "COPY \"PUBLIC\".\"test_table.*\"".r,
+      ".*FROM stl_load_errors.*".r
     )
 
     val source = new DefaultSource(mockRedshift.jdbcWrapper, _ => mockS3Client)
     intercept[Exception] {
       source.createRelation(testSqlContext, SaveMode.Overwrite, params, expectedDataDF)
-      mockRedshift.verifyThatConnectionsWereClosed()
-      mockRedshift.verifyThatExpectedQueriesWereIssued(expectedCommands)
     }
     mockRedshift.verifyThatConnectionsWereClosed()
+    mockRedshift.verifyThatCommitWasNotCalled()
+    mockRedshift.verifyThatRollbackWasCalled()
     mockRedshift.verifyThatExpectedQueriesWereIssued(expectedCommands)
   }
 
@@ -413,8 +421,7 @@ class RedshiftSourceSuite
       Map(TableName.parseFromEscaped(defaultParams("dbtable")).toString -> null))
 
     val source = new DefaultSource(mockRedshift.jdbcWrapper, _ => mockS3Client)
-    val savedDf =
-      source.createRelation(testSqlContext, SaveMode.Append, defaultParams, expectedDataDF)
+    source.createRelation(testSqlContext, SaveMode.Append, defaultParams, expectedDataDF)
 
     // This test is "appending" to an empty table, so we expect all our test data to be
     // the only content in the returned data frame.
@@ -445,6 +452,60 @@ class RedshiftSourceSuite
     assert(createTableCommand === expectedCreateTableCommand)
   }
 
+  test("configuring encoding on columns") {
+    val lzoMetadata = new MetadataBuilder().putString("encoding", "LZO").build()
+    val runlengthMetadata = new MetadataBuilder().putString("encoding", "RUNLENGTH").build()
+    val schema = StructType(
+      StructField("lzo_str", StringType, metadata = lzoMetadata) ::
+        StructField("runlength_str", StringType, metadata = runlengthMetadata) ::
+        StructField("default_str", StringType) ::
+        Nil)
+    val df = testSqlContext.createDataFrame(sc.emptyRDD[Row], schema)
+    val createTableCommand =
+      DefaultRedshiftWriter.createTableSql(df, MergedParameters.apply(defaultParams)).trim
+    val expectedCreateTableCommand =
+      """CREATE TABLE IF NOT EXISTS "PUBLIC"."test_table" ("lzo_str" TEXT  ENCODE LZO,""" +
+    """ "runlength_str" TEXT  ENCODE RUNLENGTH, "default_str" TEXT)"""
+    assert(createTableCommand === expectedCreateTableCommand)
+  }
+
+  test("configuring descriptions on columns") {
+    val descriptionMetadata1 = new MetadataBuilder().putString("description", "Test1").build()
+    val descriptionMetadata2 = new MetadataBuilder().putString("description", "Test'2").build()
+    val schema = StructType(
+      StructField("first_str", StringType, metadata = descriptionMetadata1) ::
+        StructField("second_str", StringType, metadata = descriptionMetadata2) ::
+        StructField("default_str", StringType) ::
+        Nil)
+    val df = testSqlContext.createDataFrame(sc.emptyRDD[Row], schema)
+    val commentCommands =
+      DefaultRedshiftWriter.commentActions(Some("Test"), schema)
+    val expectedCommentCommands = List(
+      "COMMENT ON TABLE %s IS 'Test'",
+      "COMMENT ON COLUMN %s.\"first_str\" IS 'Test1'",
+      "COMMENT ON COLUMN %s.\"second_str\" IS 'Test''2'")
+    assert(commentCommands === expectedCommentCommands)
+  }
+
+  test("configuring redshift_type on columns") {
+    val bpcharMetadata = new MetadataBuilder().putString("redshift_type", "BPCHAR(2)").build()
+    val nvarcharMetadata = new MetadataBuilder().putString("redshift_type", "NVARCHAR(123)").build()
+
+    val schema = StructType(
+      StructField("bpchar_str", StringType, metadata = bpcharMetadata) ::
+      StructField("bpchar_str", StringType, metadata = nvarcharMetadata) ::
+      StructField("default_str", StringType) ::
+      Nil)
+
+    val df = testSqlContext.createDataFrame(sc.emptyRDD[Row], schema)
+    val createTableCommand =
+      DefaultRedshiftWriter.createTableSql(df, MergedParameters.apply(defaultParams)).trim
+    val expectedCreateTableCommand =
+      """CREATE TABLE IF NOT EXISTS "PUBLIC"."test_table" ("bpchar_str" BPCHAR(2),""" +
+        """ "bpchar_str" NVARCHAR(123), "default_str" TEXT)"""
+    assert(createTableCommand === expectedCreateTableCommand)
+  }
+
   test("Respect SaveMode.ErrorIfExists when table exists") {
     val mockRedshift = new MockRedshift(
       defaultParams("url"),
@@ -472,10 +533,11 @@ class RedshiftSourceSuite
     val invalidParams = Map(
       "url" -> "jdbc:redshift://foo/bar?user=user&password=password",
       "tempdir" -> s3TempDir,
-      "query" -> "select * from test_table")
+      "query" -> "select * from test_table",
+      "forward_spark_s3_credentials" -> "true")
 
     val e1 = intercept[IllegalArgumentException] {
-      expectedDataDF.saveAsRedshiftTable(invalidParams)
+      expectedDataDF.write.format("com.databricks.spark.redshift").options(invalidParams).save()
     }
     assert(e1.getMessage.contains("dbtable"))
   }
@@ -484,12 +546,12 @@ class RedshiftSourceSuite
     val invalidParams = Map("dbtable" -> "foo") // missing tempdir and url
 
     val e1 = intercept[IllegalArgumentException] {
-      expectedDataDF.saveAsRedshiftTable(invalidParams)
+      expectedDataDF.write.format("com.databricks.spark.redshift").options(invalidParams).save()
     }
     assert(e1.getMessage.contains("tempdir"))
 
     val e2 = intercept[IllegalArgumentException] {
-      testSqlContext.redshiftTable(invalidParams)
+      expectedDataDF.write.format("com.databricks.spark.redshift").options(invalidParams).save()
     }
     assert(e2.getMessage.contains("tempdir"))
   }
@@ -501,7 +563,11 @@ class RedshiftSourceSuite
   test("Saves throw error message if S3 Block FileSystem would be used") {
     val params = defaultParams + ("tempdir" -> defaultParams("tempdir").replace("s3n", "s3"))
     val e = intercept[IllegalArgumentException] {
-      expectedDataDF.saveAsRedshiftTable(params)
+      expectedDataDF.write
+        .format("com.databricks.spark.redshift")
+        .mode("append")
+        .options(params)
+        .save()
     }
     assert(e.getMessage.contains("Block FileSystem"))
   }

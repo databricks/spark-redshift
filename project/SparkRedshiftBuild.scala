@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+import scala.math.Ordering.Implicits._
+import org.apache.maven.artifact.versioning.ComparableVersion
 import org.scalastyle.sbt.ScalastylePlugin.rawScalastyleSettings
 import sbt._
 import sbt.Keys._
@@ -28,6 +30,7 @@ object SparkRedshiftBuild extends Build {
   val testSparkVersion = settingKey[String]("Spark version to test against")
   val testSparkAvroVersion = settingKey[String]("spark-avro version to test against")
   val testHadoopVersion = settingKey[String]("Hadoop version to test against")
+  val testAWSJavaSDKVersion = settingKey[String]("AWS Java SDK version to test against")
 
   // Define a custom test configuration so that unit test helper classes can be re-used under
   // the integration tests configuration; see http://stackoverflow.com/a/20635808.
@@ -42,45 +45,33 @@ object SparkRedshiftBuild extends Build {
     .settings(
       name := "spark-redshift",
       organization := "com.databricks",
-      scalaVersion := "2.10.5",
+      scalaVersion := "2.11.7",
       crossScalaVersions := Seq("2.10.5", "2.11.7"),
-      sparkVersion := "1.4.1",
+      sparkVersion := "2.0.0",
       testSparkVersion := sys.props.get("spark.testVersion").getOrElse(sparkVersion.value),
-      testSparkAvroVersion := sys.props.get("sparkAvro.testVersion").getOrElse("2.0.1"),
+      testSparkAvroVersion := sys.props.get("sparkAvro.testVersion").getOrElse("3.0.0"),
       testHadoopVersion := sys.props.get("hadoop.testVersion").getOrElse("2.2.0"),
+      testAWSJavaSDKVersion := sys.props.get("aws.testVersion").getOrElse("1.10.22"),
       spName := "databricks/spark-redshift",
       sparkComponents ++= Seq("sql", "hive"),
       spIgnoreProvided := true,
       licenses += "Apache-2.0" -> url("http://opensource.org/licenses/Apache-2.0"),
       credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"),
-      resolvers +=
-        "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
       scalacOptions ++= Seq("-target:jvm-1.6"),
       javacOptions ++= Seq("-source", "1.6", "-target", "1.6"),
       libraryDependencies ++= Seq(
         "org.slf4j" % "slf4j-api" % "1.7.5",
         "com.eclipsesource.minimal-json" % "minimal-json" % "0.9.4",
-        // These Amazon SDK depdencies are marked as 'provided' in order to reduce the risk of
-        // dependency conflicts with other user libraries. In many environments, such as EMR and
-        // Databricks, the Amazon SDK will already be on the classpath. In other cases, the SDK is
-        // likely to be provided via a dependency on the S3NativeFileSystem. If this was not marked
-        // as provided, then we would have to worry about the SDK's own dependencies evicting
-        // earlier versions of those dependencies that are required by the end user's own code.
-        // There's a trade-off here and we've chosen to err on the side of minimizing dependency
-        // conflicts for a majority of users while adding a minor inconvienece (adding one extra
-        // depenendecy by hand) for a smaller set of users.
-        // We exclude jackson-databind to avoid a conflict with Spark's version (see #104).
-        "com.amazonaws" % "aws-java-sdk-core" % "1.10.22" % "provided" exclude("com.fasterxml.jackson.core", "jackson-databind"),
-        "com.amazonaws" % "aws-java-sdk-s3" % "1.10.22" % "provided" exclude("com.fasterxml.jackson.core", "jackson-databind"),
-        "com.amazonaws" % "aws-java-sdk-sts" % "1.10.22" % "test" exclude("com.fasterxml.jackson.core", "jackson-databind"),
         // We require spark-avro, but avro-mapred must be provided to match Hadoop version.
         // In most cases, avro-mapred will be provided as part of the Spark assembly JAR.
-        "com.databricks" %% "spark-avro" % "2.0.1",
+        "com.databricks" %% "spark-avro" % "3.0.0",
         if (testHadoopVersion.value.startsWith("1")) {
           "org.apache.avro" % "avro-mapred" % "1.7.7" % "provided" classifier "hadoop1" exclude("org.mortbay.jetty", "servlet-api")
         } else {
           "org.apache.avro" % "avro-mapred" % "1.7.7" % "provided" classifier "hadoop2" exclude("org.mortbay.jetty", "servlet-api")
         },
+        // Kryo is provided by Spark, but we need this here in order to be able to import KryoSerializable
+        "com.esotericsoftware" % "kryo-shaded" % "3.0.3" % "provided",
         // A Redshift-compatible JDBC driver must be present on the classpath for spark-redshift to work.
         // For testing, we use an Amazon driver, which is available from
         // http://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-connection.html
@@ -92,6 +83,25 @@ object SparkRedshiftBuild extends Build {
         "org.scalatest" %% "scalatest" % "2.2.1" % "test",
         "org.mockito" % "mockito-core" % "1.10.19" % "test"
       ),
+      libraryDependencies ++= (if (new ComparableVersion(testAWSJavaSDKVersion.value) < new ComparableVersion("1.8.10")) {
+        // These Amazon SDK depdencies are marked as 'provided' in order to reduce the risk of
+        // dependency conflicts with other user libraries. In many environments, such as EMR and
+        // Databricks, the Amazon SDK will already be on the classpath. In other cases, the SDK is
+        // likely to be provided via a dependency on the S3NativeFileSystem. If this was not marked
+        // as provided, then we would have to worry about the SDK's own dependencies evicting
+        // earlier versions of those dependencies that are required by the end user's own code.
+        // There's a trade-off here and we've chosen to err on the side of minimizing dependency
+        // conflicts for a majority of users while adding a minor inconvienece (adding one extra
+        // depenendecy by hand) for a smaller set of users.
+        // We exclude jackson-databind to avoid a conflict with Spark's version (see #104).
+        Seq("com.amazonaws" % "aws-java-sdk" % testAWSJavaSDKVersion.value % "provided" exclude("com.fasterxml.jackson.core", "jackson-databind"))
+      } else {
+        Seq(
+          "com.amazonaws" % "aws-java-sdk-core" % testAWSJavaSDKVersion.value % "provided" exclude("com.fasterxml.jackson.core", "jackson-databind"),
+          "com.amazonaws" % "aws-java-sdk-s3" % testAWSJavaSDKVersion.value % "provided" exclude("com.fasterxml.jackson.core", "jackson-databind"),
+          "com.amazonaws" % "aws-java-sdk-sts" % testAWSJavaSDKVersion.value % "test" exclude("com.fasterxml.jackson.core", "jackson-databind")
+        )
+      }),
       libraryDependencies ++= (if (testHadoopVersion.value.startsWith("1")) {
         Seq(
           "org.apache.hadoop" % "hadoop-client" % testHadoopVersion.value % "test" force(),

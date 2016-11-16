@@ -43,12 +43,7 @@ class DecimalIntegrationSuite extends IntegrationSuiteBase {
         }
         conn.commit()
         assert(DefaultJDBCWrapper.tableExists(conn, tableName))
-        val loadedDf = sqlContext.read
-          .format("com.databricks.spark.redshift")
-          .option("url", jdbcUrl)
-          .option("dbtable", tableName)
-          .option("tempdir", tempDir)
-          .load()
+        val loadedDf = read.option("dbtable", tableName).load()
         checkAnswer(loadedDf, expectedRows)
         checkAnswer(loadedDf.selectExpr("x + 0"), expectedRows)
       } finally {

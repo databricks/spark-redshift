@@ -17,13 +17,14 @@
 package com.databricks.spark.redshift
 
 import java.io.InputStreamReader
-import java.lang
 import java.net.URI
+
+import org.apache.spark.sql.catalyst.encoders.RowEncoder
 
 import scala.collection.JavaConverters._
 
-import com.amazonaws.auth.AWSCredentials
-import com.amazonaws.services.s3.{AmazonS3Client, AmazonS3URI}
+import com.amazonaws.auth.AWSCredentialsProvider
+import com.amazonaws.services.s3.AmazonS3Client
 import com.eclipsesource.json.Json
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.sources._
@@ -38,7 +39,7 @@ import com.databricks.spark.redshift.Parameters.MergedParameters
  */
 private[redshift] case class RedshiftRelation(
     jdbcWrapper: JDBCWrapper,
-    s3ClientFactory: AWSCredentials => AmazonS3Client,
+    s3ClientFactory: AWSCredentialsProvider => AmazonS3Client,
     params: MergedParameters,
     userSchema: Option[StructType])
     (@transient val sqlContext: SQLContext)
@@ -81,15 +82,27 @@ private[redshift] case class RedshiftRelation(
     writer.saveToRedshift(sqlContext, data, saveMode, params)
   }
 
-  // In Spark 1.6+, this method allows a data source to declare which filters it handles, allowing
-  // Spark to skip its own defensive filtering. See SPARK-10978 for more details. As long as we
-  // compile against Spark 1.4, we cannot use the `override` modifier here.
-  def unhandledFilters(filters: Array[Filter]): Array[Filter] = {
+  override def unhandledFilters(filters: Array[Filter]): Array[Filter] = {
     filters.filterNot(filter => FilterPushdown.buildFilterExpression(schema, filter).isDefined)
   }
 
   override def buildScan(requiredColumns: Array[String], filters: Array[Filter]): RDD[Row] = {
     val creds = AWSCredentialsUtils.load(params, sqlContext.sparkContext.hadoopConfiguration)
+    for (
+      redshiftRegion <- Utils.getRegionForRedshiftCluster(params.jdbcUrl);
+      s3Region <- Utils.getRegionForS3Bucket(params.rootTempDir, s3ClientFactory(creds))
+    ) {
+      if (redshiftRegion != s3Region) {
+        // We don't currently support `extraunloadoptions`, so even if Amazon _did_ add a `region`
+        // option for this we wouldn't be able to pass in the new option. However, we choose to
+        // err on the side of caution and don't throw an exception because we don't want to break
+        // existing workloads in case the region detection logic is wrong.
+        log.error("The Redshift cluster and S3 bucket are in different regions " +
+          s"($redshiftRegion and $s3Region, respectively). Redshift's UNLOAD command requires " +
+          s"that the Redshift cluster and Amazon S3 bucket be located in the same region, so " +
+          s"this read will fail.")
+      }
+    }
     Utils.checkThatBucketHasObjectLifecycleConfiguration(params.rootTempDir, s3ClientFactory(creds))
     if (requiredColumns.isEmpty) {
       // In the special case where no columns were requested, issue a `count(*)` against Redshift
@@ -103,8 +116,11 @@ private[redshift] case class RedshiftRelation(
         if (results.next()) {
           val numRows = results.getLong(1)
           val parallelism = sqlContext.getConf("spark.sql.shuffle.partitions", "200").toInt
-          val emptyRow = Row.empty
-          sqlContext.sparkContext.parallelize(1L to numRows, parallelism).map(_ => emptyRow)
+          val emptyRow = RowEncoder(StructType(Seq.empty)).toRow(Row(Seq.empty))
+          sqlContext.sparkContext
+            .parallelize(1L to numRows, parallelism)
+            .map(_ => emptyRow)
+            .asInstanceOf[RDD[Row]]
         } else {
           throw new IllegalStateException("Could not read count from Redshift")
         }
@@ -114,7 +130,7 @@ private[redshift] case class RedshiftRelation(
     } else {
       // Unload data from Redshift into a temporary directory in S3:
       val tempDir = params.createPerQueryTempDir()
-      val unloadSql = buildUnloadStmt(requiredColumns, filters, tempDir)
+      val unloadSql = buildUnloadStmt(requiredColumns, filters, tempDir, creds)
       log.info(unloadSql)
       val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, params.credentials)
       try {
@@ -127,7 +143,7 @@ private[redshift] case class RedshiftRelation(
       val filesToRead: Seq[String] = {
         val cleanedTempDirUri =
           Utils.fixS3Url(Utils.removeCredentialsFromURI(URI.create(tempDir)).toString)
-        val s3URI = new AmazonS3URI(cleanedTempDirUri)
+        val s3URI = Utils.createS3URI(cleanedTempDirUri)
         val s3Client = s3ClientFactory(creds)
         val is = s3Client.getObject(s3URI.getBucket, s3URI.getKey + "manifest").getObjectContent
         val s3Files = try {
@@ -143,39 +159,34 @@ private[redshift] case class RedshiftRelation(
           tempDir.stripSuffix("/") + '/' + file.stripPrefix(cleanedTempDirUri).stripPrefix("/")
         }
       }
-      // Create a DataFrame to read the unloaded data:
-      val rdd: RDD[(lang.Long, Array[String])] = {
-        val rdds = filesToRead.map { file =>
-          sqlContext.sparkContext.newAPIHadoopFile(
-            file,
-            classOf[RedshiftInputFormat],
-            classOf[java.lang.Long],
-            classOf[Array[String]])
-        }.toArray
-        sqlContext.sparkContext.union(rdds)
-      }
+
       val prunedSchema = pruneSchema(schema, requiredColumns)
-      rdd.values.mapPartitions { iter =>
-        val converter: Array[String] => Row = Conversions.createRowConverter(prunedSchema)
-        iter.map(converter)
-      }
+
+      sqlContext.read
+        .format(classOf[RedshiftFileFormat].getName)
+        .schema(prunedSchema)
+        .load(filesToRead: _*)
+        .queryExecution.executedPlan.execute().asInstanceOf[RDD[Row]]
     }
   }
+
+  override def needConversion: Boolean = false
 
   private def buildUnloadStmt(
       requiredColumns: Array[String],
       filters: Array[Filter],
-      tempDir: String): String = {
+      tempDir: String,
+      creds: AWSCredentialsProvider): String = {
     assert(!requiredColumns.isEmpty)
     // Always quote column names:
     val columnList = requiredColumns.map(col => s""""$col"""").mkString(", ")
     val whereClause = FilterPushdown.buildWhereClause(schema, filters)
-    val creds = AWSCredentialsUtils.load(params, sqlContext.sparkContext.hadoopConfiguration)
-    val credsString: String = AWSCredentialsUtils.getRedshiftCredentialsString(creds)
+    val credsString: String =
+      AWSCredentialsUtils.getRedshiftCredentialsString(params, creds.getCredentials)
     val query = {
       // Since the query passed to UNLOAD will be enclosed in single quotes, we need to escape
-      // any single quotes that appear in the query itself
-      val escapedTableNameOrSubqury = tableNameOrSubquery.replace("'", "\\'")
+      // any backslashes and single quotes that appear in the query itself
+      val escapedTableNameOrSubqury = tableNameOrSubquery.replace("\\", "\\\\").replace("'", "\\'")
       s"SELECT $columnList FROM $escapedTableNameOrSubqury $whereClause"
     }
     // We need to remove S3 credentials from the unload path URI because they will conflict with

@@ -60,6 +60,38 @@ private[redshift] object Utils {
   }
 
   /**
+   * Factory method to create new S3URI in order to handle various library incompatibilities with
+   * older AWS Java Libraries
+   */
+  def createS3URI(url: String): AmazonS3URI = {
+    try {
+      // try to instantiate AmazonS3URI with url
+      new AmazonS3URI(url)
+    } catch {
+      case e: IllegalArgumentException if e.getMessage.
+        startsWith("Invalid S3 URI: hostname does not appear to be a valid S3 endpoint") => {
+        new AmazonS3URI(addEndpointToUrl(url))
+      }
+    }
+  }
+
+  /**
+   * Since older AWS Java Libraries do not handle S3 urls that have just the bucket name
+   * as the host, add the endpoint to the host
+   */
+  def addEndpointToUrl(url: String, domain: String = "s3.amazonaws.com"): String = {
+    val uri = new URI(url)
+    val hostWithEndpoint = uri.getHost + "." + domain
+    new URI(uri.getScheme,
+      uri.getUserInfo,
+      hostWithEndpoint,
+      uri.getPort,
+      uri.getPath,
+      uri.getQuery,
+      uri.getFragment).toString
+  }
+
+  /**
    * Returns a copy of the given URI with the user credentials removed.
    */
   def removeCredentialsFromURI(uri: URI): URI = {
@@ -73,10 +105,16 @@ private[redshift] object Utils {
       uri.getFragment)
   }
 
+  // Visible for testing
+  private[redshift] var lastTempPathGenerated: String = null
+
   /**
    * Creates a randomly named temp directory path for intermediate data
    */
-  def makeTempPath(tempRoot: String): String = Utils.joinUrls(tempRoot, UUID.randomUUID().toString)
+  def makeTempPath(tempRoot: String): String = {
+    lastTempPathGenerated = Utils.joinUrls(tempRoot, UUID.randomUUID().toString)
+    lastTempPathGenerated
+  }
 
   /**
    * Checks whether the S3 bucket for the given UI has an object lifecycle configuration to
@@ -87,7 +125,7 @@ private[redshift] object Utils {
       tempDir: String,
       s3Client: AmazonS3Client): Unit = {
     try {
-      val s3URI = new AmazonS3URI(Utils.fixS3Url(tempDir))
+      val s3URI = createS3URI(Utils.fixS3Url(tempDir))
       val bucket = s3URI.getBucket
       assert(bucket != null, "Could not get bucket from S3 URI")
       val key = Option(s3URI.getKey).getOrElse("")
@@ -130,6 +168,40 @@ private[redshift] object Utils {
       throw new IllegalArgumentException(
         "spark-redshift does not support the S3 Block FileSystem. Please reconfigure `tempdir` to" +
         "use a s3n:// or s3a:// scheme.")
+    }
+  }
+
+  /**
+   * Attempts to retrieve the region of the S3 bucket.
+   */
+  def getRegionForS3Bucket(tempDir: String, s3Client: AmazonS3Client): Option[String] = {
+    try {
+      val s3URI = createS3URI(Utils.fixS3Url(tempDir))
+      val bucket = s3URI.getBucket
+      assert(bucket != null, "Could not get bucket from S3 URI")
+      val region = s3Client.getBucketLocation(bucket) match {
+        // Map "US Standard" to us-east-1
+        case null | "US" => "us-east-1"
+        case other => other
+      }
+      Some(region)
+    } catch {
+      case NonFatal(e) =>
+        log.warn("An error occurred while trying to determine the S3 bucket's region", e)
+        None
+    }
+  }
+
+  /**
+   * Attempts to determine the region of a Redshift cluster based on its URL. It may not be possible
+   * to determine the region in some cases, such as when the Redshift cluster is placed behind a
+   * proxy.
+   */
+  def getRegionForRedshiftCluster(url: String): Option[String] = {
+    val regionRegex = """.*\.([^.]+)\.redshift\.amazonaws\.com.*""".r
+    url match {
+      case regionRegex(region) => Some(region)
+      case _ => None
     }
   }
 }
