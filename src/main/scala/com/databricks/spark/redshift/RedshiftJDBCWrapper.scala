@@ -26,6 +26,7 @@ import scala.collection.JavaConverters._
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration.Duration
 import scala.util.Try
+import scala.util.control.NonFatal
 
 import org.apache.spark.SPARK_VERSION
 import org.apache.spark.sql.execution.datasources.jdbc.DriverRegistry
@@ -124,7 +125,16 @@ private[redshift] class JDBCWrapper {
       op: PreparedStatement => T): T = {
     try {
       val future = Future[T](op(statement))(ec)
-      Await.result(future, Duration.Inf)
+      try {
+        Await.result(future, Duration.Inf)
+      } catch {
+        case e: SQLException =>
+          // Wrap and re-throw so that this thread's stacktrace appears to the user.
+          throw new SQLException("Exception thrown in awaitResult: ", e)
+        case NonFatal(t) =>
+          // Wrap and re-throw so that this thread's stacktrace appears to the user.
+          throw new Exception("Exception thrown in awaitResult: ", t)
+      }
     } catch {
       case e: InterruptedException =>
         try {
