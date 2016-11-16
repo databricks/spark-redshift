@@ -74,7 +74,7 @@ class IAMIntegrationSuite extends IntegrationSuiteBase {
           .mode(SaveMode.ErrorIfExists)
           .save()
       }
-      assert(err.getMessage.contains("is not authorized to assume IAM Role"))
+      assert(err.getCause.getMessage.contains("is not authorized to assume IAM Role"))
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
       conn.commit()
