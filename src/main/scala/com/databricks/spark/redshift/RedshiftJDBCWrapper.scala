@@ -161,9 +161,13 @@ private[redshift] class JDBCWrapper {
    * @throws SQLException if the table contains an unsupported type.
    */
   def resolveTable(conn: Connection, table: String): StructType = {
-    val rs = executeQueryInterruptibly(conn.prepareStatement(s"SELECT * FROM $table WHERE 1=0"))
+    // It's important to leave the WHERE 1=0 clause in order to limit the work of the query in case
+    // the underlying JDBC driver implementation implements PreparedStatement.getMetaData() by
+    // executing the query. It looks like the standard Redshift and Postgres JDBC drivers don't do
+    // this but we leave the WHERE condition here as a safety-net to guard against perf regressions.
+    val ps = conn.prepareStatement(s"SELECT * FROM $table WHERE 1=0")
     try {
-      val rsmd = rs.getMetaData
+      val rsmd = executeInterruptibly(ps, _.getMetaData)
       val ncols = rsmd.getColumnCount
       val fields = new Array[StructField](ncols)
       var i = 0
@@ -180,7 +184,7 @@ private[redshift] class JDBCWrapper {
       }
       new StructType(fields)
     } finally {
-      rs.close()
+      ps.close()
     }
   }
 
@@ -277,7 +281,8 @@ private[redshift] class JDBCWrapper {
     // Somewhat hacky, but there isn't a good way to identify whether a table exists for all
     // SQL database systems, considering "table" could also include the database name.
     Try {
-      executeQueryInterruptibly(conn.prepareStatement(s"SELECT 1 FROM $table LIMIT 1")).next()
+      val stmt = conn.prepareStatement(s"SELECT 1 FROM $table LIMIT 1")
+      executeInterruptibly(stmt, _.getMetaData).getColumnCount
     }.isSuccess
   }
 

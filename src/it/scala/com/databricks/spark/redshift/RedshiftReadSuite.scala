@@ -17,6 +17,7 @@
 package com.databricks.spark.redshift
 
 import org.apache.spark.sql.{execution, Row}
+import org.apache.spark.sql.types.LongType
 
 /**
  * End-to-end tests of functionality which only impacts the read path (e.g. filter pushdown).
@@ -236,5 +237,12 @@ class RedshiftReadSuite extends IntegrationSuiteBase {
         read.option("dbtable", tableName).load(),
         Seq("a\nb", "\\", "\"").map(x => Row.apply(x)))
     }
+  }
+
+  test("read result of approximate count(distinct) query (#300)") {
+    val df = read
+      .option("query", s"select approximate count(distinct testbool) as c from $test_table")
+      .load()
+    assert(df.schema.fields(0).dataType === LongType)
   }
 }
