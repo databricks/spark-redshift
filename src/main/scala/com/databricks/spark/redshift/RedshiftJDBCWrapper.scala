@@ -26,6 +26,7 @@ import scala.collection.JavaConverters._
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration.Duration
 import scala.util.Try
+import scala.util.control.NonFatal
 
 import org.apache.spark.SPARK_VERSION
 import org.apache.spark.sql.execution.datasources.jdbc.DriverRegistry
@@ -124,7 +125,16 @@ private[redshift] class JDBCWrapper {
       op: PreparedStatement => T): T = {
     try {
       val future = Future[T](op(statement))(ec)
-      Await.result(future, Duration.Inf)
+      try {
+        Await.result(future, Duration.Inf)
+      } catch {
+        case e: SQLException =>
+          // Wrap and re-throw so that this thread's stacktrace appears to the user.
+          throw new SQLException("Exception thrown in awaitResult: ", e)
+        case NonFatal(t) =>
+          // Wrap and re-throw so that this thread's stacktrace appears to the user.
+          throw new Exception("Exception thrown in awaitResult: ", t)
+      }
     } catch {
       case e: InterruptedException =>
         try {
@@ -151,10 +161,10 @@ private[redshift] class JDBCWrapper {
    * @throws SQLException if the table contains an unsupported type.
    */
   def resolveTable(conn: Connection, table: String): StructType = {
-    // We need the `LIMIT 1` here to work around a corner-case bug where a query which returns no
-    // rows may sometimes cause Redshift to report the wrong decimal precision, leading to a loss of
-    // precision when we apply this schema to the results of the full unload. For more details,
-    // see https://github.com/databricks/spark-redshift/issues/203
+    // It's important to leave the `LIMIT 1` clause in order to limit the work of the query in case
+    // the underlying JDBC driver implementation implements PreparedStatement.getMetaData() by
+    // executing the query. It looks like the standard Redshift and Postgres JDBC drivers don't do
+    // this but we leave the LIMIT condition here as a safety-net to guard against perf regressions.
     val ps = conn.prepareStatement(s"SELECT * FROM $table LIMIT 1")
     try {
       val rsmd = executeInterruptibly(ps, _.getMetaData)
