@@ -161,11 +161,11 @@ private[redshift] class JDBCWrapper {
    * @throws SQLException if the table contains an unsupported type.
    */
   def resolveTable(conn: Connection, table: String): StructType = {
-    // It's important to leave the WHERE 1=0 clause in order to limit the work of the query in case
+    // It's important to leave the `LIMIT 1` clause in order to limit the work of the query in case
     // the underlying JDBC driver implementation implements PreparedStatement.getMetaData() by
     // executing the query. It looks like the standard Redshift and Postgres JDBC drivers don't do
-    // this but we leave the WHERE condition here as a safety-net to guard against perf regressions.
-    val ps = conn.prepareStatement(s"SELECT * FROM $table WHERE 1=0")
+    // this but we leave the LIMIT condition here as a safety-net to guard against perf regressions.
+    val ps = conn.prepareStatement(s"SELECT * FROM $table LIMIT 1")
     try {
       val rsmd = executeInterruptibly(ps, _.getMetaData)
       val ncols = rsmd.getColumnCount

@@ -17,6 +17,7 @@
 package com.databricks.spark.redshift
 
 import org.apache.spark.sql.Row
+import org.apache.spark.sql.types.DecimalType
 
 /**
  * Integration tests for decimal support. For a reference on Redshift's DECIMAL type, see
@@ -77,4 +78,21 @@ class DecimalIntegrationSuite extends IntegrationSuiteBase {
     "1234567.8910",
     null
   ))
+
+  test("Decimal precision is preserved when reading from query (regression test for issue #203)") {
+    withTempRedshiftTable("issue203") { tableName =>
+      try {
+        conn.createStatement().executeUpdate(s"CREATE TABLE $tableName (foo BIGINT)")
+        conn.createStatement().executeUpdate(s"INSERT INTO $tableName VALUES (91593373)")
+        conn.commit()
+        assert(DefaultJDBCWrapper.tableExists(conn, tableName))
+        val df = read
+          .option("query", s"select foo / 1000000.0 from $tableName limit 1")
+          .load()
+        val res: Double = df.collect().toSeq.head.getDecimal(0).doubleValue()
+        assert(res === (91593373L / 1000000.0) +- 0.01)
+        assert(df.schema.fields.head.dataType === DecimalType(28, 8))
+      }
+    }
+  }
 }
