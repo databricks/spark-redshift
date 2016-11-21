@@ -20,7 +20,7 @@ import org.scalastyle.sbt.ScalastylePlugin.rawScalastyleSettings
 import sbt._
 import sbt.Keys._
 import sbtsparkpackage.SparkPackagePlugin.autoImport._
-import scoverage.ScoverageSbtPlugin
+import scoverage.ScoverageKeys
 import sbtrelease.ReleasePlugin.autoImport._
 import sbtrelease.ReleasePlugin.autoImport.ReleaseTransformations._
 import com.typesafe.sbt.pgp._
@@ -141,7 +141,7 @@ object SparkRedshiftBuild extends Build {
           x => x.data.getName.contains("hadoop1") && x.data.getName.contains("avro")
         }
       }),
-      ScoverageSbtPlugin.ScoverageKeys.coverageHighlighting := {
+      ScoverageKeys.coverageHighlighting := {
         if (scalaBinaryVersion.value == "2.10") false
         else true
       },
