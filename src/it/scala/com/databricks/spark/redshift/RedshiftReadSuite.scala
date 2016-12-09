@@ -225,6 +225,8 @@ class RedshiftReadSuite extends IntegrationSuiteBase {
     }
   }
 
+
+  
   test("read records containing escaped characters") {
     withTempRedshiftTable("records_with_escaped_characters") { tableName =>
       conn.createStatement().executeUpdate(
@@ -245,4 +247,22 @@ class RedshiftReadSuite extends IntegrationSuiteBase {
       .load()
     assert(df.schema.fields(0).dataType === LongType)
   }
+  
+  
+  test("read result of count() query (a BigInt) returned as LongType (regression for #310)") {
+    val df = read
+      .option("query", s"select count(testbool) as c from $test_table")
+      .load()
+    assert(df.schema.fields(0).dataType === LongType)
+  }
+  
+  
+  test("read result returning a BigInt becomes a LongType (regression for #311)") {
+    val df = read
+      .option("query", s"select testlong::BigInt as c from $test_table")
+      .load()
+    assert(df.schema.fields(0).dataType === LongType)
+  }
+  
+  
 }
