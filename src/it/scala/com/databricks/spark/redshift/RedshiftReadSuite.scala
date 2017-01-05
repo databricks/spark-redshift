@@ -224,7 +224,7 @@ class RedshiftReadSuite extends IntegrationSuiteBase {
       conn.commit()
     }
   }
-  
+
   test("read records containing escaped characters") {
     withTempRedshiftTable("records_with_escaped_characters") { tableName =>
       conn.createStatement().executeUpdate(
