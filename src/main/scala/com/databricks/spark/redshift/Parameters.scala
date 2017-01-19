@@ -35,6 +35,7 @@ private[redshift] object Parameters {
     "tempformat" -> "AVRO",
     "csvnullstring" -> "@NULL@",
     "overwrite" -> "false",
+    "encryption" -> "false",
     "diststyle" -> "EVEN",
     "usestagingtable" -> "true",
     "preactions" -> ";",
@@ -158,6 +159,13 @@ private[redshift] object Parameters {
         password <- parameters.get("password")
       ) yield (user, password)
     }
+
+    /**
+     *  S3 Client Side Encryption will be enabled if encryption option is set
+     *  to true. Master symmetric key is taken from hadoop configuration
+     *  property spark-redshift.master-sym-key
+     */
+    def encryption: Boolean = parameters("encryption").toBoolean
 
     /**
      * A JDBC URL, of the format:

@@ -402,16 +402,35 @@ The following describes how each connection can be authenticated:
     [_JDBC Driver Configuration Options_](http://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-options.html) to add the appropriate SSL options
     to the JDBC `url` used with this library.
 
-- **Encrypting `UNLOAD` data stored in S3 (data stored when reading from Redshift)**: According to the Redshift documentation
-    on [_Unloading Data to S3_](http://docs.aws.amazon.com/redshift/latest/dg/t_Unloading_tables.html),
-    "UNLOAD automatically encrypts data files using Amazon S3 server-side encryption (SSE-S3)."
+- **S3 Client Side Encryption (CSE)**: Redshift supports S3 CSE with a custom master symmetric key 
+   (see: [_S3 CSE on EMRFS_](http://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-4.5.0//emr-cluster-configuration-object-encryption.html), 
+   [S3 CSE on Databricks FS](https://docs.databricks.com/spark/latest/data-sources/amazon-s3.html?highlight=encryption#client-side-s3-encryption)). 
+    This library uses RedshiftEncryptionMaterialsProvider to configure the underlying filesystem (EMRFS or Databricks FS). User can turn on S3 CSE by:
+    1. Setting "fs.s3.cse.enabled" to "true" at the start of the job.
+    2. Setting "fs.s3.cse.encryptionMaterialsProvider" to "com.databricks.spark.redshift.RedshiftEncryptionMaterialsProvider" at the start of the job
+    3. Setting "spark-redshift.master-sym-key" to master_symmetric_key to be used by Redshift at the start of the job.
+    4. Setting "encryption" option to "true" in the parameters.
 
-    Redshift also supports client-side encryption with a custom key
-    (see: [_Unloading Encrypted Data Files_](http://docs.aws.amazon.com/redshift/latest/dg/t_unloading_encrypted_files.html))
-    but this library currently lacks the capability to specify the required symmetric key.
+    **NOTE: Once configured cluster will keep using the master symmetric key to read/write any object to S3. New job must be started to change encryption handling on the cluster.**
+
+  For example, in Scala add:
+ ```scala
+sc.hadoopConfiguration.set("fs.s3.cse.enabled", "true")
+sc.hadoopConfiguration.set("fs.s3.cse.encryptionMaterialsProvider", "com.databricks.spark.redshift.RedshiftEncryptionMaterialsProvider")
+sc.hadoopConfiguration.set("spark-redshift.master-sym-key", "YOUR_MASTER_SYMMETRIC_KEY")
+```
+
+- **Encrypting `UNLOAD` data stored in S3 (data stored when reading from Redshift)**: 
+
+    * Usig S3 server-side encryption (S3 SSE): According to the Redshift documentation
+    on [_S3 Client Side Encryption_](http://docs.aws.amazon.com/redshift/latest/dg/t_Unloading_tables.html),
+    "UNLOAD automatically encrypts data files using Amazon S3 SSE."
+    
+    * Using S3 client-side encryption (S3 CSE): Once configured using the steps provided in the previous section, 
+    UNLOAD automatically encrypts data files using Amazon S3 CSE.
 
 - **Encrypting `COPY` data stored in S3 (data stored when writing to Redshift)**:
-    According to the Redshift documentation on
+  * Usig S3 server-side encryption (S3 SSE): According to the Redshift documentation on
     [_Loading Encrypted Data Files from Amazon S3_](http://docs.aws.amazon.com/redshift/latest/dg/c_loading-encrypted-files.html):
 
     > You can use the COPY command to load data files that were uploaded to Amazon S3 using
@@ -423,6 +442,62 @@ The following describes how each connection can be authenticated:
     are using `s3a`, `s3n`, EMRFS, etc.).
     Note that the `MANIFEST` file (a list of all files written) will not be encrypted.
 
+ * Using S3 client-side encryption (S3 CSE): Once configured using the steps provided in the previous section,
+  COPY automatically encrypts data files using Amazon S3 client-side encryption (S3 CSE).
+
+Following is an example to read and write data using S3 CSE:
+```scala
+import org.apache.spark.sql._
+
+val sc = // existing SparkContext
+val sqlContext = new SQLContext(sc)
+
+// Enable encryption by setting required hadoop configuration
+sc.hadoopConfiguration.set("fs.s3.cse.enabled", "true")
+sc.hadoopConfiguration.set("fs.s3.cse.encryptionMaterialsProvider", "com.databricks.spark.redshift.RedshiftEncryptionMaterialsProvider")
+sc.hadoopConfiguration.set("spark-redshift.master-sym-key", "YOUR_MASTER_SYMMETRIC_KEY")
+
+// Get some data from a Redshift table
+val df: DataFrame = sqlContext.read
+    .format("com.databricks.spark.redshift")
+    .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass")
+    .option("dbtable", "my_table")
+    .option("tempdir", "s3n://path/for/temp/data")
+    .option("encryption", "true")
+    .load()
+
+// Can also load data from a Redshift query
+val df: DataFrame = sqlContext.read
+    .format("com.databricks.spark.redshift")
+    .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass")
+    .option("query", "select x, count(*) my_table group by x")
+    .option("tempdir", "s3n://path/for/temp/data")
+    .option("encryption", "true")
+    .load()
+
+// Apply some transformations to the data as per normal, then you can use the
+// Data Source API to write the data back to another table
+
+df.write
+  .format("com.databricks.spark.redshift")
+  .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass")
+  .option("dbtable", "my_table_copy")
+  .option("tempdir", "s3n://path/for/temp/data")
+  .option("encryption", "true")
+  .mode("error")
+  .save()
+
+// Using IAM Role based authentication
+df.write
+  .format("com.databricks.spark.redshift")
+  .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass")
+  .option("dbtable", "my_table_copy")
+  .option("aws_iam_role", "arn:aws:iam::123456789000:role/redshift_iam_role")
+  .option("tempdir", "s3n://path/for/temp/data")
+  .option("encryption", "true")
+  .mode("error")
+  .save()
+```
 
 ### Parameters
 
@@ -512,6 +587,19 @@ need to be configured to allow access from your driver application.
     <td>No</td>
     <td>No default</td>
     <td>AWS session token corresponding to provided access key.</td>
+ </tr>
+ <tr>
+    <td><tt>encryption</tt></td>
+    <td>No</td>
+    <td>false</td>
+    <td>
+    <p>
+    Toggles using Amazon S3 Client Side Encryption (CSE): <br>
+    When set to true, CSE will be used.<br>
+    When using CSE, the following needs to happen:<br>
+    1. The master symmetric key must be set in the Hadoop configuration via the "spark-redshift.master-sym-key" property. <br> 
+    2. EncryptionMaterialsProvider property must be set using "fs.s3.cse.encryptionMaterialsProvider" property. 
+    </p>
  </tr>
  <tr>
     <td><tt>tempdir</tt></td>
