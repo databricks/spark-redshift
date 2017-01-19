@@ -579,4 +579,15 @@ class RedshiftSourceSuite
     }
     assert(e.getMessage.contains("Block FileSystem"))
   }
+
+  test("DefaultSource supports shortName") {
+    assume(org.apache.spark.SPARK_VERSION.take(3) >= "1.5",
+      "Data source short names are only supported in Spark 1.5+")
+    val resolvedSource = {
+      Utils.classForName("org.apache.spark.sql.execution.datasources.ResolvedDataSource")
+        .getDeclaredMethod("lookupDataSource", classOf[String])
+        .invoke(null, "redshift")
+    }
+    assert(resolvedSource === classOf[DefaultSource])
+  }
 }
