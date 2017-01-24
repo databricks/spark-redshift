@@ -29,7 +29,7 @@ class PostgresDriverIntegrationSuite extends IntegrationSuiteBase {
   }
 
   test("postgresql driver takes precedence for jdbc:postgresql:// URIs") {
-    val conn = DefaultJDBCWrapper.getConnector(None, jdbcUrl, None)
+    val conn = DefaultJDBCWrapper.getConnector(None, jdbcUrl, None, None)
     try {
       assert(conn.getClass.getName === "org.postgresql.jdbc4.Jdbc4Connection")
     } finally {

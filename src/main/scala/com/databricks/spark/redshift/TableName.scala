@@ -21,11 +21,15 @@ import scala.collection.mutable.ArrayBuffer
 /**
  * Wrapper class for representing the name of a Redshift table.
  */
-private[redshift] case class TableName(unescapedSchemaName: String, unescapedTableName: String) {
+private[redshift] case class TableName
+    (unescapedSchemaName: String, unescapedTableName: String) {
   private def quote(str: String) = '"' + str.replace("\"", "\"\"") + '"'
   def escapedSchemaName: String = quote(unescapedSchemaName)
   def escapedTableName: String = quote(unescapedTableName)
-  override def toString: String = s"$escapedSchemaName.$escapedTableName"
+  override def toString: String = unescapedSchemaName.isEmpty match {
+    case false => s"$escapedSchemaName.$escapedTableName"
+    case true => escapedTableName
+  }
 }
 
 private[redshift] object TableName {
@@ -39,7 +43,7 @@ private[redshift] object TableName {
     def unescapeQuotes(s: String) = s.replace("\"\"", "\"")
     def unescape(s: String) = unescapeQuotes(dropOuterQuotes(s))
     splitByDots(str) match {
-      case Seq(tableName) => TableName("PUBLIC", unescape(tableName))
+      case Seq(tableName) => TableName("", unescape(tableName))
       case Seq(schemaName, tableName) => TableName(unescape(schemaName), unescape(tableName))
       case other => throw new IllegalArgumentException(s"Could not parse table name from '$str'")
     }

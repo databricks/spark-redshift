@@ -21,8 +21,8 @@ import org.scalatest.FunSuite
 class TableNameSuite extends FunSuite {
   test("TableName.parseFromEscaped") {
     assert(TableName.parseFromEscaped("foo.bar") === TableName("foo", "bar"))
-    assert(TableName.parseFromEscaped("foo") === TableName("PUBLIC", "foo"))
-    assert(TableName.parseFromEscaped("\"foo\"") === TableName("PUBLIC", "foo"))
+    assert(TableName.parseFromEscaped("foo") === TableName("", "foo"))
+    assert(TableName.parseFromEscaped("\"foo\"") === TableName("", "foo"))
     assert(TableName.parseFromEscaped("\"\"\"foo\"\"\".bar") === TableName("\"foo\"", "bar"))
     // Dots (.) can also appear inside of valid identifiers.
     assert(TableName.parseFromEscaped("\"foo.bar\".baz") === TableName("foo.bar", "baz"))

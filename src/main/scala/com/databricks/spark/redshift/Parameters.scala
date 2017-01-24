@@ -214,6 +214,12 @@ private[redshift] object Parameters {
      */
     def sortKeySpec: Option[String] = parameters.get("sortkeyspec")
 
+
+    /**
+      *
+      * The name of the Redshift Schema, if specified will be set on the Connection
+      */
+    def searchPath: Option[String] = parameters.get("search_path")
     /**
      * DEPRECATED: see PR #157.
      *

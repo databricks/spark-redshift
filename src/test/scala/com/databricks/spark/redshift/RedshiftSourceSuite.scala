@@ -157,7 +157,7 @@ class RedshiftSourceSuite
       "UNLOAD \\('SELECT \"testbyte\", \"testbool\", \"testdate\", \"testdouble\"," +
       " \"testfloat\", \"testint\", \"testlong\", \"testshort\", \"teststring\", " +
       "\"testtimestamp\" " +
-      "FROM \"PUBLIC\".\"test_table\" '\\) " +
+      "FROM \"test_table\" '\\) " +
       "TO '.*' " +
       "WITH CREDENTIALS 'aws_access_key_id=test1;aws_secret_access_key=test2' " +
       "ESCAPE").r
@@ -228,7 +228,7 @@ class RedshiftSourceSuite
       """.stripMargin.trim
     // scalastyle:on
     val expectedQuery = (
-      "UNLOAD \\('SELECT \"testbyte\", \"testbool\" FROM \"PUBLIC\".\"test_table\" '\\) " +
+      "UNLOAD \\('SELECT \"testbyte\", \"testbool\" FROM \"test_table\" '\\) " +
       "TO '.*' " +
       "WITH CREDENTIALS 'aws_access_key_id=test1;aws_secret_access_key=test2' " +
       "ESCAPE").r
@@ -262,7 +262,7 @@ class RedshiftSourceSuite
     unloadedData = "1|t"
     val expectedQuery = (
       "UNLOAD \\('SELECT \"testbyte\", \"testbool\" " +
-        "FROM \"PUBLIC\".\"test_table\" " +
+        "FROM \"test_table\" " +
         "WHERE \"testbool\" = true " +
         "AND \"teststring\" = \\\\'Unicode\\\\'\\\\'s樂趣\\\\' " +
         "AND \"testdouble\" > 1000.0 " +
@@ -320,12 +320,12 @@ class RedshiftSourceSuite
       "usestagingtable" -> "true")
 
     val expectedCommands = Seq(
-      "DROP TABLE IF EXISTS \"PUBLIC\".\"test_table.*\"".r,
-      "CREATE TABLE IF NOT EXISTS \"PUBLIC\".\"test_table.*\"".r,
-      "DELETE FROM \"PUBLIC\".\"test_table.*\" WHERE id < 100".r,
-      "DELETE FROM \"PUBLIC\".\"test_table.*\" WHERE id > 100".r,
-      "DELETE FROM \"PUBLIC\".\"test_table.*\" WHERE id = -1".r,
-      "COPY \"PUBLIC\".\"test_table.*\"".r)
+      "DROP TABLE IF EXISTS \"test_table.*\"".r,
+      "CREATE TABLE IF NOT EXISTS \"test_table.*\"".r,
+      "DELETE FROM \"test_table.*\" WHERE id < 100".r,
+      "DELETE FROM \"test_table.*\" WHERE id > 100".r,
+      "DELETE FROM \"test_table.*\" WHERE id = -1".r,
+      "COPY \"test_table.*\"".r)
 
     source.createRelation(testSqlContext, SaveMode.Overwrite, params, expectedDataDF)
     mockRedshift.verifyThatExpectedQueriesWereIssued(expectedCommands)
@@ -339,11 +339,11 @@ class RedshiftSourceSuite
       "distkey" -> "testint")
 
     val expectedCommands = Seq(
-      "DROP TABLE IF EXISTS \"PUBLIC\"\\.\"test_table.*\"".r,
-      ("CREATE TABLE IF NOT EXISTS \"PUBLIC\"\\.\"test_table.*" +
+      "DROP TABLE IF EXISTS \"test_table.*\"".r,
+      ("CREATE TABLE IF NOT EXISTS \"test_table.*" +
         " DISTSTYLE KEY DISTKEY \\(testint\\).*").r,
-      "COPY \"PUBLIC\"\\.\"test_table.*\"".r,
-      "GRANT SELECT ON \"PUBLIC\"\\.\"test_table\" TO jeremy".r)
+      "COPY \"test_table.*\"".r,
+      "GRANT SELECT ON \"test_table\" TO jeremy".r)
 
     val mockRedshift = new MockRedshift(
       defaultParams("url"),
@@ -392,12 +392,12 @@ class RedshiftSourceSuite
     val mockRedshift = new MockRedshift(
       defaultParams("url"),
       Map(TableName.parseFromEscaped("test_table").toString -> TestUtils.testSchema),
-      jdbcQueriesThatShouldFail = Seq("COPY \"PUBLIC\".\"test_table.*\"".r))
+      jdbcQueriesThatShouldFail = Seq("COPY \"test_table.*\"".r))
 
     val expectedCommands = Seq(
-      "DROP TABLE IF EXISTS \"PUBLIC\".\"test_table.*\"".r,
-      "CREATE TABLE IF NOT EXISTS \"PUBLIC\".\"test_table.*\"".r,
-      "COPY \"PUBLIC\".\"test_table.*\"".r,
+      "DROP TABLE IF EXISTS \"test_table.*\"".r,
+      "CREATE TABLE IF NOT EXISTS \"test_table.*\"".r,
+      "COPY \"test_table.*\"".r,
       ".*FROM stl_load_errors.*".r
     )
 
@@ -413,8 +413,8 @@ class RedshiftSourceSuite
 
   test("Append SaveMode doesn't destroy existing data") {
     val expectedCommands =
-      Seq("CREATE TABLE IF NOT EXISTS \"PUBLIC\".\"test_table\" .*".r,
-          "COPY \"PUBLIC\".\"test_table\" .*".r)
+      Seq("CREATE TABLE IF NOT EXISTS \"test_table\" .*".r,
+          "COPY \"test_table\" .*".r)
 
     val mockRedshift = new MockRedshift(
       defaultParams("url"),
@@ -447,7 +447,7 @@ class RedshiftSourceSuite
     val createTableCommand =
       DefaultRedshiftWriter.createTableSql(df, MergedParameters.apply(defaultParams)).trim
     val expectedCreateTableCommand =
-      """CREATE TABLE IF NOT EXISTS "PUBLIC"."test_table" ("long_str" VARCHAR(512),""" +
+      """CREATE TABLE IF NOT EXISTS "test_table" ("long_str" VARCHAR(512),""" +
         """ "short_str" VARCHAR(10), "default_str" TEXT)"""
     assert(createTableCommand === expectedCreateTableCommand)
   }
@@ -464,7 +464,7 @@ class RedshiftSourceSuite
     val createTableCommand =
       DefaultRedshiftWriter.createTableSql(df, MergedParameters.apply(defaultParams)).trim
     val expectedCreateTableCommand =
-      """CREATE TABLE IF NOT EXISTS "PUBLIC"."test_table" ("lzo_str" TEXT  ENCODE LZO,""" +
+      """CREATE TABLE IF NOT EXISTS "test_table" ("lzo_str" TEXT  ENCODE LZO,""" +
     """ "runlength_str" TEXT  ENCODE RUNLENGTH, "default_str" TEXT)"""
     assert(createTableCommand === expectedCreateTableCommand)
   }
@@ -501,7 +501,7 @@ class RedshiftSourceSuite
     val createTableCommand =
       DefaultRedshiftWriter.createTableSql(df, MergedParameters.apply(defaultParams)).trim
     val expectedCreateTableCommand =
-      """CREATE TABLE IF NOT EXISTS "PUBLIC"."test_table" ("bpchar_str" BPCHAR(2),""" +
+      """CREATE TABLE IF NOT EXISTS "test_table" ("bpchar_str" BPCHAR(2),""" +
         """ "bpchar_str" NVARCHAR(123), "default_str" TEXT)"""
     assert(createTableCommand === expectedCreateTableCommand)
   }

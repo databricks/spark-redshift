@@ -199,7 +199,8 @@ private[redshift] class JDBCWrapper {
   def getConnector(
       userProvidedDriverClass: Option[String],
       url: String,
-      credentials: Option[(String, String)]) : Connection = {
+      credentials: Option[(String, String)],
+      redshiftSchema: Option[String] = None): Connection = {
     val subprotocol = url.stripPrefix("jdbc:").split(":")(0)
     val driverClass: String = getDriverClass(subprotocol, userProvidedDriverClass)
     DriverRegistry.register(driverClass)
@@ -229,7 +230,16 @@ private[redshift] class JDBCWrapper {
       properties.setProperty("user", user)
       properties.setProperty("password", password)
     }
-    driver.connect(url, properties)
+    val conn = driver.connect(url, properties)
+
+    redshiftSchema match {
+      case Some(schema) =>
+        val statement = conn.createStatement()
+        statement.execute(s"set search_path to $schema")
+      case None =>
+    }
+
+    conn
   }
 
   /**
