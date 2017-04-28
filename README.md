@@ -571,6 +571,16 @@ must also set a distribution key with the <tt>distkey</tt> option.
     <p>Since setting <tt>usestagingtable=false</tt> operation risks data loss / unavailability, we have chosen to deprecate it in favor of requiring users to manually drop the destination table themselves.</p>
     </td>
  </tr>
+  <tr>
+    <td><tt>include_column_list</tt></td>
+    <td>No</td>
+    <td>false</td>
+    <td>
+        If <tt>true</tt> then this library will automatically extract the columns from the schema
+        and add them to the COPY command according to the <a href="http://docs.aws.amazon.com/redshift/latest/dg/copy-parameters-column-mapping.html">Column List docs</a>.
+        (e.g. `COPY "PUBLIC"."tablename" ("column1" [,"column2", ...])`).
+    </td>
+  </tr>
  <tr>
     <td><tt>description</tt></td>
     <td>No</td>

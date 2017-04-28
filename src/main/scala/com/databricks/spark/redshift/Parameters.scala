@@ -289,7 +289,7 @@ private[redshift] object Parameters {
 
     /**
      * If true then this library will extract the column list from the schema to
-     * include in the COPY command (e.g. `COPY "PUBLIC"."tablename" ("column1" [,"column2", ...]))`
+     * include in the COPY command (e.g. `COPY "PUBLIC"."tablename" ("column1" [,"column2", ...])`)
      */
     def includeColumnList: Boolean = parameters("include_column_list").toBoolean
   }
