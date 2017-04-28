@@ -100,12 +100,12 @@ private[redshift] class RedshiftWriter(
       case csv if csv == "CSV" || csv == "CSV GZIP" => csv + s" NULL AS '${params.nullString}'"
     }
     val columns = if (params.includeColumnList) {
-        "(" + schema.fieldNames.map(name => s""""$name"""").mkString(",") + ")"
+        "(" + schema.fieldNames.map(name => s""""$name"""").mkString(",") + ") "
     } else {
       ""
     }
 
-    s"COPY ${params.table.get} $columns FROM '$fixedUrl' CREDENTIALS '$credsString' FORMAT AS " +
+    s"COPY ${params.table.get} ${columns}FROM '$fixedUrl' CREDENTIALS '$credsString' FORMAT AS " +
       s"${format} manifest ${params.extraCopyOptions}"
   }
 

@@ -438,7 +438,7 @@ class RedshiftSourceSuite
   test("Include Column List adds the schema columns to the COPY query") {
     val copyCommand =
           "COPY \"PUBLIC\".\"test_table\" \\(\"testbyte\",\"testbool\",\"testdate\",\"testdouble\"" +
-          ",\"testfloat\",\"testint\",\"testlong\",\"testshort\",\"teststring\",\"testtimestamp\"\\) .*"
+          ",\"testfloat\",\"testint\",\"testlong\",\"testshort\",\"teststring\",\"testtimestamp\"\\) FROM .*"
     val expectedCommands =
       Seq("CREATE TABLE IF NOT EXISTS \"PUBLIC\".\"test_table\" .*".r,
           copyCommand.r)
