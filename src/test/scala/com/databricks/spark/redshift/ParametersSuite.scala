@@ -42,7 +42,7 @@ class ParametersSuite extends FunSuite with Matchers {
 
     // Check that the defaults have been added
     (Parameters.DEFAULT_PARAMETERS - "forward_spark_s3_credentials" - "include_column_list").foreach {
-      case (key, value) => println(key); println(value); mergedParams.parameters(key) shouldBe value
+      case (key, value) => mergedParams.parameters(key) shouldBe value
     }
   }
 
