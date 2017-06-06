@@ -38,7 +38,8 @@ private[redshift] object Parameters {
     "diststyle" -> "EVEN",
     "usestagingtable" -> "true",
     "preactions" -> ";",
-    "postactions" -> ";"
+    "postactions" -> ";",
+    "create_table_if_not_exist" -> "true"
   )
 
   val VALID_TEMP_FORMATS = Set("AVRO", "CSV", "CSV GZIP")
@@ -285,5 +286,13 @@ private[redshift] object Parameters {
           new BasicSessionCredentials(accessKey, secretAccessKey, sessionToken))
       }
     }
+
+
+    /**
+      * If true then this library will automatically discover the credentials that Spark is
+      * using to connect to S3 and will forward those credentials to Redshift over JDBC.
+      */
+    def createTableIfNotExist: Boolean = parameters("create_table_if_not_exist").toBoolean
+
   }
 }
