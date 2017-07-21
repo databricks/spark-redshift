@@ -51,7 +51,7 @@ object SparkRedshiftBuild extends Build {
       testSparkVersion := sys.props.get("spark.testVersion").getOrElse(sparkVersion.value),
       testSparkAvroVersion := sys.props.get("sparkAvro.testVersion").getOrElse("3.0.0"),
       testHadoopVersion := sys.props.get("hadoop.testVersion").getOrElse("2.2.0"),
-      testAWSJavaSDKVersion := sys.props.get("aws.testVersion").getOrElse("1.10.22"),
+      testAWSJavaSDKVersion := sys.props.get("aws.testVersion").getOrElse("1.11.166"),
       spName := "databricks/spark-redshift",
       sparkComponents ++= Seq("sql", "hive"),
       spIgnoreProvided := true,
