@@ -28,6 +28,7 @@ private[redshift] object AWSCredentialsUtils {
   /**
     * Generates a credentials string for use in Redshift COPY and UNLOAD statements.
     * Favors a configured `aws_iam_role` if available in the parameters.
+    * http://docs.aws.amazon.com/redshift/latest/dg/copy-parameters-authorization.html
     */
   def getRedshiftCredentialsString(
       params: MergedParameters,
@@ -36,15 +37,14 @@ private[redshift] object AWSCredentialsUtils {
     def awsCredsToString(credentials: AWSCredentials): String = {
       credentials match {
         case creds: AWSSessionCredentials =>
-          s"aws_access_key_id=${creds.getAWSAccessKeyId};" +
-            s"aws_secret_access_key=${creds.getAWSSecretKey};token=${creds.getSessionToken}"
+          s"access_key_id '${creds.getAWSAccessKeyId}' secret_access_key '${creds.getAWSSecretKey}' " +
+            s"session_token '${creds.getSessionToken}'"
         case creds =>
-          s"aws_access_key_id=${creds.getAWSAccessKeyId};" +
-            s"aws_secret_access_key=${creds.getAWSSecretKey}"
+          s"access_key_id '${creds.getAWSAccessKeyId}' secret_access_key '${creds.getAWSSecretKey}'"
       }
     }
     if (params.iamRole.isDefined) {
-      s"aws_iam_role=${params.iamRole.get}"
+      s"iam_role '${params.iamRole.get}'"
     } else if (params.temporaryAWSCredentials.isDefined) {
       awsCredsToString(params.temporaryAWSCredentials.get.getCredentials)
     } else if (params.forwardSparkS3Credentials) {
