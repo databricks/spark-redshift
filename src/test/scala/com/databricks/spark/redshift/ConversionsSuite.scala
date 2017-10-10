@@ -17,13 +17,12 @@
 package com.databricks.spark.redshift
 
 import java.sql.Timestamp
-import java.util.Locale
-
-import org.apache.spark.sql.catalyst.encoders.RowEncoder
-import org.scalatest.FunSuite
+import java.util.{Locale, TimeZone}
 
 import org.apache.spark.sql.Row
+import org.apache.spark.sql.catalyst.encoders.RowEncoder
 import org.apache.spark.sql.types._
+import org.scalatest.FunSuite
 
 /**
  * Unit test for data type conversions
@@ -43,17 +42,20 @@ class ConversionsSuite extends FunSuite {
     // scalastyle:on
 
     val timestampWithMillis = "2014-03-01 00:00:01.123"
+    val timestampTzWithMillis = "2014-02-28 21:00:01.123-11"
 
     val expectedDateMillis = TestUtils.toMillis(2015, 6, 1, 0, 0, 0)
     val expectedTimestampMillis = TestUtils.toMillis(2014, 2, 1, 0, 0, 1, 123)
+    val expectedTimestampTzMillis = TestUtils.toMillis(2014, 2, 1, 9, 0, 1, 123,
+      TimeZone.getTimeZone("UTC"))
 
     val convertedRow = convertRow(
       Array("1", "t", "2015-07-01", doubleMin, "1.0", "42",
-        longMax, "23", unicodeString, timestampWithMillis))
+        longMax, "23", unicodeString, timestampWithMillis, timestampTzWithMillis))
 
     val expectedRow = Row(1.asInstanceOf[Byte], true, new Timestamp(expectedDateMillis),
       Double.MinValue, 1.0f, 42, Long.MaxValue, 23.toShort, unicodeString,
-      new Timestamp(expectedTimestampMillis))
+      new Timestamp(expectedTimestampMillis), new Timestamp(expectedTimestampTzMillis))
 
     assert(convertedRow == expectedRow)
   }
@@ -120,4 +122,39 @@ class ConversionsSuite extends FunSuite {
     assert(convertRow(Array("inf")) === Row(Double.PositiveInfinity))
     assert(convertRow(Array("-inf")) === Row(Double.NegativeInfinity))
   }
+
+  test("timestamps with timezones have multiple formats") {
+    val schema = StructType(Seq(StructField("a", TimestampType)))
+    val convertRow = createRowConverter(schema)
+    val utc = TimeZone.getTimeZone("UTC")
+    Seq(
+      "2014-03-01 00:00:01+01" -> TestUtils.toMillis(2014, 2, 1, 0, 0, 0, millis = 1000,
+        timezone = utc),
+      // daylights savings
+      "2014-03-01 01:00:01.000+02" -> TestUtils.toMillis(2014, 2, 1, 0, 0, 0, millis = 1000,
+        timezone = utc),
+      // no daylights savings
+      "2014-04-01 01:00:01.000+01" -> TestUtils.toMillis(2014, 3, 1, 0, 0, 0, millis = 1000,
+        timezone = utc),
+      "2014-02-28 22:00:00.1-01" -> TestUtils.toMillis(2014, 2, 1, 0, 0, 0, millis = 100,
+        timezone = utc),
+      "2014-03-01 01:00:00.10+02" -> TestUtils.toMillis(2014, 2, 1, 0, 0, 0, millis = 100,
+        timezone = utc),
+      "2014-02-28 23:00:00.100-00" -> TestUtils.toMillis(2014, 2, 1, 0, 0, 0, millis = 100,
+        timezone = utc),
+      "2014-02-28 14:00:00.01-09" -> TestUtils.toMillis(2014, 2, 1, 0, 0, 0, millis = 10,
+        timezone = utc),
+      "2014-03-01 09:00:00.010+10" -> TestUtils.toMillis(2014, 2, 1, 0, 0, 0, millis = 10,
+        timezone = utc),
+      "2014-03-01 09:00:00.001+10" -> TestUtils.toMillis(2014, 2, 1, 0, 0, 0, millis = 1,
+        timezone = utc)
+    ).foreach { case (timestampString, expectedTime) =>
+      withClue(s"timestamp string is '$timestampString'") {
+        val convertedRow = convertRow(Array(timestampString))
+        val convertedTimestamp = convertedRow.get(0).asInstanceOf[Timestamp]
+        assert(convertedTimestamp === new Timestamp(expectedTime))
+      }
+    }
+  }
+
 }

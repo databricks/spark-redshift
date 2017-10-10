@@ -17,7 +17,7 @@
 package com.databricks.spark.redshift
 
 import java.sql.{Date, Timestamp}
-import java.util.{Calendar, Locale}
+import java.util.{Calendar, Locale, TimeZone}
 
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.types._
@@ -42,7 +42,8 @@ object TestUtils {
       StructField("testlong", LongType),
       StructField("testshort", ShortType),
       StructField("teststring", StringType),
-      StructField("testtimestamp", TimestampType)))
+      StructField("testtimestamp", TimestampType),
+      StructField("testtimestamptz", TimestampType)))
   }
 
   // scalastyle:off
@@ -52,14 +53,17 @@ object TestUtils {
   val expectedData: Seq[Row] = Seq(
     Row(1.toByte, true, TestUtils.toDate(2015, 6, 1), 1234152.12312498,
       1.0f, 42, 1239012341823719L, 23.toShort, "Unicode's樂趣",
-      TestUtils.toTimestamp(2015, 6, 1, 0, 0, 0, 1)),
+      TestUtils.toTimestamp(2015, 6, 1, 0, 0, 0, 1), TestUtils.toTimestamp(2015, 6, 1, 0, 0, 0, 1,
+        TimeZone.getTimeZone("UTC"))),
     Row(1.toByte, false, TestUtils.toDate(2015, 6, 2), 0.0, 0.0f, 42,
-      1239012341823719L, -13.toShort, "asdf", TestUtils.toTimestamp(2015, 6, 2, 0, 0, 0, 0)),
+      1239012341823719L, -13.toShort, "asdf", TestUtils.toTimestamp(2015, 6, 2, 0, 0, 0, 0),
+      TestUtils.toTimestamp(2015, 6, 2, 0, 0, 0, 0, TimeZone.getTimeZone("UTC"))),
     Row(0.toByte, null, TestUtils.toDate(2015, 6, 3), 0.0, -1.0f, 4141214,
-      1239012341823719L, null, "f", TestUtils.toTimestamp(2015, 6, 3, 0, 0, 0)),
+      1239012341823719L, null, "f", TestUtils.toTimestamp(2015, 6, 3, 0, 0, 0),
+      TestUtils.toTimestamp(2015, 6, 3, 0, 0, 0, timezone = TimeZone.getTimeZone("UTC"))),
     Row(0.toByte, false, null, -1234152.12312498, 100000.0f, null, 1239012341823719L, 24.toShort,
-      "___|_123", null),
-    Row(List.fill(10)(null): _*))
+      "___|_123", null, null),
+    Row(List.fill(11)(null): _*))
   // scalastyle:on
 
   /**
@@ -84,8 +88,9 @@ object TestUtils {
       hour: Int,
       minutes: Int,
       seconds: Int,
-      millis: Int = 0): Long = {
-    val calendar = Calendar.getInstance()
+      millis: Int = 0,
+      timezone: TimeZone = TimeZone.getDefault): Long = {
+    val calendar = Calendar.getInstance(timezone)
     calendar.set(year, zeroBasedMonth, date, hour, minutes, seconds)
     calendar.set(Calendar.MILLISECOND, millis)
     calendar.getTime.getTime
@@ -101,8 +106,9 @@ object TestUtils {
       hour: Int,
       minutes: Int,
       seconds: Int,
-      millis: Int = 0): Timestamp = {
-    new Timestamp(toMillis(year, zeroBasedMonth, date, hour, minutes, seconds, millis))
+      millis: Int = 0,
+      timezone: TimeZone = TimeZone.getDefault): Timestamp = {
+    new Timestamp(toMillis(year, zeroBasedMonth, date, hour, minutes, seconds, millis, timezone))
   }
 
   /**

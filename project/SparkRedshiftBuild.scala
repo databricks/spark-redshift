@@ -59,6 +59,7 @@ object SparkRedshiftBuild extends Build {
       credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"),
       scalacOptions ++= Seq("-target:jvm-1.6"),
       javacOptions ++= Seq("-source", "1.6", "-target", "1.6"),
+      resolvers ++= Seq("redshift" at "http://redshift-maven-repository.s3-website-us-east-1.amazonaws.com/release"),
       libraryDependencies ++= Seq(
         "org.slf4j" % "slf4j-api" % "1.7.5",
         "com.eclipsesource.minimal-json" % "minimal-json" % "0.9.4",
@@ -75,7 +76,7 @@ object SparkRedshiftBuild extends Build {
         // A Redshift-compatible JDBC driver must be present on the classpath for spark-redshift to work.
         // For testing, we use an Amazon driver, which is available from
         // http://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-connection.html
-        "com.amazon.redshift" % "jdbc4" % "1.1.7.1007" % "test" from "https://s3.amazonaws.com/redshift-downloads/drivers/RedshiftJDBC4-1.1.7.1007.jar",
+        "com.amazon.redshift" % "redshift-jdbc42" % "1.2.8.1005" % "it,test",
         // Although support for the postgres driver is lower priority than support for Amazon's
         // official Redshift driver, we still run basic tests with it.
         "postgresql" % "postgresql" % "8.3-606.jdbc4" % "test",
