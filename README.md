@@ -3,6 +3,11 @@
 [![Build Status](https://travis-ci.org/databricks/spark-redshift.svg?branch=master)](https://travis-ci.org/databricks/spark-redshift)
 [![codecov.io](http://codecov.io/github/databricks/spark-redshift/coverage.svg?branch=master)](http://codecov.io/github/databricks/spark-redshift?branch=master)
 
+
+*Note*: To ensure the best experience for our customers, we have decided to inline this connector directly in Databricks Runtime. The latest version of Databricks Runtime (3.0+)  includes an advanced version of the RedShift connector for Spark that features both performance improvements (full query pushdown) as well as security improvements (automatic encryption). For more information, refer to the <a href="https://docs.databricks.com/spark/latest/data-sources/aws/amazon-redshift.html">Databricks documentation</a>. As a result, we will no longer be making releases separately from Databricks Runtime.
+
+
+
 A library to load data into Spark SQL DataFrames from Amazon Redshift, and write them back to
 Redshift tables. Amazon S3 is used to efficiently transfer data in and out of Redshift, and
 JDBC is used to automatically trigger the appropriate `COPY` and `UNLOAD` commands on Redshift.
