@@ -181,7 +181,7 @@ class RedshiftSourceSuite
         |UNLOAD \('SELECT "testbyte", "testbool" FROM
         |  \(select testbyte, testbool
         |    from test_table
-        |    where teststring = \\'\\\\\\\\Unicode\\'\\'s樂趣\\'\) '\)
+        |    where teststring = \\'\\\\\\\\Unicode\\'\\'s樂趣\\'\) AS q '\)
       """.stripMargin.lines.map(_.trim).mkString(" ").trim.r
     val query =
       """select testbyte, testbool from test_table where teststring = '\\Unicode''s樂趣'"""
@@ -196,7 +196,7 @@ class RedshiftSourceSuite
     {
       val params = defaultParams + ("dbtable" -> s"($query)")
       val mockRedshift =
-        new MockRedshift(defaultParams("url"), Map(params("dbtable") -> querySchema))
+        new MockRedshift(defaultParams("url"), Map(s"${params("dbtable")} AS q" -> querySchema))
       val relation = new DefaultSource(
         mockRedshift.jdbcWrapper, _ => mockS3Client).createRelation(testSqlContext, params)
       assert(testSqlContext.baseRelationToDataFrame(relation).collect() === expectedValues)
@@ -207,7 +207,7 @@ class RedshiftSourceSuite
     // Test with query parameter
     {
       val params = defaultParams - "dbtable" + ("query" -> query)
-      val mockRedshift = new MockRedshift(defaultParams("url"), Map(s"($query)" -> querySchema))
+      val mockRedshift = new MockRedshift(defaultParams("url"), Map(s"($query) AS q" -> querySchema))
       val relation = new DefaultSource(
         mockRedshift.jdbcWrapper, _ => mockS3Client).createRelation(testSqlContext, params)
       assert(testSqlContext.baseRelationToDataFrame(relation).collect() === expectedValues)

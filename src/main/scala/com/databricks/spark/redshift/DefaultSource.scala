@@ -41,6 +41,11 @@ class DefaultSource(
   def this() = this(DefaultJDBCWrapper, awsCredentials => new AmazonS3Client(awsCredentials))
 
   /**
+   * Constructor to provide a custom S3 client factory
+   */
+  def this(s3ClientFactory: AWSCredentialsProvider => AmazonS3Client) = this(DefaultJDBCWrapper, s3ClientFactory)
+
+  /**
    * Create a new RedshiftRelation instance using parameters from Spark SQL DDL. Resolves the schema
    * using JDBC connection over provided URL, which must contain credentials.
    */

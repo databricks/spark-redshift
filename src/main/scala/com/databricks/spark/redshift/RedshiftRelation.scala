@@ -55,12 +55,12 @@ private[redshift] case class RedshiftRelation(
   }
 
   private val tableNameOrSubquery =
-    params.query.map(q => s"($q)").orElse(params.table.map(_.toString)).get
+    params.query.map(q => s"($q) AS q").orElse(params.table.map(_.toString)).get
 
   override lazy val schema: StructType = {
     userSchema.getOrElse {
       val tableNameOrSubquery =
-        params.query.map(q => s"($q)").orElse(params.table.map(_.toString)).get
+        params.query.map(q => s"($q) AS q").orElse(params.table.map(_.toString)).get
       val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, params.credentials)
       try {
         jdbcWrapper.resolveTable(conn, tableNameOrSubquery)
