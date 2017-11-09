@@ -124,10 +124,12 @@ private[redshift] class RedshiftWriter(
       creds: AWSCredentialsProvider,
       manifestUrl: Option[String]): Unit = {
 
-    // If the table doesn't exist, we need to create it first, using JDBC to infer column types
-    val createStatement = createTableSql(data, params)
-    log.info(createStatement)
-    jdbcWrapper.executeInterruptibly(conn.prepareStatement(createStatement))
+    if (params.createTableIfNotExist) {
+      // If the table doesn't exist, we need to create it first, using JDBC to infer column types
+      val createStatement = createTableSql(data, params)
+      log.info(createStatement)
+      jdbcWrapper.executeInterruptibly(conn.prepareStatement(createStatement))
+    }
 
     val preActions = commentActions(params.description, data.schema) ++ params.preActions
 

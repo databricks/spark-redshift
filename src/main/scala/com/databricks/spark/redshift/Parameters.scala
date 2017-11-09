@@ -38,7 +38,8 @@ private[redshift] object Parameters {
     "diststyle" -> "EVEN",
     "usestagingtable" -> "true",
     "preactions" -> ";",
-    "postactions" -> ";"
+    "postactions" -> ";",
+    "create_table_if_not_exist" -> "true"
   )
 
   val VALID_TEMP_FORMATS = Set("AVRO", "CSV", "CSV GZIP")
@@ -47,8 +48,9 @@ private[redshift] object Parameters {
    * Merge user parameters with the defaults, preferring user parameters if specified
    */
   def mergeParameters(userParameters: Map[String, String]): MergedParameters = {
-    if (!userParameters.contains("tempdir")) {
-      throw new IllegalArgumentException("'tempdir' is required for all Redshift loads and saves")
+    if (!userParameters.contains("tempdir") && !userParameters.contains("permdir")) {
+      throw new IllegalArgumentException("'tempdir' or 'permdir' is required "
+        + "for all Redshift loads and saves")
     }
     if (userParameters.contains("tempformat") &&
         !VALID_TEMP_FORMATS.contains(userParameters("tempformat").toUpperCase)) {
@@ -121,8 +123,15 @@ private[redshift] object Parameters {
 
     /**
      * Creates a per-query subdirectory in the [[rootTempDir]], with a random UUID.
+     * modified by jchoi to support permDir
      */
-    def createPerQueryTempDir(): String = Utils.makeTempPath(rootTempDir)
+    def createPerQueryTempDir(): String = {
+      if (!permDir.isEmpty){
+        return permDir
+      }
+
+      Utils.makeTempPath(rootTempDir)
+    }
 
     /**
      * The Redshift table to be used as the target when loading or writing data.
@@ -285,5 +294,18 @@ private[redshift] object Parameters {
           new BasicSessionCredentials(accessKey, secretAccessKey, sessionToken))
       }
     }
+
+
+    /**
+      * option for create table if not exists
+      */
+    def createTableIfNotExist: Boolean = parameters("create_table_if_not_exist").toBoolean
+
+    /**
+      *
+      * @return
+      */
+    def permDir: String = parameters.getOrElse("permdir", "")
+
   }
 }

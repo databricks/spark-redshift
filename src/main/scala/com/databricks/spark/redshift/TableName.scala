@@ -25,7 +25,10 @@ private[redshift] case class TableName(unescapedSchemaName: String, unescapedTab
   private def quote(str: String) = '"' + str.replace("\"", "\"\"") + '"'
   def escapedSchemaName: String = quote(unescapedSchemaName)
   def escapedTableName: String = quote(unescapedTableName)
-  override def toString: String = s"$escapedSchemaName.$escapedTableName"
+
+  // escapedSchemaName.length == 2 if empty due to ""
+  override def toString: String = if (escapedSchemaName.length == 2) escapedTableName
+                                    else s"$escapedSchemaName.$escapedTableName"
 }
 
 private[redshift] object TableName {
@@ -39,7 +42,7 @@ private[redshift] object TableName {
     def unescapeQuotes(s: String) = s.replace("\"\"", "\"")
     def unescape(s: String) = unescapeQuotes(dropOuterQuotes(s))
     splitByDots(str) match {
-      case Seq(tableName) => TableName("PUBLIC", unescape(tableName))
+      case Seq(tableName) => TableName("", unescape(tableName)) // jchoi "PUBLIC"
       case Seq(schemaName, tableName) => TableName(unescape(schemaName), unescape(tableName))
       case other => throw new IllegalArgumentException(s"Could not parse table name from '$str'")
     }
