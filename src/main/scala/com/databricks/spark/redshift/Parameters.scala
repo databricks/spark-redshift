@@ -58,7 +58,7 @@ private[redshift] object Parameters {
         "You cannot specify both the 'dbtable' and 'query' parameters at the same time.")
     }
     val credsInURL = userParameters.get("url")
-      .filter(url => url.contains("user=") || url.contains("password="))
+      .filter(url => url.contains("user=") || url.contains("password=") || url.contains("DbUser="))
     if (userParameters.contains("user") || userParameters.contains("password")) {
       if (credsInURL.isDefined) {
         throw new IllegalArgumentException(
