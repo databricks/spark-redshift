@@ -17,13 +17,15 @@
 package com.databricks.spark.redshift
 
 import java.sql.Timestamp
-import java.text.{DecimalFormat, DecimalFormatSymbols, SimpleDateFormat}
-import java.util.Locale
+import java.text.{DecimalFormat, DecimalFormatSymbols, ParseException, SimpleDateFormat}
+import java.util.{Locale, TimeZone}
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.encoders.RowEncoder
 import org.apache.spark.sql.catalyst.expressions.GenericRow
 import org.apache.spark.sql.types._
+
+import scala.util.Try
 
 /**
  * Data type conversions for Redshift unloaded data
@@ -104,7 +106,8 @@ private[redshift] object Conversions {
         case LongType => (data: String) => java.lang.Long.parseLong(data)
         case ShortType => (data: String) => java.lang.Short.parseShort(data)
         case StringType => (data: String) => data
-        case TimestampType => (data: String) => Timestamp.valueOf(data)
+        case TimestampType => (data: String) =>
+          Try(Timestamp.valueOf(data)).getOrElse(parseTimestampTz(data))
         case _ => (data: String) => data
       }
     }
@@ -121,5 +124,26 @@ private[redshift] object Conversions {
       }
       encoder.toRow(externalRow)
     }
+  }
+
+  private def parseTimestampTz(data: String): Timestamp = {
+    // Cannot just parse using SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSX")
+    // since "2014-02-28 22:00:00.10+00"
+    // should be equivalent to "2014-02-28 22:00:00.100" (100 millis)
+    // but returns "2014-02-28 22:00:00.010" (10 millis).
+    var timezoneOffsetIndex = data.indexOf("+", "yyyy-MM-dd HH:mm:ss".length)
+    val timezoneHourOffset = if (timezoneOffsetIndex >= 0) {
+      -data.substring(timezoneOffsetIndex + 1).toInt
+    } else {
+      timezoneOffsetIndex = data.indexOf("-", "yyyy-MM-dd HH:mm:ss".length)
+      if (timezoneOffsetIndex < 0) {
+        throw new ParseException(s"""Unparseable date. Timezone data not recognized: "$data"""", 0)
+      }
+      data.substring(timezoneOffsetIndex + 1).toInt
+    }
+    val currentTimezone = TimeZone.getDefault
+    val of = Timestamp.valueOf(data.substring(0, timezoneOffsetIndex))
+    new Timestamp(of.getTime + timezoneHourOffset * 3600000 +
+      currentTimezone.getRawOffset + currentTimezone.getDSTSavings)
   }
 }

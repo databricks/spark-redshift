@@ -790,8 +790,12 @@ to the `extracopyoptions` setting. For example, with a bucket in the US East (Vi
 As a result, this use-case is not supported by this library. The only workaround is to use a new bucket in the same region as your Redshift cluster.
 
 ## Migration Guide
+### 4.0 
+- Amazon Redshift JDBC Drivers should be version 1.2.8.1005 or later
+- `TIMESTAMPTZ` fields should be treated as a `TimestampType` normalized to UTC instead of a `StringType`
 
-- Version 3.0 now requires `forward_spark_s3_credentials` to be explicitly set before Spark S3
+### 3.0 
+- `forward_spark_s3_credentials` should be explicitly set before Spark S3
   credentials will be forwarded to Redshift. Users who use the `aws_iam_role` or `temporary_aws_*`
   authentication mechanisms will be unaffected by this change. Users who relied on the old default
   behavior will now need to explicitly set `forward_spark_s3_credentials` to `true` to continue
