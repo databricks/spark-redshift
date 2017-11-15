@@ -19,11 +19,13 @@ package com.databricks.spark.redshift
 import java.net.URI
 import java.util.UUID
 
+import com.amazonaws.auth.{AWSCredentials, AWSCredentialsProvider}
+
 import scala.collection.JavaConverters._
 import scala.util.control.NonFatal
-
-import com.amazonaws.services.s3.{AmazonS3URI, AmazonS3Client}
+import com.amazonaws.services.s3.{AmazonS3Client, AmazonS3URI}
 import com.amazonaws.services.s3.model.BucketLifecycleConfiguration
+import com.databricks.spark.redshift.Parameters.MergedParameters
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.FileSystem
 import org.slf4j.LoggerFactory
@@ -203,5 +205,47 @@ private[redshift] object Utils {
       case regionRegex(region) => Some(region)
       case _ => None
     }
+  }
+
+  /**
+    * Evaluates hadoop configuration and encryption option. Returns string required to be appended
+    * to UNLOAD/COPY statements to enable or disable encryption.
+    */
+  def getEncryptOptStr(params: MergedParameters, hadoopConfig: Configuration): String = {
+    val sparkRedshiftMasterSymKey = hadoopConfig.get("spark-redshift.master-sym-key")
+    val encryptionMaterialsProvider =
+      hadoopConfig.get("fs.s3.cse.encryptionMaterialsProvider")
+    val enableS3CSEEncryption = hadoopConfig.get("fs.s3.cse.enabled")
+
+    throwExceptionIfConfigurationIsInvalid(
+      params, sparkRedshiftMasterSymKey, encryptionMaterialsProvider, enableS3CSEEncryption)
+
+    if (params.encryption) {
+      "ENCRYPTED"
+    } else {
+      ""
+    }
+  }
+
+  def throwExceptionIfConfigurationIsInvalid(
+                                    params: MergedParameters,
+                                    sparkRedshiftMasterSymKey: String,
+                                    encryptionMaterialsProvider: String,
+                                    enableS3CSEEncryption: String): Unit =
+
+  if (params.encryption &&
+        (sparkRedshiftMasterSymKey == null
+          || encryptionMaterialsProvider == null
+          || enableS3CSEEncryption == null
+        )
+  ) {
+    throw new IllegalArgumentException(
+      "spark-redshift.master-sym-key, fs.s3.cse.encryptionMaterialsProvider and " +
+        "fs.s3.cse.enabled hadoop configuration must be set immediately after spark " +
+        "job startup, if encryption option is enabled")
+  } else if (!params.encryption && sparkRedshiftMasterSymKey != null) {
+    throw new IllegalArgumentException(
+      "encryption option must be enabled if " +
+        "spark-redshift.master-sym-key hadoop configuration is set")
   }
 }

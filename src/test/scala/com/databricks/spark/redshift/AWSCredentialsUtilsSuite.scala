@@ -38,28 +38,73 @@ class AWSCredentialsUtilsSuite extends FunSuite {
   }
 
   test("credentialsString with regular keys") {
+    val hadoopConfiguration: Configuration = new Configuration()
     val creds = new BasicAWSCredentials("ACCESSKEYID", "SECRET/KEY/WITH/SLASHES")
     val params =
       Parameters.mergeParameters(baseParams ++ Map("forward_spark_s3_credentials" -> "true"))
-    assert(AWSCredentialsUtils.getRedshiftCredentialsString(params, creds) ===
+    assert(AWSCredentialsUtils.getRedshiftCredentialsString(params, creds, hadoopConfiguration) ===
       "aws_access_key_id=ACCESSKEYID;aws_secret_access_key=SECRET/KEY/WITH/SLASHES")
   }
 
+  test("credentialsString with regular keys and encryption") {
+    val hadoopConfiguration: Configuration = new Configuration()
+    hadoopConfiguration.set("spark-redshift.master-sym-key", "test-master-sym-key")
+    val creds = new BasicAWSCredentials("ACCESSKEYID", "SECRET/KEY/WITH/SLASHES")
+    val params =
+      Parameters.mergeParameters(
+        baseParams ++ Map("forward_spark_s3_credentials" -> "true", "encryption" -> "true")
+      )
+    assert(AWSCredentialsUtils.getRedshiftCredentialsString(params, creds, hadoopConfiguration) ===
+      "aws_access_key_id=ACCESSKEYID;" +
+      "aws_secret_access_key=SECRET/KEY/WITH/SLASHES;" +
+      "master_symmetric_key=test-master-sym-key")
+  }
+
   test("credentialsString with STS temporary keys") {
+    val hadoopConfiguration: Configuration = new Configuration()
     val params = Parameters.mergeParameters(baseParams ++ Map(
       "temporary_aws_access_key_id" -> "ACCESSKEYID",
       "temporary_aws_secret_access_key" -> "SECRET/KEY",
       "temporary_aws_session_token" -> "SESSION/Token"))
-    assert(AWSCredentialsUtils.getRedshiftCredentialsString(params, null) ===
+    assert(AWSCredentialsUtils.getRedshiftCredentialsString(params, null, hadoopConfiguration) ===
       "aws_access_key_id=ACCESSKEYID;aws_secret_access_key=SECRET/KEY;token=SESSION/Token")
   }
 
+  test("credentialsString with STS temporary keys and encryption") {
+    val hadoopConfiguration: Configuration = new Configuration()
+    hadoopConfiguration.set("spark-redshift.master-sym-key", "test-master-sym-key")
+    val params = Parameters.mergeParameters(baseParams ++ Map(
+      "temporary_aws_access_key_id" -> "ACCESSKEYID",
+      "temporary_aws_secret_access_key" -> "SECRET/KEY",
+      "temporary_aws_session_token" -> "SESSION/Token",
+      "encryption" -> "true"))
+    assert(AWSCredentialsUtils.getRedshiftCredentialsString(params, null, hadoopConfiguration) ===
+        "aws_access_key_id=ACCESSKEYID;" +
+        "aws_secret_access_key=SECRET/KEY;" +
+        "token=SESSION/Token;" +
+        "master_symmetric_key=test-master-sym-key")
+  }
+
   test("Configured IAM roles should take precedence") {
+    val hadoopConfiguration: Configuration = new Configuration()
     val creds = new BasicSessionCredentials("ACCESSKEYID", "SECRET/KEY", "SESSION/Token")
     val iamRole = "arn:aws:iam::123456789000:role/redshift_iam_role"
     val params = Parameters.mergeParameters(baseParams ++ Map("aws_iam_role" -> iamRole))
-    assert(AWSCredentialsUtils.getRedshiftCredentialsString(params, null) ===
+    assert(AWSCredentialsUtils.getRedshiftCredentialsString(params, null, hadoopConfiguration) ===
       s"aws_iam_role=$iamRole")
+  }
+
+  test("Configured IAM roles should take precedence with encryption") {
+    val hadoopConfiguration: Configuration = new Configuration()
+    hadoopConfiguration.set("spark-redshift.master-sym-key", "test-master-sym-key")
+    val creds = new BasicSessionCredentials("ACCESSKEYID", "SECRET/KEY", "SESSION/Token")
+    val iamRole = "arn:aws:iam::123456789000:role/redshift_iam_role"
+    val params = Parameters.mergeParameters(baseParams ++ Map(
+      "aws_iam_role" -> iamRole,
+      "encryption" -> "true"
+    ))
+    assert(AWSCredentialsUtils.getRedshiftCredentialsString(params, null, hadoopConfiguration) ===
+        s"aws_iam_role=$iamRole;master_symmetric_key=test-master-sym-key")
   }
 
   test("AWSCredentials.load() STS temporary keys should take precedence") {

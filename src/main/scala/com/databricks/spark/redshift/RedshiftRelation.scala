@@ -181,22 +181,31 @@ private[redshift] case class RedshiftRelation(
     // Always quote column names:
     val columnList = requiredColumns.map(col => s""""$col"""").mkString(", ")
     val whereClause = FilterPushdown.buildWhereClause(schema, filters)
+    val hadoopConfiguration = sqlContext.sparkContext.hadoopConfiguration
     val credsString: String =
-      AWSCredentialsUtils.getRedshiftCredentialsString(params, creds.getCredentials)
+      AWSCredentialsUtils.getRedshiftCredentialsString(
+        params, creds.getCredentials, hadoopConfiguration)
     val query = {
       // Since the query passed to UNLOAD will be enclosed in single quotes, we need to escape
       // any backslashes and single quotes that appear in the query itself
-      val escapedTableNameOrSubqury = tableNameOrSubquery.replace("\\", "\\\\").replace("'", "\\'")
-      s"SELECT $columnList FROM $escapedTableNameOrSubqury $whereClause"
+      val escapedTableNameOrSubquery = tableNameOrSubquery.replace("\\", "\\\\").replace("'", "\\'")
+      s"SELECT $columnList FROM $escapedTableNameOrSubquery $whereClause"
     }
     // We need to remove S3 credentials from the unload path URI because they will conflict with
     // the credentials passed via `credsString`.
     val fixedUrl = Utils.fixS3Url(Utils.removeCredentialsFromURI(new URI(tempDir)).toString)
+    val encryptOptStr: String =
+        Utils.getEncryptOptStr(params, sqlContext.sparkContext.hadoopConfiguration)
 
-    s"UNLOAD ('$query') TO '$fixedUrl' WITH CREDENTIALS '$credsString' ESCAPE MANIFEST"
+    s"UNLOAD ('$query') " +
+        s"TO '$fixedUrl' " +
+        s"WITH CREDENTIALS '$credsString' " +
+        s"ESCAPE " +
+        s"MANIFEST " +
+        s"$encryptOptStr"
   }
 
-  private def pruneSchema(schema: StructType, columns: Array[String]): StructType = {
+    private def pruneSchema(schema: StructType, columns: Array[String]): StructType = {
     val fieldMap = Map(schema.fields.map(x => x.name -> x): _*)
     new StructType(columns.map(name => fieldMap(name)))
   }

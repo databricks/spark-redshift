@@ -28,8 +28,26 @@ private[redshift] object AWSCredentialsUtils {
   /**
     * Generates a credentials string for use in Redshift COPY and UNLOAD statements.
     * Favors a configured `aws_iam_role` if available in the parameters.
+    * Adds master symmetric key to the credential string if S3 CSE is enabled.
+    * NOTE: This method deals with encryption because Redshift's CREDENTIALS option
+    * considers master symmetric key a part of credential string.
     */
   def getRedshiftCredentialsString(
+                                    params: MergedParameters,
+                                    sparkAwsCredentials: AWSCredentials,
+                                    hadoopConfiguration: Configuration
+                                  ): String = {
+
+    getRedshiftAWSCredentialsSubString(params, sparkAwsCredentials) +
+      getRedshiftEncryptionSubString(params, hadoopConfiguration)
+  }
+
+
+  /**
+    * Generates a credentials string for use in Redshift COPY and UNLOAD statements.
+    * Favors a configured `aws_iam_role` if available in the parameters.
+    */
+  private def getRedshiftAWSCredentialsSubString(
       params: MergedParameters,
       sparkAwsCredentials: AWSCredentials): String = {
 
@@ -43,6 +61,7 @@ private[redshift] object AWSCredentialsUtils {
             s"aws_secret_access_key=${creds.getAWSSecretKey}"
       }
     }
+
     if (params.iamRole.isDefined) {
       s"aws_iam_role=${params.iamRole.get}"
     } else if (params.temporaryAWSCredentials.isDefined) {
@@ -104,6 +123,19 @@ private[redshift] object AWSCredentialsUtils {
         }
       case other =>
         throw new IllegalArgumentException(s"Unrecognized scheme $other; expected s3, s3n, or s3a")
+    }
+  }
+
+  /**
+    * Generates encryption string to be appended to the Redshift Credentials string
+    */
+  private def getRedshiftEncryptionSubString(
+                                   params: MergedParameters,
+                                   hadoopConfiguration: Configuration): String = {
+    if (params.encryption) {
+      s";master_symmetric_key=${hadoopConfiguration.get("spark-redshift.master-sym-key")}"
+    } else {
+      ""
     }
   }
 }

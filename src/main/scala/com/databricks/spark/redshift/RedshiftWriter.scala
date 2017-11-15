@@ -19,17 +19,17 @@ package com.databricks.spark.redshift
 import java.net.URI
 import java.sql.{Connection, Date, SQLException, Timestamp}
 
-import com.amazonaws.auth.AWSCredentialsProvider
-import com.amazonaws.services.s3.AmazonS3Client
+import com.amazonaws.auth.{AWSCredentials, AWSCredentialsProvider}
+import com.amazonaws.services.s3.model.PutObjectRequest
+import com.amazonaws.services.s3.{AmazonS3Client, AmazonS3URI}
 import org.apache.hadoop.fs.{FileSystem, Path}
-
 import org.apache.spark.TaskContext
 import org.slf4j.LoggerFactory
+
 import scala.collection.mutable
 import scala.util.control.NonFatal
-
 import com.databricks.spark.redshift.Parameters.MergedParameters
-
+import org.apache.commons.io.IOUtils
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{DataFrame, Row, SQLContext, SaveMode}
 import org.apache.spark.sql.types._
@@ -92,14 +92,19 @@ private[redshift] class RedshiftWriter(
       creds: AWSCredentialsProvider,
       manifestUrl: String): String = {
     val credsString: String =
-      AWSCredentialsUtils.getRedshiftCredentialsString(params, creds.getCredentials)
+      AWSCredentialsUtils.getRedshiftCredentialsString(
+        params, creds.getCredentials, sqlContext.sparkContext.hadoopConfiguration)
     val fixedUrl = Utils.fixS3Url(manifestUrl)
+
+    val encryptOptString: String =
+        Utils.getEncryptOptStr(params, sqlContext.sparkContext.hadoopConfiguration)
+
     val format = params.tempFormat match {
       case "AVRO" => "AVRO 'auto'"
       case csv if csv == "CSV" || csv == "CSV GZIP" => csv + s" NULL AS '${params.nullString}'"
     }
     s"COPY ${params.table.get} FROM '$fixedUrl' CREDENTIALS '$credsString' FORMAT AS " +
-      s"${format} manifest ${params.extraCopyOptions}"
+      s"${format} manifest ${params.extraCopyOptions} $encryptOptString"
   }
 
   /**
@@ -209,6 +214,7 @@ private[redshift] class RedshiftWriter(
   private def unloadData(
       sqlContext: SQLContext,
       data: DataFrame,
+      creds: AWSCredentialsProvider,
       tempDir: String,
       tempFormat: String,
       nullString: String): Option[String] = {
@@ -319,14 +325,28 @@ private[redshift] class RedshiftWriter(
       }
       val manifest = s"""{"entries": [${manifestEntries.mkString(",\n")}]}"""
       val manifestPath = sanitizedTempDir + "/manifest.json"
-      val fsDataOut = fs.create(new Path(manifestPath))
-      try {
-        fsDataOut.write(manifest.getBytes("utf-8"))
-      } finally {
-        fsDataOut.close()
-      }
+
+      writeRedshiftManifestUnencrypted(creds, manifest, manifestPath)
       Some(manifestPath)
     }
+  }
+
+  /**
+    * Writes Redshift Manifest file to S3 without encryption.
+    */
+  private def writeRedshiftManifestUnencrypted(
+                                                creds: AWSCredentialsProvider,
+                                                manifest: String,
+                                                manifestPath: String) = {
+    /* By default EncryptionMaterialsProviders encrypt every S3 object using client side
+     * encryption. Redshift expects manifest file to be unencrypted. Hence, instantiating
+     * a new unencrypted AmazonS3Client object to write the manifest to S3.
+     */
+    val s3Client = s3ClientFactory(creds)
+    val s3URI = new AmazonS3URI(manifestPath)
+    val putObjectRequest: PutObjectRequest = new PutObjectRequest(s3URI.getBucket(),
+      s3URI.getKey, IOUtils.toInputStream(manifest, "utf-8"), null);
+    s3Client.putObject(putObjectRequest)
   }
 
   /**
@@ -392,6 +412,7 @@ private[redshift] class RedshiftWriter(
     val manifestUrl = unloadData(
       sqlContext,
       data,
+      creds,
       tempDir = params.createPerQueryTempDir(),
       tempFormat = params.tempFormat,
       nullString = params.nullString)
