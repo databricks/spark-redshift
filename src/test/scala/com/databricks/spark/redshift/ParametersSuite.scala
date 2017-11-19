@@ -28,7 +28,8 @@ class ParametersSuite extends FunSuite with Matchers {
       "tempdir" -> "s3://foo/bar",
       "dbtable" -> "test_schema.test_table",
       "url" -> "jdbc:redshift://foo/bar?user=user&password=password",
-      "forward_spark_s3_credentials" -> "true")
+      "forward_spark_s3_credentials" -> "true",
+      "include_column_list" -> "true")
 
     val mergedParams = Parameters.mergeParameters(params)
 
@@ -37,9 +38,10 @@ class ParametersSuite extends FunSuite with Matchers {
     mergedParams.jdbcUrl shouldBe params("url")
     mergedParams.table shouldBe Some(TableName("test_schema", "test_table"))
     assert(mergedParams.forwardSparkS3Credentials)
+    assert(mergedParams.includeColumnList)
 
     // Check that the defaults have been added
-    (Parameters.DEFAULT_PARAMETERS - "forward_spark_s3_credentials").foreach {
+    (Parameters.DEFAULT_PARAMETERS - "forward_spark_s3_credentials" - "include_column_list").foreach {
       case (key, value) => mergedParams.parameters(key) shouldBe value
     }
   }
