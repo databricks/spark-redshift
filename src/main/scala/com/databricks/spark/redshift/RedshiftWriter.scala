@@ -22,14 +22,13 @@ import java.sql.{Connection, Date, SQLException, Timestamp}
 import com.amazonaws.auth.AWSCredentialsProvider
 import com.amazonaws.services.s3.AmazonS3Client
 import org.apache.hadoop.fs.{FileSystem, Path}
-
 import org.apache.spark.TaskContext
 import org.slf4j.LoggerFactory
+
 import scala.collection.mutable
 import scala.util.control.NonFatal
-
 import com.databricks.spark.redshift.Parameters.MergedParameters
-
+import org.apache.hadoop.conf.Configuration
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{DataFrame, Row, SQLContext, SaveMode}
 import org.apache.spark.sql.types._
@@ -62,6 +61,9 @@ private[redshift] class RedshiftWriter(
     s3ClientFactory: AWSCredentialsProvider => AmazonS3Client) {
 
   private val log = LoggerFactory.getLogger(getClass)
+
+  // http://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-cluster-configuration-object-encryption.html
+  private val EMRFS_CLIENT_SIDE_ENCRYPTION_KEY :String = "fs.s3.cse.enabled"
 
   /**
    * Generate CREATE TABLE statement for Redshift
@@ -98,7 +100,7 @@ private[redshift] class RedshiftWriter(
       case "AVRO" => "AVRO 'auto'"
       case csv if csv == "CSV" || csv == "CSV GZIP" => csv + s" NULL AS '${params.nullString}'"
     }
-    s"COPY ${params.table.get} FROM '$fixedUrl' CREDENTIALS '$credsString' FORMAT AS " +
+    s"COPY ${params.table.get} FROM '$fixedUrl' $credsString FORMAT AS " +
       s"${format} manifest ${params.extraCopyOptions}"
   }
 
@@ -295,19 +297,36 @@ private[redshift] class RedshiftWriter(
     }).save(tempDir)
 
     if (nonEmptyPartitions.value.isEmpty) {
+      log.info("Did not write any records. Not creating a manifest file.")
       None
     } else {
       // See https://docs.aws.amazon.com/redshift/latest/dg/loading-data-files-using-manifest.html
       // for a description of the manifest file format. The URLs in this manifest must be absolute
       // and complete.
 
+      // The manifest file must be stored in plain text, even if the contents of the files being loaded into
+      // Redshift are encrypted. To make this work, we create a separate FileSystem without any encryption options
+      // set
+
+      // Clone existing configuration set by the user
+      val plainTextHadoopConfig = new Configuration(sqlContext.sparkContext.hadoopConfiguration)
+
+      // Make sure that we don't get a cached value of the file system, with client side encryption configuration
+      // set to true. FileSystem class will cache implementations of file system based on scheme and authority
+      // of the path of the file, so even if you pass a completely different configuration to FileSystem, you may
+      // still get a cached value of a FileSystem with different properties
+      plainTextHadoopConfig.set("fs.s3.impl.disable.cache", "true")
+
+      // Turn off any CSE if it's set
+      plainTextHadoopConfig.set(EMRFS_CLIENT_SIDE_ENCRYPTION_KEY, "false")
+
       // The partition filenames are of the form part-r-XXXXX-UUID.fileExtension.
-      val fs = FileSystem.get(URI.create(tempDir), sqlContext.sparkContext.hadoopConfiguration)
+      val fs = FileSystem.get(URI.create(tempDir), plainTextHadoopConfig)
       val partitionIdRegex = "^part-(?:r-)?(\\d+)[^\\d+].*$".r
       val filesToLoad: Seq[String] = {
         val nonEmptyPartitionIds = nonEmptyPartitions.value.toSet
         fs.listStatus(new Path(tempDir)).map(_.getPath.getName).collect {
-          case file @ partitionIdRegex(id) if nonEmptyPartitionIds.contains(id.toInt) => file
+          case file@partitionIdRegex(id) if nonEmptyPartitionIds.contains(id.toInt) => file
         }
       }
       // It's possible that tempDir contains AWS access keys. We shouldn't save those credentials to
@@ -325,6 +344,7 @@ private[redshift] class RedshiftWriter(
       } finally {
         fsDataOut.close()
       }
+
       Some(manifestPath)
     }
   }

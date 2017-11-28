@@ -193,7 +193,7 @@ private[redshift] case class RedshiftRelation(
     // the credentials passed via `credsString`.
     val fixedUrl = Utils.fixS3Url(Utils.removeCredentialsFromURI(new URI(tempDir)).toString)
 
-    s"UNLOAD ('$query') TO '$fixedUrl' WITH CREDENTIALS '$credsString' ESCAPE MANIFEST"
+    s"UNLOAD ('$query') TO '$fixedUrl' $credsString ESCAPE MANIFEST"
   }
 
   private def pruneSchema(schema: StructType, columns: Array[String]): StructType = {

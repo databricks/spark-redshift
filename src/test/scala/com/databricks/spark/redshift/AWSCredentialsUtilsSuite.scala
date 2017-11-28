@@ -42,7 +42,7 @@ class AWSCredentialsUtilsSuite extends FunSuite {
     val params =
       Parameters.mergeParameters(baseParams ++ Map("forward_spark_s3_credentials" -> "true"))
     assert(AWSCredentialsUtils.getRedshiftCredentialsString(params, creds) ===
-      "aws_access_key_id=ACCESSKEYID;aws_secret_access_key=SECRET/KEY/WITH/SLASHES")
+      "access_key_id 'ACCESSKEYID' secret_access_key 'SECRET/KEY/WITH/SLASHES'")
   }
 
   test("credentialsString with STS temporary keys") {
@@ -51,7 +51,7 @@ class AWSCredentialsUtilsSuite extends FunSuite {
       "temporary_aws_secret_access_key" -> "SECRET/KEY",
       "temporary_aws_session_token" -> "SESSION/Token"))
     assert(AWSCredentialsUtils.getRedshiftCredentialsString(params, null) ===
-      "aws_access_key_id=ACCESSKEYID;aws_secret_access_key=SECRET/KEY;token=SESSION/Token")
+      "access_key_id 'ACCESSKEYID' secret_access_key 'SECRET/KEY' session_token 'SESSION/Token'")
   }
 
   test("Configured IAM roles should take precedence") {
@@ -59,7 +59,7 @@ class AWSCredentialsUtilsSuite extends FunSuite {
     val iamRole = "arn:aws:iam::123456789000:role/redshift_iam_role"
     val params = Parameters.mergeParameters(baseParams ++ Map("aws_iam_role" -> iamRole))
     assert(AWSCredentialsUtils.getRedshiftCredentialsString(params, null) ===
-      s"aws_iam_role=$iamRole")
+      s"iam_role '$iamRole'")
   }
 
   test("AWSCredentials.load() STS temporary keys should take precedence") {
