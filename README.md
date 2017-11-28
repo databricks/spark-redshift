@@ -428,7 +428,11 @@ The following describes how each connection can be authenticated:
     To use this capability, you should configure your Hadoop S3 FileSystem to use encryption by
     setting the appropriate configuration properties (which will vary depending on whether you
     are using `s3a`, `s3n`, EMRFS, etc.).
+    
     Note that the `MANIFEST` file (a list of all files written) will not be encrypted.
+    
+    To use CSE with S3 during COPY, generate your own encryption key, and pass it to the writer using
+    ```.option("extracopyoptions", s"encrypted master_symmetric_key '$encodedSymmetricKey'")```
 
 
 ### Parameters
