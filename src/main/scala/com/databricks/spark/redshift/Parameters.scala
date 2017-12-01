@@ -18,6 +18,8 @@ package com.databricks.spark.redshift
 
 import com.amazonaws.auth.{AWSCredentialsProvider, BasicSessionCredentials}
 
+import scala.util.Try
+
 /**
  * All user-specifiable parameters for spark-redshift, along with their validation rules and
  * defaults.
@@ -285,5 +287,11 @@ private[redshift] object Parameters {
           new BasicSessionCredentials(accessKey, secretAccessKey, sessionToken))
       }
     }
+
+    /**
+      * Timeout (in milliseconds) between writing temp files in S3 and calling
+      * upon Redshift to COPY.
+      */
+    def writeTimeout: Try[Int] = Try(parameters.get("writetimeout").get.toInt)
   }
 }

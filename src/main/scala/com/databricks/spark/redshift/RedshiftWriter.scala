@@ -395,6 +395,11 @@ private[redshift] class RedshiftWriter(
       tempDir = params.createPerQueryTempDir(),
       tempFormat = params.tempFormat,
       nullString = params.nullString)
+
+    if (params.writeTimeout.isSuccess) {
+      Thread.sleep(params.writeTimeout.get)
+    }
+
     val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, params.credentials)
     conn.setAutoCommit(false)
     try {
