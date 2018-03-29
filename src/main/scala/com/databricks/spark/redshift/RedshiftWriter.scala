@@ -191,12 +191,15 @@ private[redshift] class RedshiftWriter(
       }
     }
 
+    conn.setAutoCommit(false)
     // Execute postActions
     params.postActions.foreach { action =>
       val actionSql = if (action.contains("%s")) action.format(params.table.get) else action
       log.info("Executing postAction: " + actionSql)
       jdbcWrapper.executeInterruptibly(conn.prepareStatement(actionSql))
     }
+    conn.commit()
+    conn.setAutoCommit(true)
   }
 
   /**
@@ -386,7 +389,7 @@ private[redshift] class RedshiftWriter(
     Utils.assertThatFileSystemIsNotS3BlockFileSystem(
       new URI(params.rootTempDir), sqlContext.sparkContext.hadoopConfiguration)
 
-    Utils.checkThatBucketHasObjectLifecycleConfiguration(params.rootTempDir, s3ClientFactory(creds))
+    // Utils.checkThatBucketHasObjectLifecycleConfiguration(params.rootTempDir, s3ClientFactory(creds))
 
     // Save the table's rows to S3:
     val manifestUrl = unloadData(
@@ -396,22 +399,17 @@ private[redshift] class RedshiftWriter(
       tempFormat = params.tempFormat,
       nullString = params.nullString)
     val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, params.credentials)
-    conn.setAutoCommit(false)
+
+    conn.setAutoCommit(true)
+
     try {
       val table: TableName = params.table.get
       if (saveMode == SaveMode.Overwrite) {
         // Overwrites must drop the table in case there has been a schema update
         jdbcWrapper.executeInterruptibly(conn.prepareStatement(s"DROP TABLE IF EXISTS $table;"))
-        if (!params.useStagingTable) {
-          // If we're not using a staging table, commit now so that Redshift doesn't have to
-          // maintain a snapshot of the old table during the COPY; this sacrifices atomicity for
-          // performance.
-          conn.commit()
-        }
       }
       log.info(s"Loading new Redshift data to: $table")
       doRedshiftLoad(conn, data, params, creds, manifestUrl)
-      conn.commit()
     } catch {
       case NonFatal(e) =>
         try {
