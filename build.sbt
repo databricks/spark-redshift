@@ -1,15 +1,14 @@
 
+retrieveManaged := true
+
 lazy val root = Project("spark-redshift", file("."))
-  .configs(IntegrationTest)
   //.settings(net.virtualvoid.sbt.graph.Plugin.graphSettings: _*)
   .settings(Defaults.coreDefaultSettings: _*)
-  .settings(Defaults.itSettings: _*)
   .settings(
     name := "spark-redshift",
     organization := "com.databricks",
     scalaVersion := "2.11.12",
     licenses += "Apache-2.0" -> url("http://opensource.org/licenses/Apache-2.0"),
-    credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"),
     // scalacOptions ++= Seq("-target:jvm-1.6"),
     // javacOptions ++= Seq("-source", "1.6", "-target", "1.6"),
     libraryDependencies ++= Seq(
