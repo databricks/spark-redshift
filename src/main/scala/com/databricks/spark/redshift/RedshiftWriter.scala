@@ -191,15 +191,11 @@ private[redshift] class RedshiftWriter(
       }
     }
 
-    conn.setAutoCommit(false)
     // Execute postActions
-    params.postActions.foreach { action =>
-      val actionSql = if (action.contains("%s")) action.format(params.table.get) else action
-      log.info("Executing postAction: " + actionSql)
-      jdbcWrapper.executeInterruptibly(conn.prepareStatement(actionSql))
-    }
-    conn.commit()
-    conn.setAutoCommit(true)
+    val action = params.postActions
+    val actionSql = if (action.contains("%s")) action.format(params.table.get) else action
+    log.info("Executing postAction: " + actionSql)
+    jdbcWrapper.executeInterruptibly(conn.prepareStatement(actionSql))
   }
 
   /**

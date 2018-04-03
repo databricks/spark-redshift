@@ -4,3 +4,4 @@ project/target
 .idea_modules/
 *.DS_Store
 build/*.jar
+lib_managed

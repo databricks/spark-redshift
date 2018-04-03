@@ -257,7 +257,7 @@ private[redshift] object Parameters {
      *
      * Defaults to empty.
      */
-    def postActions: Array[String] = parameters("postactions").split(";")
+    def postActions: String = parameters("postactions")
 
     /**
       * The IAM role that Redshift should assume for COPY/UNLOAD operations.
