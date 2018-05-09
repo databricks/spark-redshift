@@ -75,7 +75,7 @@ object SparkRedshiftBuild extends Build {
         // A Redshift-compatible JDBC driver must be present on the classpath for spark-redshift to work.
         // For testing, we use an Amazon driver, which is available from
         // http://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-connection.html
-        "com.amazon.redshift" % "jdbc4" % "1.1.7.1007" % "test" from "https://s3.amazonaws.com/redshift-downloads/drivers/RedshiftJDBC4-1.1.7.1007.jar",
+        "com.amazon.redshift" % "jdbc41" % "1.2.12.1017" % "test" from "https://s3.amazonaws.com/redshift-downloads/drivers/jdbc/1.2.12.1017/RedshiftJDBC41-1.2.12.1017.jar",
         // Although support for the postgres driver is lower priority than support for Amazon's
         // official Redshift driver, we still run basic tests with it.
         "postgresql" % "postgresql" % "8.3-606.jdbc4" % "test",
