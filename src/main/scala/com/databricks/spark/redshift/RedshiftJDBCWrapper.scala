@@ -300,47 +300,37 @@ private[redshift] class JDBCWrapper {
     // TODO: cleanup types which are irrelevant for Redshift.
     val answer = sqlType match {
       // scalastyle:off
-      case java.sql.Types.ARRAY         => null
-      case java.sql.Types.BIGINT        => if (signed) { LongType } else { DecimalType(20,0) }
-      case java.sql.Types.BINARY        => BinaryType
-      case java.sql.Types.BIT           => BooleanType // @see JdbcDialect for quirks
-      case java.sql.Types.BLOB          => BinaryType
-      case java.sql.Types.BOOLEAN       => BooleanType
+      // Null Type
+      case java.sql.Types.NULL          => null
+
+      // Character Types
       case java.sql.Types.CHAR          => StringType
-      case java.sql.Types.CLOB          => StringType
-      case java.sql.Types.DATALINK      => null
+      case java.sql.Types.NCHAR         => StringType
+      case java.sql.Types.NVARCHAR      => StringType
+      case java.sql.Types.VARCHAR       => StringType
+
+      // Datetime Types
       case java.sql.Types.DATE          => DateType
+      case java.sql.Types.TIME          => TimestampType
+      case java.sql.Types.TIMESTAMP     => TimestampType
+
+      // Boolean Type
+      case java.sql.Types.BOOLEAN       => BooleanType
+
+      // Numeric Types
+      case java.sql.Types.BIGINT        => if (signed) { LongType } else { DecimalType(20,0) }
       case java.sql.Types.DECIMAL
         if precision != 0 || scale != 0 => DecimalType(precision, scale)
       case java.sql.Types.DECIMAL       => DecimalType(38, 18) // Spark 1.5.0 default
-      case java.sql.Types.DISTINCT      => null
       case java.sql.Types.DOUBLE        => DoubleType
       case java.sql.Types.FLOAT         => FloatType
       case java.sql.Types.INTEGER       => if (signed) { IntegerType } else { LongType }
-      case java.sql.Types.JAVA_OBJECT   => null
-      case java.sql.Types.LONGNVARCHAR  => StringType
-      case java.sql.Types.LONGVARBINARY => BinaryType
-      case java.sql.Types.LONGVARCHAR   => StringType
-      case java.sql.Types.NCHAR         => StringType
-      case java.sql.Types.NCLOB         => StringType
-      case java.sql.Types.NULL          => null
       case java.sql.Types.NUMERIC
         if precision != 0 || scale != 0 => DecimalType(precision, scale)
       case java.sql.Types.NUMERIC       => DecimalType(38, 18) // Spark 1.5.0 default
-      case java.sql.Types.NVARCHAR      => StringType
-      case java.sql.Types.OTHER         => null
-      case java.sql.Types.REAL          => DoubleType
-      case java.sql.Types.REF           => StringType
-      case java.sql.Types.ROWID         => LongType
+      case java.sql.Types.REAL          => FloatType
       case java.sql.Types.SMALLINT      => IntegerType
-      case java.sql.Types.SQLXML        => StringType
-      case java.sql.Types.STRUCT        => StringType
-      case java.sql.Types.TIME          => TimestampType
-      case java.sql.Types.TIMESTAMP     => TimestampType
       case java.sql.Types.TINYINT       => IntegerType
-      case java.sql.Types.VARBINARY     => BinaryType
-      case java.sql.Types.VARCHAR       => StringType
-      case _                            => null
       // scalastyle:on
     }
 
