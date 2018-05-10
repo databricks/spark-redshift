@@ -197,10 +197,9 @@ class RedshiftReadSuite extends IntegrationSuiteBase {
         s"INSERT INTO $tableName VALUES ('NaN'), ('Infinity'), ('-Infinity')")
       conn.commit()
       assert(DefaultJDBCWrapper.tableExists(conn, tableName))
-      // Due to #98, we use Double here instead of float:
       checkAnswer(
         read.option("dbtable", tableName).load(),
-        Seq(Double.NaN, Double.PositiveInfinity, Double.NegativeInfinity).map(x => Row.apply(x)))
+        Seq(Float.NaN, Float.PositiveInfinity, Float.NegativeInfinity).map(x => Row.apply(x)))
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
       conn.commit()
