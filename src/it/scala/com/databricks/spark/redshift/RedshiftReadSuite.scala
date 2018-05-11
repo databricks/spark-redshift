@@ -206,6 +206,21 @@ class RedshiftReadSuite extends IntegrationSuiteBase {
     }
   }
 
+  test("test empty string and null") {
+    withTempRedshiftTable("records_with_empty_and_null_characters") { tableName =>
+      conn.createStatement().executeUpdate(
+        s"CREATE TABLE $tableName (x varchar(256))")
+      conn.createStatement().executeUpdate(
+        s"INSERT INTO $tableName VALUES ('null'), (''), (null)")
+      conn.commit()
+      assert(DefaultJDBCWrapper.tableExists(conn, tableName))
+      checkAnswer(
+        read.option("dbtable", tableName).load(),
+        Seq("null", "", null).map(x => Row.apply(x)))
+    }
+  }
+
+
   test("read special double values (regression test for #261)") {
     val tableName = s"roundtrip_special_double_values_$randomSuffix"
     try {

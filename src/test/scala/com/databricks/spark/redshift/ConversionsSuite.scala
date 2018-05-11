@@ -31,7 +31,7 @@ import org.apache.spark.sql.types._
 class ConversionsSuite extends FunSuite {
 
   private def createRowConverter(schema: StructType) = {
-    Conversions.createRowConverter(schema).andThen(RowEncoder(schema).resolveAndBind().fromRow)
+    Conversions.createRowConverter(schema, Parameters.DEFAULT_PARAMETERS("csvnullstring")).andThen(RowEncoder(schema).resolveAndBind().fromRow)
   }
 
   test("Data should be correctly converted") {
