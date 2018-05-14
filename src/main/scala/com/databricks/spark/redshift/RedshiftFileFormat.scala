@@ -95,7 +95,8 @@ private[redshift] class RedshiftFileFormat extends FileFormat {
       // be closed once it is completely iterated, but this is necessary to guard against
       // resource leaks in case the task fails or is interrupted.
       Option(TaskContext.get()).foreach(_.addTaskCompletionListener(_ => iter.close()))
-      val converter = Conversions.createRowConverter(requiredSchema)
+      val converter = Conversions.createRowConverter(requiredSchema,
+        options.getOrElse("nullString", Parameters.DEFAULT_PARAMETERS("csvnullstring")))
       iter.map(converter)
     }
   }
