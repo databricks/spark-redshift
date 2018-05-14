@@ -117,12 +117,15 @@ private[redshift] object Conversions {
       while (i < schema.length) {
         val data = inputRow(i)
         converted(i) = if ((data == null || data == nullString) ||
-          (data.isEmpty && schema.fields(i).dataType != StringType))
+          (data.isEmpty && schema.fields(i).dataType != StringType)) {
           null
-        else if (data.isEmpty)
+        }
+        else if (data.isEmpty) {
           ""
-        else
+        }
+        else {
           conversionFunctions(i)(data)
+        }
         i += 1
       }
       encoder.toRow(externalRow)
