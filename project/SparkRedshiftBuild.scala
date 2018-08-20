@@ -82,7 +82,7 @@ object SparkRedshiftBuild extends Build {
         "com.google.guava" % "guava" % "14.0.1" % "test",
         "org.scalatest" %% "scalatest" % "2.2.1" % "test",
         "org.mockito" % "mockito-core" % "1.10.19" % "test"
-      ),
+      ).map(_.exclude("org.mortbay.jetty", "jetty")),
       libraryDependencies ++= (if (new ComparableVersion(testAWSJavaSDKVersion.value) < new ComparableVersion("1.8.10")) {
         // These Amazon SDK depdencies are marked as 'provided' in order to reduce the risk of
         // dependency conflicts with other user libraries. In many environments, such as EMR and
@@ -101,7 +101,7 @@ object SparkRedshiftBuild extends Build {
           "com.amazonaws" % "aws-java-sdk-s3" % testAWSJavaSDKVersion.value % "provided" exclude("com.fasterxml.jackson.core", "jackson-databind"),
           "com.amazonaws" % "aws-java-sdk-sts" % testAWSJavaSDKVersion.value % "test" exclude("com.fasterxml.jackson.core", "jackson-databind")
         )
-      }),
+      }).map(_.exclude("org.mortbay.jetty", "jetty")),
       libraryDependencies ++= (if (testHadoopVersion.value.startsWith("1")) {
         Seq(
           "org.apache.hadoop" % "hadoop-client" % testHadoopVersion.value % "test" force(),
@@ -113,13 +113,13 @@ object SparkRedshiftBuild extends Build {
           "org.apache.hadoop" % "hadoop-common" % testHadoopVersion.value % "test" exclude("javax.servlet", "servlet-api") force(),
           "org.apache.hadoop" % "hadoop-common" % testHadoopVersion.value % "test" classifier "tests" force()
         )
-      }),
+      }).map(_.exclude("org.mortbay.jetty", "jetty")),
       libraryDependencies ++= Seq(
         "org.apache.spark" %% "spark-core" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force(),
         "org.apache.spark" %% "spark-sql" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force(),
         "org.apache.spark" %% "spark-hive" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force(),
         "com.databricks" %% "spark-avro" % testSparkAvroVersion.value % "test" exclude("org.apache.avro", "avro-mapred") force()
-      ),
+      ).map(_.exclude("org.mortbay.jetty", "jetty")),
       // Although spark-avro declares its avro-mapred dependency as `provided`, its version of the
       // dependency can still end up on the classpath during tests, which breaks the tests for
       // Hadoop 1.x. To work around this, we filter out the incompatible JARs here:
@@ -161,10 +161,10 @@ object SparkRedshiftBuild extends Build {
       releasePublishArtifactsAction := PgpKeys.publishSigned.value,
 
       pomExtra :=
-        <url>https://github.com/databricks/spark-redshift</url>
+        <url>https://github.com/letgoapp/spark-redshift</url>
         <scm>
-          <url>git@github.com:databricks/spark-redshift.git</url>
-          <connection>scm:git:git@github.com:databricks/spark-redshift.git</connection>
+          <url>git@github.com:letgoapp/spark-redshift.git</url>
+          <connection>scm:git:git@github.com:letgoapp/spark-redshift.git</connection>
         </scm>
         <developers>
           <developer>
