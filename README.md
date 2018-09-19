@@ -183,7 +183,7 @@ df = sql_context.read \
 df = sql_context.read \
     .format("com.databricks.spark.redshift") \
     .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass") \
-    .option("query", "select x, count(*) my_table group by x") \
+    .option("query", "select x, count(*) from my_table group by x") \
     .option("tempdir", "s3n://path/for/temp/data") \
     .load()
 
