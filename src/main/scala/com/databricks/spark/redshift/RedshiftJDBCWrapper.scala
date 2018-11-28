@@ -247,8 +247,7 @@ private[redshift] class JDBCWrapper {
           case LongType => "BIGINT"
           case DoubleType => "DOUBLE PRECISION"
           case FloatType => "REAL"
-          case ShortType => "INTEGER"
-          case ByteType => "SMALLINT" // Redshift does not support the BYTE type.
+          case ShortType | ByteType => "SMALLINT" // Redshift does not support the BYTE type.
           case BooleanType => "BOOLEAN"
           case StringType =>
             if (field.metadata.contains("maxlength")) {
