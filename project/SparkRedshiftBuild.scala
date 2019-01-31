@@ -64,7 +64,7 @@ object SparkRedshiftBuild extends Build {
         "com.eclipsesource.minimal-json" % "minimal-json" % "0.9.4",
         // We require spark-avro, but avro-mapred must be provided to match Hadoop version.
         // In most cases, avro-mapred will be provided as part of the Spark assembly JAR.
-        "com.databricks" %% "spark-avro" % "3.0.0",
+        "org.apache.spark" %% "spark-avro" % sparkVersion.value,
         if (testHadoopVersion.value.startsWith("1")) {
           "org.apache.avro" % "avro-mapred" % "1.7.7" % "provided" classifier "hadoop1" exclude("org.mortbay.jetty", "servlet-api")
         } else {
@@ -118,7 +118,7 @@ object SparkRedshiftBuild extends Build {
         "org.apache.spark" %% "spark-core" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force(),
         "org.apache.spark" %% "spark-sql" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force(),
         "org.apache.spark" %% "spark-hive" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force(),
-        "com.databricks" %% "spark-avro" % testSparkAvroVersion.value % "test" exclude("org.apache.avro", "avro-mapred") force()
+        "org.apache.spark" %% "spark-avro" % testSparkVersion.value % "test" exclude("org.apache.avro", "avro-mapred") force()
       ),
       // Although spark-avro declares its avro-mapred dependency as `provided`, its version of the
       // dependency can still end up on the classpath during tests, which breaks the tests for
