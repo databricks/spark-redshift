@@ -44,7 +44,6 @@ class AWSCredentialsInUriIntegrationSuite extends IntegrationSuiteBase {
   // Override this method so that we do not set the credentials in sc.hadoopConf.
   override def beforeAll(): Unit = {
     assert(tempDir.contains("AKIA"), "tempdir did not contain AWS credentials")
-    assert(!AWS_SECRET_ACCESS_KEY.contains("/"), "AWS secret key should not contain slash")
     sc = new SparkContext("local", getClass.getSimpleName)
     conn = DefaultJDBCWrapper.getConnector(None, jdbcUrl, None)
   }

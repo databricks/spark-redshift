@@ -197,15 +197,29 @@ class RedshiftReadSuite extends IntegrationSuiteBase {
         s"INSERT INTO $tableName VALUES ('NaN'), ('Infinity'), ('-Infinity')")
       conn.commit()
       assert(DefaultJDBCWrapper.tableExists(conn, tableName))
-      // Due to #98, we use Double here instead of float:
       checkAnswer(
         read.option("dbtable", tableName).load(),
-        Seq(Double.NaN, Double.PositiveInfinity, Double.NegativeInfinity).map(x => Row.apply(x)))
+        Seq(Float.NaN, Float.PositiveInfinity, Float.NegativeInfinity).map(x => Row.apply(x)))
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
       conn.commit()
     }
   }
+
+  test("test empty string and null") {
+    withTempRedshiftTable("records_with_empty_and_null_characters") { tableName =>
+      conn.createStatement().executeUpdate(
+        s"CREATE TABLE $tableName (x varchar(256))")
+      conn.createStatement().executeUpdate(
+        s"INSERT INTO $tableName VALUES ('null'), (''), (null)")
+      conn.commit()
+      assert(DefaultJDBCWrapper.tableExists(conn, tableName))
+      checkAnswer(
+        read.option("dbtable", tableName).load(),
+        Seq("null", "", null).map(x => Row.apply(x)))
+    }
+  }
+
 
   test("read special double values (regression test for #261)") {
     val tableName = s"roundtrip_special_double_values_$randomSuffix"

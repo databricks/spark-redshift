@@ -28,7 +28,7 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.sources.Filter
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.types.{DataType, StructType}
 
 /**
  * Internal data source used for reading Redshift UNLOAD files.
@@ -95,8 +95,11 @@ private[redshift] class RedshiftFileFormat extends FileFormat {
       // be closed once it is completely iterated, but this is necessary to guard against
       // resource leaks in case the task fails or is interrupted.
       Option(TaskContext.get()).foreach(_.addTaskCompletionListener(_ => iter.close()))
-      val converter = Conversions.createRowConverter(requiredSchema)
+      val converter = Conversions.createRowConverter(requiredSchema,
+        options.getOrElse("nullString", Parameters.DEFAULT_PARAMETERS("csvnullstring")))
       iter.map(converter)
     }
   }
+
+  override def supportDataType(dataType: DataType, isReadPath: Boolean): Boolean = true
 }
