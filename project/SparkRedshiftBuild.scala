@@ -31,7 +31,6 @@ object SparkRedshiftBuild extends Build {
   val testSparkAvroVersion = settingKey[String]("spark-avro version to test against")
   val testHadoopVersion = settingKey[String]("Hadoop version to test against")
   val testAWSJavaSDKVersion = settingKey[String]("AWS Java SDK version to test against")
-
   // Define a custom test configuration so that unit test helper classes can be re-used under
   // the integration tests configuration; see http://stackoverflow.com/a/20635808.
   lazy val IntegrationTest = config("it") extend Test
@@ -46,10 +45,10 @@ object SparkRedshiftBuild extends Build {
       name := "spark-redshift",
       organization := "com.databricks",
       scalaVersion := "2.11.7",
-      crossScalaVersions := Seq("2.10.5", "2.11.7"),
-      sparkVersion := "2.0.0",
+      crossScalaVersions := Seq("2.11.7"),
+      sparkVersion := "2.4.0",
       testSparkVersion := sys.props.get("spark.testVersion").getOrElse(sparkVersion.value),
-      testSparkAvroVersion := sys.props.get("sparkAvro.testVersion").getOrElse("3.0.0"),
+      testSparkAvroVersion := sys.props.get("sparkAvro.testVersion").getOrElse("4.0.0"),
       testHadoopVersion := sys.props.get("hadoop.testVersion").getOrElse("2.2.0"),
       testAWSJavaSDKVersion := sys.props.get("aws.testVersion").getOrElse("1.10.22"),
       spName := "databricks/spark-redshift",
@@ -57,14 +56,14 @@ object SparkRedshiftBuild extends Build {
       spIgnoreProvided := true,
       licenses += "Apache-2.0" -> url("http://opensource.org/licenses/Apache-2.0"),
       credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"),
-      scalacOptions ++= Seq("-target:jvm-1.6"),
-      javacOptions ++= Seq("-source", "1.6", "-target", "1.6"),
+      scalacOptions ++= Seq("-target:jvm-1.8"),
+      javacOptions ++= Seq("-source", "1.8", "-target", "1.8"),
       libraryDependencies ++= Seq(
         "org.slf4j" % "slf4j-api" % "1.7.5",
         "com.eclipsesource.minimal-json" % "minimal-json" % "0.9.4",
         // We require spark-avro, but avro-mapred must be provided to match Hadoop version.
         // In most cases, avro-mapred will be provided as part of the Spark assembly JAR.
-        "com.databricks" %% "spark-avro" % "3.0.0",
+        "com.databricks" %% "spark-avro" % "4.0.0",
         if (testHadoopVersion.value.startsWith("1")) {
           "org.apache.avro" % "avro-mapred" % "1.7.7" % "provided" classifier "hadoop1" exclude("org.mortbay.jetty", "servlet-api")
         } else {
@@ -157,47 +156,6 @@ object SparkRedshiftBuild extends Build {
 
       publishMavenStyle := true,
       releaseCrossBuild := true,
-      licenses += ("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0")),
-      releasePublishArtifactsAction := PgpKeys.publishSigned.value,
-
-      pomExtra :=
-        <url>https://github.com/databricks/spark-redshift</url>
-        <scm>
-          <url>git@github.com:databricks/spark-redshift.git</url>
-          <connection>scm:git:git@github.com:databricks/spark-redshift.git</connection>
-        </scm>
-        <developers>
-          <developer>
-            <id>meng</id>
-            <name>Xiangrui Meng</name>
-            <url>https://github.com/mengxr</url>
-          </developer>
-          <developer>
-            <id>JoshRosen</id>
-            <name>Josh Rosen</name>
-            <url>https://github.com/JoshRosen</url>
-          </developer>
-          <developer>
-            <id>marmbrus</id>
-            <name>Michael Armbrust</name>
-            <url>https://github.com/marmbrus</url>
-          </developer>
-        </developers>,
-
-      bintrayReleaseOnPublish in ThisBuild := false,
-
-      // Add publishing to spark packages as another step.
-      releaseProcess := Seq[ReleaseStep](
-        checkSnapshotDependencies,
-        inquireVersions,
-        runTest,
-        setReleaseVersion,
-        commitReleaseVersion,
-        tagRelease,
-        publishArtifacts,
-        setNextVersion,
-        commitNextVersion,
-        pushChanges
-      )
+      licenses += ("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0"))
     )
 }
