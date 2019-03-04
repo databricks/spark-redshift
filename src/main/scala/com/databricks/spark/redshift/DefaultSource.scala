@@ -35,6 +35,14 @@ class DefaultSource(
 
   private val log = LoggerFactory.getLogger(getClass)
 
+  def s3ClientFactoryFixed(provider:AWSCredentialsProvider):AmazonS3Client = {
+    val s3Client = s3ClientFactory(provider)
+      
+    val endpoint = Option( System.getProperty("fs.s3a.endpoint") )
+    endpoint.foreach(s3Client.setEndpoint(_))
+
+    s3Client
+  }
   /**
    * Default constructor required by Data Source API
    */
@@ -48,7 +56,7 @@ class DefaultSource(
       sqlContext: SQLContext,
       parameters: Map[String, String]): BaseRelation = {
     val params = Parameters.mergeParameters(parameters)
-    RedshiftRelation(jdbcWrapper, s3ClientFactory, params, None)(sqlContext)
+    RedshiftRelation(jdbcWrapper, s3ClientFactoryFixed, params, None)(sqlContext)
   }
 
   /**
@@ -59,7 +67,7 @@ class DefaultSource(
       parameters: Map[String, String],
       schema: StructType): BaseRelation = {
     val params = Parameters.mergeParameters(parameters)
-    RedshiftRelation(jdbcWrapper, s3ClientFactory, params, Some(schema))(sqlContext)
+    RedshiftRelation(jdbcWrapper, s3ClientFactoryFixed, params, Some(schema))(sqlContext)
   }
 
   /**
@@ -105,7 +113,7 @@ class DefaultSource(
 
     if (doSave) {
       val updatedParams = parameters.updated("overwrite", dropExisting.toString)
-      new RedshiftWriter(jdbcWrapper, s3ClientFactory).saveToRedshift(
+      new RedshiftWriter(jdbcWrapper, s3ClientFactoryFixed).saveToRedshift(
         sqlContext, data, saveMode, Parameters.mergeParameters(updatedParams))
     }
 
