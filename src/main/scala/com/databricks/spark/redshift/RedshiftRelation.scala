@@ -130,10 +130,16 @@ private[redshift] case class RedshiftRelation(
     } else {
       // Unload data from Redshift into a temporary directory in S3:
       val tempDir = params.createPerQueryTempDir()
+      val preActions = params.preActions
       val unloadSql = buildUnloadStmt(requiredColumns, filters, tempDir, creds)
       log.info(unloadSql)
       val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, params.credentials)
       try {
+        preActions.foreach { action =>
+          val actionSql = if (action.contains("%s")) action.format(params.table.get) else action
+          log.info("Executing preAction: " + actionSql)
+          jdbcWrapper.executeInterruptibly(conn.prepareStatement(actionSql))
+        }
         jdbcWrapper.executeInterruptibly(conn.prepareStatement(unloadSql))
       } finally {
         conn.close()

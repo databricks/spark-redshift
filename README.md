@@ -591,7 +591,8 @@ See also the <tt>description</tt> metadata to set descriptions on individual col
     <td>No</td>
     <td>No default</td>
     <td>
-<p>This can be a <tt>;</tt> separated list of SQL commands to be executed before loading <tt>COPY</tt> command.
+<p>This can be a <tt>;</tt> separated list of SQL commands to be executed before loading <tt>COPY</tt> command 
+or before unload command. Use it to preprocess the data to read or write.
 It may be useful to have some <tt>DELETE</tt> commands or similar run here before loading new data. If the command contains
 <tt>%s</tt>, the table name will be formatted in before execution (in case you're using a staging table).</p>
 
