@@ -107,7 +107,8 @@ object SparkRedshiftBuild extends Build {
       libraryDependencies ++= Seq(
         "org.apache.spark" %% "spark-core" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force(),
         "org.apache.spark" %% "spark-sql" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force(),
-        "org.apache.spark" %% "spark-hive" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force()
+        "org.apache.spark" %% "spark-hive" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force(),
+        "org.apache.spark" %% "spark-avro" % sparkVersion.value
       ),
       ScoverageKeys.coverageHighlighting := {
         if (scalaBinaryVersion.value == "2.10") false
