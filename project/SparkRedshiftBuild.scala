@@ -28,7 +28,6 @@ import bintray.BintrayPlugin.autoImport._
 
 object SparkRedshiftBuild extends Build {
   val testSparkVersion = settingKey[String]("Spark version to test against")
-  val testSparkAvroVersion = settingKey[String]("spark-avro version to test against")
   val testHadoopVersion = settingKey[String]("Hadoop version to test against")
   val testAWSJavaSDKVersion = settingKey[String]("AWS Java SDK version to test against")
   // Define a custom test configuration so that unit test helper classes can be re-used under
@@ -48,7 +47,6 @@ object SparkRedshiftBuild extends Build {
       crossScalaVersions := Seq("2.11.7"),
       sparkVersion := "2.4.0",
       testSparkVersion := sys.props.get("spark.testVersion").getOrElse(sparkVersion.value),
-      testSparkAvroVersion := sys.props.get("sparkAvro.testVersion").getOrElse("4.0.0"),
       testHadoopVersion := sys.props.get("hadoop.testVersion").getOrElse("2.2.0"),
       testAWSJavaSDKVersion := sys.props.get("aws.testVersion").getOrElse("1.10.22"),
       spName := "databricks/spark-redshift",
@@ -61,14 +59,6 @@ object SparkRedshiftBuild extends Build {
       libraryDependencies ++= Seq(
         "org.slf4j" % "slf4j-api" % "1.7.5",
         "com.eclipsesource.minimal-json" % "minimal-json" % "0.9.4",
-        // We require spark-avro, but avro-mapred must be provided to match Hadoop version.
-        // In most cases, avro-mapred will be provided as part of the Spark assembly JAR.
-        "com.databricks" %% "spark-avro" % "4.0.0",
-        if (testHadoopVersion.value.startsWith("1")) {
-          "org.apache.avro" % "avro-mapred" % "1.7.7" % "provided" classifier "hadoop1" exclude("org.mortbay.jetty", "servlet-api")
-        } else {
-          "org.apache.avro" % "avro-mapred" % "1.7.7" % "provided" classifier "hadoop2" exclude("org.mortbay.jetty", "servlet-api")
-        },
         // Kryo is provided by Spark, but we need this here in order to be able to import KryoSerializable
         "com.esotericsoftware" % "kryo-shaded" % "3.0.3" % "provided",
         // A Redshift-compatible JDBC driver must be present on the classpath for spark-redshift to work.
@@ -82,7 +72,8 @@ object SparkRedshiftBuild extends Build {
         "org.scalatest" %% "scalatest" % "2.2.1" % "test",
         "org.mockito" % "mockito-core" % "1.10.19" % "test"
       ),
-      libraryDependencies ++= (if (new ComparableVersion(testAWSJavaSDKVersion.value) < new ComparableVersion("1.8.10")) {
+      libraryDependencies ++= (
+        if (new ComparableVersion(testAWSJavaSDKVersion.value) < new ComparableVersion("1.8.10")) {
         // These Amazon SDK depdencies are marked as 'provided' in order to reduce the risk of
         // dependency conflicts with other user libraries. In many environments, such as EMR and
         // Databricks, the Amazon SDK will already be on the classpath. In other cases, the SDK is
@@ -116,30 +107,8 @@ object SparkRedshiftBuild extends Build {
       libraryDependencies ++= Seq(
         "org.apache.spark" %% "spark-core" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force(),
         "org.apache.spark" %% "spark-sql" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force(),
-        "org.apache.spark" %% "spark-hive" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force(),
-        "com.databricks" %% "spark-avro" % testSparkAvroVersion.value % "test" exclude("org.apache.avro", "avro-mapred") force()
+        "org.apache.spark" %% "spark-hive" % testSparkVersion.value % "test" exclude("org.apache.hadoop", "hadoop-client") force()
       ),
-      // Although spark-avro declares its avro-mapred dependency as `provided`, its version of the
-      // dependency can still end up on the classpath during tests, which breaks the tests for
-      // Hadoop 1.x. To work around this, we filter out the incompatible JARs here:
-      (fullClasspath in Test) := (if (testHadoopVersion.value.startsWith("1")) {
-        (fullClasspath in Test).value.filterNot {
-          x => x.data.getName.contains("hadoop2") && x.data.getName.contains("avro")
-        }
-      } else {
-        (fullClasspath in Test).value.filterNot {
-          x => x.data.getName.contains("hadoop1") && x.data.getName.contains("avro")
-        }
-      }),
-      (fullClasspath in IntegrationTest) := (if (testHadoopVersion.value.startsWith("1")) {
-        (fullClasspath in IntegrationTest).value.filterNot {
-          x => x.data.getName.contains("hadoop2") && x.data.getName.contains("avro")
-        }
-      } else {
-        (fullClasspath in IntegrationTest).value.filterNot {
-          x => x.data.getName.contains("hadoop1") && x.data.getName.contains("avro")
-        }
-      }),
       ScoverageKeys.coverageHighlighting := {
         if (scalaBinaryVersion.value == "2.10") false
         else true

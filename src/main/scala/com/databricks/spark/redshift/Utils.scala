@@ -127,6 +127,7 @@ private[redshift] object Utils {
     try {
       val endpoint = Option( System.getProperty("fs.s3a.endpoint") )
       endpoint.foreach(s3Client.setEndpoint(_))
+      val s3URI = createS3URI(Utils.fixS3Url(tempDir))
       val bucket = s3URI.getBucket
       assert(bucket != null, "Could not get bucket from S3 URI")
       val key = Option(s3URI.getKey).getOrElse("")

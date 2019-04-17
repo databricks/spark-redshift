@@ -361,7 +361,7 @@ class RedshiftSourceSuite
     // `tempdir` between every unit test, there should only be one directory here.
     assert(s3FileSystem.listStatus(new Path(s3TempDir)).length === 1)
     val dirWithAvroFiles = s3FileSystem.listStatus(new Path(s3TempDir)).head.getPath.toUri.toString
-    val written = testSqlContext.read.format("com.databricks.spark.avro").load(dirWithAvroFiles)
+    val written = testSqlContext.read.format("avro").load(dirWithAvroFiles)
     checkAnswer(written, TestUtils.expectedDataWithConvertedTimesAndDates)
     mockRedshift.verifyThatConnectionsWereClosed()
     mockRedshift.verifyThatExpectedQueriesWereIssued(expectedCommands)
@@ -429,7 +429,7 @@ class RedshiftSourceSuite
     // `tempdir` between every unit test, there should only be one directory here.
     assert(s3FileSystem.listStatus(new Path(s3TempDir)).length === 1)
     val dirWithAvroFiles = s3FileSystem.listStatus(new Path(s3TempDir)).head.getPath.toUri.toString
-    val written = testSqlContext.read.format("com.databricks.spark.avro").load(dirWithAvroFiles)
+    val written = testSqlContext.read.format("avro").load(dirWithAvroFiles)
     checkAnswer(written, TestUtils.expectedDataWithConvertedTimesAndDates)
     mockRedshift.verifyThatConnectionsWereClosed()
     mockRedshift.verifyThatExpectedQueriesWereIssued(expectedCommands)
