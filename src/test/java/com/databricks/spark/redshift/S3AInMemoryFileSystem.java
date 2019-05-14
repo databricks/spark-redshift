@@ -16,17 +16,17 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.fs.s3native;
-
-import org.apache.hadoop.fs.s3native.NativeS3FileSystem;
-import org.apache.hadoop.fs.s3native.InMemoryNativeFileSystemStore;
-
-/**
- * A helper implementation of {@link NativeS3FileSystem}
- * without actually connecting to S3 for unit testing.
- */
-public class S3NInMemoryFileSystem extends NativeS3FileSystem {
-  public S3NInMemoryFileSystem() {
-    super(new InMemoryNativeFileSystemStore());
-  }
-}
+//package com.databricks.spark.redshift;
+//
+//import org.apache.hadoop.fs.s3a.S3AFileSystem;
+//import org.apache.hadoop.fs.s3.
+//
+///**
+// * A helper implementation of {@link S3AFileSystem}
+// * without actually connecting to S3 for unit testing.
+// */
+//public class S3AInMemoryFileSystem extends S3AFileSystem{
+//  public S3AInMemoryFileSystem() {
+//    super(new S3ATestUtils.createTestFileSystem());
+//  }
+//}

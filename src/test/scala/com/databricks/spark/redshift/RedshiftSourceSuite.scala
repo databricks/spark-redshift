@@ -27,7 +27,6 @@ import org.mockito.Matchers._
 import org.mockito.Mockito
 import org.mockito.Mockito.when
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.hadoop.fs.s3native.S3NInMemoryFileSystem
 import org.mockito.invocation.InvocationOnMock
 import org.mockito.stubbing.Answer
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers}
@@ -36,6 +35,7 @@ import org.apache.spark.sql.sources._
 import org.apache.spark.sql._
 import org.apache.spark.sql.types._
 import com.databricks.spark.redshift.Parameters.MergedParameters
+import org.apache.hadoop.fs.s3a.S3AFileSystem
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.encoders.RowEncoder
 
@@ -62,7 +62,7 @@ class RedshiftSourceSuite
 
   private var s3FileSystem: FileSystem = _
 
-  private val s3TempDir: String = "s3n://test-bucket/temp-dir/"
+  private val s3TempDir: String = "s3a://test-bucket/temp-dir/"
 
   private var unloadedData: String = ""
 
@@ -76,7 +76,7 @@ class RedshiftSourceSuite
   override def beforeAll(): Unit = {
     super.beforeAll()
     sc = new SparkContext("local", "RedshiftSourceSuite")
-    sc.hadoopConfiguration.set("fs.s3n.impl", classOf[S3NInMemoryFileSystem].getName)
+    sc.hadoopConfiguration.set("fs.s3a.impl", classOf[S3AFileSystem].getName)
     // We need to use a DirectOutputCommitter to work around an issue which occurs with renames
     // while using the mocked S3 filesystem.
     sc.hadoopConfiguration.set("spark.sql.sources.outputCommitterClass",
@@ -85,8 +85,8 @@ class RedshiftSourceSuite
       classOf[DirectMapredOutputCommitter].getName)
     sc.hadoopConfiguration.set("fs.s3.awsAccessKeyId", "test1")
     sc.hadoopConfiguration.set("fs.s3.awsSecretAccessKey", "test2")
-    sc.hadoopConfiguration.set("fs.s3n.awsAccessKeyId", "test1")
-    sc.hadoopConfiguration.set("fs.s3n.awsSecretAccessKey", "test2")
+    sc.hadoopConfiguration.set("fs.s3a.awsAccessKeyId", "test1")
+    sc.hadoopConfiguration.set("fs.s3a.awsSecretAccessKey", "test2")
   }
 
   override def beforeEach(): Unit = {
@@ -561,7 +561,7 @@ class RedshiftSourceSuite
   }
 
   test("Saves throw error message if S3 Block FileSystem would be used") {
-    val params = defaultParams + ("tempdir" -> defaultParams("tempdir").replace("s3n", "s3"))
+    val params = defaultParams + ("tempdir" -> defaultParams("tempdir").replace("s3a", "s3"))
     val e = intercept[IllegalArgumentException] {
       expectedDataDF.write
         .format("com.databricks.spark.redshift")
@@ -573,7 +573,7 @@ class RedshiftSourceSuite
   }
 
   test("Loads throw error message if S3 Block FileSystem would be used") {
-    val params = defaultParams + ("tempdir" -> defaultParams("tempdir").replace("s3n", "s3"))
+    val params = defaultParams + ("tempdir" -> defaultParams("tempdir").replace("s3a", "s3"))
     val e = intercept[IllegalArgumentException] {
       testSqlContext.read.format("com.databricks.spark.redshift").options(params).load()
     }

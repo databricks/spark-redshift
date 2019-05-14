@@ -1,7 +1,10 @@
 # Redshift Data Source for Apache Spark
 
-[![Build Status](https://travis-ci.org/Yelp/spark-redshift.svg?branch=master)](https://travis-ci.org/Yelp/spark-redshift)
-[![codecov.io](http://codecov.io/github/Yelp/spark-redshift/coverage.svg?branch=master)](http://codecov.io/github/Yelp/spark-redshift?branch=master)
+[![Build Status](https://travis-ci.org/databricks/spark-redshift.svg?branch=master)](https://travis-ci.org/databricks/spark-redshift)
+[![codecov.io](http://codecov.io/github/databricks/spark-redshift/coverage.svg?branch=master)](http://codecov.io/github/databricks/spark-redshift?branch=master)
+
+## Disclaimer
+This is fork version from Databricks's spark-redshift repository. Our custom changes only tested with Spark **2.4.0** version. These custom changes may not be worked with older version of Spark
 
 ## Note
 
