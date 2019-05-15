@@ -97,9 +97,18 @@ object SparkRedshiftBuild extends Build {
         Seq("com.amazonaws" % "aws-java-sdk" % testAWSJavaSDKVersion.value % "provided" exclude("com.fasterxml.jackson.core", "jackson-databind"))
       } else {
         Seq(
-          "com.amazonaws" % "aws-java-sdk-core" % testAWSJavaSDKVersion.value % "provided" exclude("com.fasterxml.jackson.core", "jackson-databind"),
-          "com.amazonaws" % "aws-java-sdk-s3" % testAWSJavaSDKVersion.value % "provided" exclude("com.fasterxml.jackson.core", "jackson-databind"),
-          "com.amazonaws" % "aws-java-sdk-sts" % testAWSJavaSDKVersion.value % "test" exclude("com.fasterxml.jackson.core", "jackson-databind")
+          "com.amazonaws" % "aws-java-sdk-core" % testAWSJavaSDKVersion.value % "provided"
+            exclude("com.fasterxml.jackson.core", "jackson-databind")
+            exclude("com.fasterxml.jackson.core", "jackson-annotations")
+            exclude("com.fasterxml.jackson.core", "jackson-core"),
+          "com.amazonaws" % "aws-java-sdk-s3" % testAWSJavaSDKVersion.value % "provided"
+            exclude("com.fasterxml.jackson.core", "jackson-databind")
+            exclude("com.fasterxml.jackson.core", "jackson-annotations")
+            exclude("com.fasterxml.jackson.core", "jackson-core"),
+          "com.amazonaws" % "aws-java-sdk-sts" % testAWSJavaSDKVersion.value % "test"
+            exclude("com.fasterxml.jackson.core", "jackson-databind")
+            exclude("com.fasterxml.jackson.core", "jackson-annotations")
+            exclude("com.fasterxml.jackson.core", "jackson-core")
         )
       }),
       libraryDependencies ++= (if (testHadoopVersion.value.startsWith("1")) {
@@ -112,7 +121,10 @@ object SparkRedshiftBuild extends Build {
           "org.apache.hadoop" % "hadoop-client" % testHadoopVersion.value % "test" exclude("javax.servlet", "servlet-api") force(),
           "org.apache.hadoop" % "hadoop-common" % testHadoopVersion.value % "test" exclude("javax.servlet", "servlet-api") force(),
           "org.apache.hadoop" % "hadoop-common" % testHadoopVersion.value % "test" classifier "tests" force(),
-          "org.apache.hadoop" % "hadoop-aws" % testHadoopVersion.value force()
+          "org.apache.hadoop" % "hadoop-aws" % testHadoopVersion.value
+            exclude("com.fasterxml.jackson.core", "jackson-databind")
+            exclude("com.fasterxml.jackson.core", "jackson-annotations")
+            exclude("com.fasterxml.jackson.core", "jackson-core")
         )
       }),
       libraryDependencies ++= Seq(
