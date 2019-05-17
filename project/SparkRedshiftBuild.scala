@@ -50,8 +50,8 @@ object SparkRedshiftBuild extends Build {
       sparkVersion := "2.4.0",
       testSparkVersion := sys.props.get("spark.testVersion").getOrElse(sparkVersion.value),
       testSparkAvroVersion := sys.props.get("sparkAvro.testVersion").getOrElse("3.0.0"),
-      testHadoopVersion := sys.props.get("hadoop.testVersion").getOrElse("2.7.3"),
-      testAWSJavaSDKVersion := sys.props.get("aws.testVersion").getOrElse("1.10.22"),
+      testHadoopVersion := sys.props.get("hadoop.testVersion").getOrElse("2.7.7"),
+      testAWSJavaSDKVersion := sys.props.get("aws.testVersion").getOrElse("1.7.4"),
       spName := "databricks/spark-redshift",
       sparkComponents ++= Seq("sql", "hive"),
       spIgnoreProvided := true,
@@ -64,7 +64,7 @@ object SparkRedshiftBuild extends Build {
         "com.eclipsesource.minimal-json" % "minimal-json" % "0.9.4",
         // We require spark-avro, but avro-mapred must be provided to match Hadoop version.
         // In most cases, avro-mapred will be provided as part of the Spark assembly JAR.
-        "org.apache.spark" %% "spark-avro" % sparkVersion.value,
+        "org.apache.spark" %% "spark-avro" % sparkVersion.value force(),
         if (testHadoopVersion.value.startsWith("1")) {
           "org.apache.avro" % "avro-mapred" % "1.7.7" % "provided" classifier "hadoop1" exclude("org.mortbay.jetty", "servlet-api")
         } else {
