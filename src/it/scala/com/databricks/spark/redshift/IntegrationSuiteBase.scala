@@ -58,7 +58,7 @@ trait IntegrationSuiteBase
   protected val AWS_SECRET_ACCESS_KEY: String = loadConfigFromEnv("AWS_SECRET_ACCESS_KEY")
   // Path to a directory in S3 (e.g. 's3n://bucket-name/path/to/scratch/space').
   protected val AWS_S3_SCRATCH_SPACE: String = loadConfigFromEnv("AWS_S3_SCRATCH_SPACE")
-  require(AWS_S3_SCRATCH_SPACE.contains("s3n"), "must use s3n:// URL")
+  require(AWS_S3_SCRATCH_SPACE.contains("s3a"), "must use s3a:// URL")
 
   protected def jdbcUrl: String = {
     s"$AWS_REDSHIFT_JDBC_URL?user=$AWS_REDSHIFT_USER&password=$AWS_REDSHIFT_PASSWORD&ssl=true"
@@ -175,7 +175,7 @@ trait IntegrationSuiteBase
          """.stripMargin
     )
     // scalastyle:on
-    conn.commit()
+//    conn.commit()
   }
 
   protected def withTempRedshiftTable[T](namePrefix: String)(body: String => T): T = {
@@ -184,7 +184,7 @@ trait IntegrationSuiteBase
       body(tableName)
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
-      conn.commit()
+//      conn.commit()
     }
   }
 
