@@ -44,10 +44,18 @@ object SparkRedshiftBuild extends Build {
       name := "spark-redshift",
       organization := "com.databricks",
       scalaVersion := "2.11.12",
-      sparkVersion := "2.4.0",
+      sparkVersion := "2.4.3",
       testSparkVersion := sys.props.get("spark.testVersion").getOrElse(sparkVersion.value),
-      testHadoopVersion := sys.props.get("hadoop.testVersion").getOrElse("2.7.7"),
-      testAWSJavaSDKVersion := sys.props.get("aws.testVersion").getOrElse("1.10.22"),
+
+      // Spark 2.4.x should be compatible with hadoop >= 2.7.x
+      // https://spark.apache.org/downloads.html
+      testHadoopVersion := sys.props.get("hadoop.testVersion").getOrElse("2.9.0"),
+
+      // Hadoop 2.7.7 is compatible with aws-java-sdk 1.7.4 - should we downgrade?
+      // Hadoop includes 1.7.4 so if using other version we get 2 aws-java-sdks :/
+      // https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-aws/2.7.7
+      testAWSJavaSDKVersion := sys.props.get("aws.testVersion").getOrElse("1.11.199"), // hadoop 2.9 likes 1.11.199
+
       spName := "databricks/spark-redshift",
       sparkComponents ++= Seq("sql", "hive"),
       spIgnoreProvided := true,
@@ -71,7 +79,9 @@ object SparkRedshiftBuild extends Build {
         // A Redshift-compatible JDBC driver must be present on the classpath for spark-redshift to work.
         // For testing, we use an Amazon driver, which is available from
         // http://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-connection.html
-        "com.amazon.redshift" % "jdbc42" % "1.2.27.1051" % "test" from "https://s3.amazonaws.com/redshift-downloads/drivers/jdbc/1.2.27.1051/RedshiftJDBC42-no-awssdk-1.2.27.1051.jar",
+
+        // (luca) need to update this https://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-connection.html
+        "com.amazon.redshift" % "jdbc41" % "1.2.27.1051" % "test" from "https://s3.amazonaws.com/redshift-downloads/drivers/jdbc/1.2.27.1051/RedshiftJDBC41-no-awssdk-1.2.27.1051.jar",
 
         "com.google.guava" % "guava" % "14.0.1" % "test",
         "org.scalatest" %% "scalatest" % "3.0.5" % "test",

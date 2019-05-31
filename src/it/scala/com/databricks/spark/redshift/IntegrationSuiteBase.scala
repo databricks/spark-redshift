@@ -174,6 +174,7 @@ trait IntegrationSuiteBase
          |(1, true, '2015-07-01', 1234152.12312498, 1.0, 42, 1239012341823719, 23, 'Unicode''s樂趣', '2015-07-01 00:00:00.001')
          """.stripMargin
     )
+    conn.close()
     // scalastyle:on
 //    conn.commit()
   }

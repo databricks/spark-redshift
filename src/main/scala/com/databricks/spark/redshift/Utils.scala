@@ -24,6 +24,7 @@ import scala.util.control.NonFatal
 
 import com.amazonaws.services.s3.{AmazonS3URI, AmazonS3Client}
 import com.amazonaws.services.s3.model.BucketLifecycleConfiguration
+import com.amazonaws.services.s3.model.lifecycle.{LifecycleAndOperator, LifecyclePredicateVisitor, LifecyclePrefixPredicate, LifecycleTagPredicate}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.FileSystem
 import org.slf4j.LoggerFactory
@@ -121,6 +122,7 @@ private[redshift] object Utils {
    * ensure cleanup of temporary files. If no applicable configuration is found, this method logs
    * a helpful warning for the user.
    */
+  // (luca | Applying https://github.com/databricks/spark-redshift/pull/357/files)
   def checkThatBucketHasObjectLifecycleConfiguration(
       tempDir: String,
       s3Client: AmazonS3Client): Unit = {
@@ -133,11 +135,15 @@ private[redshift] object Utils {
         val rules = Option(s3Client.getBucketLifecycleConfiguration(bucket))
           .map(_.getRules.asScala)
           .getOrElse(Seq.empty)
+        val keyPrefixMatchingVisitor = new KeyPrefixMatchingVisitor(key)
+
         rules.exists { rule =>
           // Note: this only checks that there is an active rule which matches the temp directory;
           // it does not actually check that the rule will delete the files. This check is still
           // better than nothing, though, and we can always improve it later.
-          rule.getStatus == BucketLifecycleConfiguration.ENABLED && key.startsWith(rule.getPrefix)
+
+          rule.getFilter.getPredicate.accept(keyPrefixMatchingVisitor)
+          rule.getStatus == BucketLifecycleConfiguration.ENABLED && keyPrefixMatchingVisitor.matchFound
         }
       }
       if (!hasMatchingBucketLifecycleRule) {
@@ -205,3 +211,19 @@ private[redshift] object Utils {
     }
   }
 }
+
+private class KeyPrefixMatchingVisitor(key: String) extends LifecyclePredicateVisitor {
+  var matchFound = false
+
+  override def visit(lifecyclePrefixPredicate: LifecyclePrefixPredicate): Unit = {
+    if (!matchFound && key.startsWith(lifecyclePrefixPredicate.getPrefix)) {
+      matchFound = true
+    }
+  }
+
+  override def visit(lifecycleTagPredicate: LifecycleTagPredicate): Unit = {}
+
+  override def visit(lifecycleAndOperator: LifecycleAndOperator): Unit = {}
+}
+
+
