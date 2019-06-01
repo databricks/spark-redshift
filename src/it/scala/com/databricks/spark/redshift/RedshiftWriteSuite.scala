@@ -45,23 +45,27 @@ abstract class BaseRedshiftWriteSuite extends IntegrationSuiteBase {
       checkAnswer(read.option("dbtable", tableName).load(), TestUtils.expectedData)
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
-      conn.commit()
     }
   }
 
   test("roundtrip save and load with uppercase column names") {
     testRoundtripSaveAndLoad(
       s"roundtrip_write_and_read_with_uppercase_column_names_$randomSuffix",
-      sqlContext.createDataFrame(sc.parallelize(Seq(Row(1))),
-        StructType(StructField("A", IntegerType) :: Nil)),
-      expectedSchemaAfterLoad = Some(StructType(StructField("a", IntegerType) :: Nil)))
+      sqlContext.createDataFrame(
+        sc.parallelize(Seq(Row(1))), StructType(StructField("SomeColumn", IntegerType) :: Nil)
+      ),
+      expectedSchemaAfterLoad = Some(StructType(StructField("somecolumn", IntegerType) :: Nil))
+    )
   }
 
   test("save with column names that are reserved words") {
     testRoundtripSaveAndLoad(
       s"save_with_column_names_that_are_reserved_words_$randomSuffix",
-      sqlContext.createDataFrame(sc.parallelize(Seq(Row(1))),
-        StructType(StructField("table", IntegerType) :: Nil)))
+      sqlContext.createDataFrame(
+        sc.parallelize(Seq(Row(1))),
+        StructType(StructField("table", IntegerType) :: Nil)
+      )
+    )
   }
 
   test("save with one empty partition (regression test for #96)") {
@@ -97,7 +101,6 @@ abstract class BaseRedshiftWriteSuite extends IntegrationSuiteBase {
       assert(e.getMessage.contains("while loading data into Redshift"))
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
-      conn.commit()
     }
   }
 
@@ -161,7 +164,6 @@ class CSVGZIPRedshiftWriteSuite extends IntegrationSuiteBase {
       checkAnswer(read.option("dbtable", tableName).load(), TestUtils.expectedData)
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
-      conn.commit()
     }
   }
 }

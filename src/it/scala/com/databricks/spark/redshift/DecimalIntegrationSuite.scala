@@ -41,14 +41,12 @@ class DecimalIntegrationSuite extends IntegrationSuiteBase {
         for (x <- decimalStrings) {
           conn.createStatement().executeUpdate(s"INSERT INTO $tableName VALUES ($x)")
         }
-        conn.commit()
         assert(DefaultJDBCWrapper.tableExists(conn, tableName))
         val loadedDf = read.option("dbtable", tableName).load()
         checkAnswer(loadedDf, expectedRows)
         checkAnswer(loadedDf.selectExpr("x + 0"), expectedRows)
       } finally {
         conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
-        conn.commit()
       }
     }
   }
@@ -83,7 +81,6 @@ class DecimalIntegrationSuite extends IntegrationSuiteBase {
     withTempRedshiftTable("issue203") { tableName =>
       conn.createStatement().executeUpdate(s"CREATE TABLE $tableName (foo BIGINT)")
       conn.createStatement().executeUpdate(s"INSERT INTO $tableName VALUES (91593373)")
-      conn.commit()
       assert(DefaultJDBCWrapper.tableExists(conn, tableName))
       val df = read
         .option("query", s"select foo / 1000000.0 from $tableName limit 1")

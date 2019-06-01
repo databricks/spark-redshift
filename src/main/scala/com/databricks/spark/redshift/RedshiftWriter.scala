@@ -22,14 +22,12 @@ import java.sql.{Connection, Date, SQLException, Timestamp}
 import com.amazonaws.auth.AWSCredentialsProvider
 import com.amazonaws.services.s3.AmazonS3Client
 import org.apache.hadoop.fs.{FileSystem, Path}
-
 import org.apache.spark.TaskContext
 import org.slf4j.LoggerFactory
+
 import scala.collection.mutable
 import scala.util.control.NonFatal
-
 import com.databricks.spark.redshift.Parameters.MergedParameters
-
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{DataFrame, Row, SQLContext, SaveMode}
 import org.apache.spark.sql.types._

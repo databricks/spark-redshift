@@ -29,7 +29,6 @@ class RedshiftReadSuite extends IntegrationSuiteBase {
   override def beforeAll(): Unit = {
     super.beforeAll()
     conn.prepareStatement(s"drop table if exists $test_table").executeUpdate()
-    conn.commit()
     createTestDataInRedshift(test_table)
   }
 

@@ -51,7 +51,6 @@ class IAMIntegrationSuite extends IntegrationSuiteBase {
       checkAnswer(loadedDf, Seq(Row(1)))
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
-      conn.commit()
     }
   }
 
@@ -71,7 +70,6 @@ class IAMIntegrationSuite extends IntegrationSuiteBase {
       assert(err.getCause.getMessage.contains("is not authorized to assume IAM Role"))
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
-      conn.commit()
     }
   }
 }

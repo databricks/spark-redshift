@@ -223,7 +223,6 @@ trait IntegrationSuiteBase
       checkAnswer(loadedDf, df.collect())
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
-      conn.commit()
     }
   }
 }

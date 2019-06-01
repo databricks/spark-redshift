@@ -76,7 +76,7 @@ private[redshift] object AWSCredentialsUtils {
     val uriScheme = uri.getScheme
 
     uriScheme match {
-      case "s3" | "s3a" =>
+      case "s3" | "s3n" | "s3a" =>
         // This matches what S3A does, with one exception: we don't support anonymous credentials.
         // First, try to parse from URI:
         Option(uri.getUserInfo).flatMap { userInfo =>
@@ -103,7 +103,7 @@ private[redshift] object AWSCredentialsUtils {
          new DefaultAWSCredentialsProviderChain()
         }
       case other =>
-        throw new IllegalArgumentException(s"Unrecognized scheme $other; expected s3 or s3a")
+        throw new IllegalArgumentException(s"Unrecognized scheme $other; expected s3, s3n, or s3a")
     }
   }
 }

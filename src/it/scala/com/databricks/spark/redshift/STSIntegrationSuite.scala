@@ -16,10 +16,10 @@
 
 package com.databricks.spark.redshift
 
-import com.amazonaws.auth.BasicAWSCredentials
-import com.amazonaws.services.securitytoken.AWSSecurityTokenServiceClient
+import com.amazonaws.auth.{AWSStaticCredentialsProvider, BasicAWSCredentials, STSAssumeRoleSessionCredentialsProvider}
+import com.amazonaws.auth.profile.ProfileCredentialsProvider
+import com.amazonaws.services.securitytoken.{AWSSecurityTokenServiceClient, AWSSecurityTokenServiceClientBuilder, model}
 import com.amazonaws.services.securitytoken.model.AssumeRoleRequest
-
 import org.apache.spark.sql.{Row, SaveMode}
 import org.apache.spark.sql.types.{IntegerType, StructField, StructType}
 
@@ -36,12 +36,26 @@ class STSIntegrationSuite extends IntegrationSuiteBase {
   override def beforeAll(): Unit = {
     super.beforeAll()
     val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
-    val stsClient = new AWSSecurityTokenServiceClient(awsCredentials)
-    val assumeRoleRequest = new AssumeRoleRequest()
-    assumeRoleRequest.setDurationSeconds(900) // this is the minimum supported duration
-    assumeRoleRequest.setRoleArn(STS_ROLE_ARN)
-    assumeRoleRequest.setRoleSessionName(s"spark-$randomSuffix")
-    val creds = stsClient.assumeRole(assumeRoleRequest).getCredentials
+
+    val stsClient = AWSSecurityTokenServiceClientBuilder
+      .standard()
+      .withRegion("us-east-1")
+      .withCredentials(new AWSStaticCredentialsProvider(awsCredentials))
+      .build()
+
+    val roleRequest = new AssumeRoleRequest()
+      .withDurationSeconds(900)
+      .withRoleArn(STS_ROLE_ARN)
+      .withRoleSessionName(s"spark-$randomSuffix")
+
+    val creds = stsClient.assumeRole(roleRequest).getCredentials
+
+//    val stsClient = new AWSSecurityTokenServiceClient(awsCredentials)
+//    val assumeRoleRequest = new AssumeRoleRequest()
+//    assumeRoleRequest.setDurationSeconds(900) // this is the minimum supported duration
+//    assumeRoleRequest.setRoleArn(STS_ROLE_ARN)
+//    assumeRoleRequest.setRoleSessionName(s"spark-$randomSuffix")
+//    val creds = stsClient.assumeRole(assumeRoleRequest).getCredentials
     STS_ACCESS_KEY_ID = creds.getAccessKeyId
     STS_SECRET_ACCESS_KEY = creds.getSecretAccessKey
     STS_SESSION_TOKEN = creds.getSessionToken
