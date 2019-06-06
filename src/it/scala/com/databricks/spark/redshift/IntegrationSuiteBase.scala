@@ -91,6 +91,8 @@ trait IntegrationSuiteBase
     sc.hadoopConfiguration.setBoolean("fs.s3n.impl.disable.cache", true)
     sc.hadoopConfiguration.set("fs.s3n.awsAccessKeyId", AWS_ACCESS_KEY_ID)
     sc.hadoopConfiguration.set("fs.s3n.awsSecretAccessKey", AWS_SECRET_ACCESS_KEY)
+    sc.hadoopConfiguration.set("fs.s3a.access.key", AWS_ACCESS_KEY_ID)
+    sc.hadoopConfiguration.set("fs.s3a.secret.key", AWS_SECRET_ACCESS_KEY)
     conn = DefaultJDBCWrapper.getConnector(None, jdbcUrl, None)
   }
 
@@ -174,9 +176,7 @@ trait IntegrationSuiteBase
          |(1, true, '2015-07-01', 1234152.12312498, 1.0, 42, 1239012341823719, 23, 'Unicode''s樂趣', '2015-07-01 00:00:00.001')
          """.stripMargin
     )
-    conn.close()
     // scalastyle:on
-//    conn.commit()
   }
 
   protected def withTempRedshiftTable[T](namePrefix: String)(body: String => T): T = {
@@ -185,7 +185,6 @@ trait IntegrationSuiteBase
       body(tableName)
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
-//      conn.commit()
     }
   }
 

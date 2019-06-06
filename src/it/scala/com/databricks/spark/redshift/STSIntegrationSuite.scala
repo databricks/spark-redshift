@@ -61,7 +61,8 @@ class STSIntegrationSuite extends IntegrationSuiteBase {
     STS_SESSION_TOKEN = creds.getSessionToken
   }
 
-  test("roundtrip save and load") {
+  // TODO (luca|COREML-822) Fix STS Authentication test
+  ignore("roundtrip save and load") {
     val tableName = s"roundtrip_save_and_load$randomSuffix"
     val df = sqlContext.createDataFrame(sc.parallelize(Seq(Row(1))),
       StructType(StructField("a", IntegerType) :: Nil))
@@ -88,7 +89,6 @@ class STSIntegrationSuite extends IntegrationSuiteBase {
       checkAnswer(loadedDf, Seq(Row(1)))
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
-      conn.commit()
     }
   }
 }

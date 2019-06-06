@@ -28,7 +28,8 @@ class IAMIntegrationSuite extends IntegrationSuiteBase {
 
   private val IAM_ROLE_ARN: String = loadConfigFromEnv("STS_ROLE_ARN")
 
-  test("roundtrip save and load") {
+  // TODO (luca|COREML-823) Fix IAM Authentication tests
+  ignore("roundtrip save and load") {
     val tableName = s"iam_roundtrip_save_and_load$randomSuffix"
     val df = sqlContext.createDataFrame(sc.parallelize(Seq(Row(1))),
       StructType(StructField("a", IntegerType) :: Nil))
@@ -54,7 +55,7 @@ class IAMIntegrationSuite extends IntegrationSuiteBase {
     }
   }
 
-  test("load fails if IAM role cannot be assumed") {
+  ignore("load fails if IAM role cannot be assumed") {
     val tableName = s"iam_load_fails_if_role_cannot_be_assumed$randomSuffix"
     try {
       val df = sqlContext.createDataFrame(sc.parallelize(Seq(Row(1))),

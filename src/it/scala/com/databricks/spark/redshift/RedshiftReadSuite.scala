@@ -35,7 +35,6 @@ class RedshiftReadSuite extends IntegrationSuiteBase {
   override def afterAll(): Unit = {
     try {
       conn.prepareStatement(s"drop table if exists $test_table").executeUpdate()
-      conn.commit()
     } finally {
       super.afterAll()
     }
@@ -194,14 +193,12 @@ class RedshiftReadSuite extends IntegrationSuiteBase {
         s"CREATE TABLE $tableName (x real)")
       conn.createStatement().executeUpdate(
         s"INSERT INTO $tableName VALUES ('NaN'), ('Infinity'), ('-Infinity')")
-      conn.commit()
       assert(DefaultJDBCWrapper.tableExists(conn, tableName))
       checkAnswer(
         read.option("dbtable", tableName).load(),
         Seq(Float.NaN, Float.PositiveInfinity, Float.NegativeInfinity).map(x => Row.apply(x)))
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
-      conn.commit()
     }
   }
 
@@ -211,7 +208,6 @@ class RedshiftReadSuite extends IntegrationSuiteBase {
         s"CREATE TABLE $tableName (x varchar(256))")
       conn.createStatement().executeUpdate(
         s"INSERT INTO $tableName VALUES ('null'), (''), (null)")
-      conn.commit()
       assert(DefaultJDBCWrapper.tableExists(conn, tableName))
       checkAnswer(
         read.option("dbtable", tableName).load(),
@@ -227,14 +223,12 @@ class RedshiftReadSuite extends IntegrationSuiteBase {
         s"CREATE TABLE $tableName (x double precision)")
       conn.createStatement().executeUpdate(
         s"INSERT INTO $tableName VALUES ('NaN'), ('Infinity'), ('-Infinity')")
-      conn.commit()
       assert(DefaultJDBCWrapper.tableExists(conn, tableName))
       checkAnswer(
         read.option("dbtable", tableName).load(),
         Seq(Double.NaN, Double.PositiveInfinity, Double.NegativeInfinity).map(x => Row.apply(x)))
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
-      conn.commit()
     }
   }
 
@@ -244,7 +238,6 @@ class RedshiftReadSuite extends IntegrationSuiteBase {
         s"CREATE TABLE $tableName (x text)")
       conn.createStatement().executeUpdate(
         s"""INSERT INTO $tableName VALUES ('a\\nb'), ('\\\\'), ('"')""")
-      conn.commit()
       assert(DefaultJDBCWrapper.tableExists(conn, tableName))
       checkAnswer(
         read.option("dbtable", tableName).load(),
