@@ -49,33 +49,28 @@ object SparkRedshiftBuild extends Build {
 
       // Spark 2.4.x should be compatible with hadoop >= 2.7.x
       // https://spark.apache.org/downloads.html
-      testHadoopVersion := sys.props.get("hadoop.testVersion").getOrElse("2.9.0"),
+      testHadoopVersion := sys.props.get("hadoop.testVersion").getOrElse("2.7.7"),
 
+      /* DON't UPGRADE AWS-SDK-JAVA https://stackoverflow.com/a/49510602/2544874 */
+      
       // Hadoop 2.7.7 is compatible with aws-java-sdk 1.7.4 - should we downgrade?
       // Hadoop includes 1.7.4 so if using other version we get 2 aws-java-sdks :/
       // https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-aws/2.7.7
-      testAWSJavaSDKVersion := sys.props.get("aws.testVersion").getOrElse("1.11.199"), // hadoop 2.9 likes 1.11.199
+      testAWSJavaSDKVersion := sys.props.get("aws.testVersion").getOrElse("1.7.4"),
+      
+//      testAWSJavaSDKVersion := sys.props.get("aws.testVersion").getOrElse("1.11.199"), // hadoop 2.9 likes 1.11.199
 
       spName := "databricks/spark-redshift",
       sparkComponents ++= Seq("sql", "hive"),
       spIgnoreProvided := true,
       licenses += "Apache-2.0" -> url("http://opensource.org/licenses/Apache-2.0"),
       credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"),
-      scalacOptions ++= Seq("-target:jvm-1.6"),
-      javacOptions ++= Seq("-source", "1.6", "-target", "1.6"),
+      scalacOptions ++= Seq("-target:jvm-1.8"),
+      javacOptions ++= Seq("-source", "1.8", "-target", "1.8"),
       libraryDependencies ++= Seq(
         "org.slf4j" % "slf4j-api" % "1.7.5",
         "com.eclipsesource.minimal-json" % "minimal-json" % "0.9.4",
-        // We require spark-avro, but avro-mapred must be provided to match Hadoop version.
-        // In most cases, avro-mapred will be provided as part of the Spark assembly JAR.
-        //        "org.apache.spark" %% "spark-avro" % sparkVersion.value force(),
-//        "org.apache.avro" % "avro-mapred" % "1.7.7" % "provided" classifier "hadoop2" exclude("org.mortbay.jetty", "servlet-api"),
-
-
-        // DO WE NEED THIS ?
-        // Kryo is provided by Spark, but we need this here in order to be able to import KryoSerializable
-//        "com.esotericsoftware" % "kryo-shaded" % "3.0.3" % "provided",
-
+        
         // A Redshift-compatible JDBC driver must be present on the classpath for spark-redshift to work.
         // For testing, we use an Amazon driver, which is available from
         // http://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-connection.html
@@ -87,22 +82,15 @@ object SparkRedshiftBuild extends Build {
         "org.scalatest" %% "scalatest" % "3.0.5" % "test",
         "org.mockito" % "mockito-core" % "1.10.19" % "test",
 
-        "com.amazonaws" % "aws-java-sdk-core" % testAWSJavaSDKVersion.value % "provided"
-          exclude("com.fasterxml.jackson.core", "jackson-databind")
-          exclude("com.fasterxml.jackson.core", "jackson-annotations")
-          exclude("com.fasterxml.jackson.core", "jackson-core"),
-        "com.amazonaws" % "aws-java-sdk-s3" % testAWSJavaSDKVersion.value % "provided"
-          exclude("com.fasterxml.jackson.core", "jackson-databind")
-          exclude("com.fasterxml.jackson.core", "jackson-annotations")
-          exclude("com.fasterxml.jackson.core", "jackson-core"),
-        "com.amazonaws" % "aws-java-sdk-sts" % testAWSJavaSDKVersion.value % "test"
-          exclude("com.fasterxml.jackson.core", "jackson-databind")
-          exclude("com.fasterxml.jackson.core", "jackson-annotations")
-          exclude("com.fasterxml.jackson.core", "jackson-core"),
+        "com.amazonaws" % "aws-java-sdk" % testAWSJavaSDKVersion.value % "provided" excludeAll  
+          (ExclusionRule(organization = "com.fasterxml.jackson.core")),
+//          exclude("com.fasterxml.jackson.core", "jackson-databind")
+//          exclude("com.fasterxml.jackson.core", "jackson-annotations")
+//          exclude("com.fasterxml.jackson.core", "jackson-core"),
 
-          "org.apache.hadoop" % "hadoop-client" % testHadoopVersion.value % "test" exclude("javax.servlet", "servlet-api") force(),
-          "org.apache.hadoop" % "hadoop-common" % testHadoopVersion.value % "test" exclude("javax.servlet", "servlet-api") force(),
-          "org.apache.hadoop" % "hadoop-common" % testHadoopVersion.value % "test" classifier "tests" force(),
+        "org.apache.hadoop" % "hadoop-client" % testHadoopVersion.value % "test" exclude("javax.servlet", "servlet-api") force(),
+        "org.apache.hadoop" % "hadoop-common" % testHadoopVersion.value % "test" exclude("javax.servlet", "servlet-api") force(),
+        "org.apache.hadoop" % "hadoop-common" % testHadoopVersion.value % "test" classifier "tests" force(),
 
         "org.apache.hadoop" % "hadoop-aws" % testHadoopVersion.value excludeAll
           (ExclusionRule(organization = "com.fasterxml.jackson.core"))
