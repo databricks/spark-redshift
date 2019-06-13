@@ -205,19 +205,3 @@ private[redshift] object Utils {
     }
   }
 }
-
-//private class KeyPrefixMatchingVisitor(key: String) extends LifecyclePredicateVisitor {
-//  var matchFound = false
-//
-//  override def visit(lifecyclePrefixPredicate: LifecyclePrefixPredicate): Unit = {
-//    if (!matchFound && key.startsWith(lifecyclePrefixPredicate.getPrefix)) {
-//      matchFound = true
-//    }
-//  }
-//
-//  override def visit(lifecycleTagPredicate: LifecycleTagPredicate): Unit = {}
-//
-//  override def visit(lifecycleAndOperator: LifecycleAndOperator): Unit = {}
-//}
-//
-

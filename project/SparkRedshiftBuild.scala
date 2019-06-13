@@ -51,15 +51,11 @@ object SparkRedshiftBuild extends Build {
       // https://spark.apache.org/downloads.html
       testHadoopVersion := sys.props.get("hadoop.testVersion").getOrElse("2.7.7"),
 
-      /* DON't UPGRADE AWS-SDK-JAVA https://stackoverflow.com/a/49510602/2544874 */
-      
-      // Hadoop 2.7.7 is compatible with aws-java-sdk 1.7.4 - should we downgrade?
-      // Hadoop includes 1.7.4 so if using other version we get 2 aws-java-sdks :/
+      // DON't UPGRADE AWS-SDK-JAVA if not compatible with hadoop version
+      // https://stackoverflow.com/a/49510602/2544874 
       // https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-aws/2.7.7
       testAWSJavaSDKVersion := sys.props.get("aws.testVersion").getOrElse("1.7.4"),
       
-//      testAWSJavaSDKVersion := sys.props.get("aws.testVersion").getOrElse("1.11.199"), // hadoop 2.9 likes 1.11.199
-
       spName := "databricks/spark-redshift",
       sparkComponents ++= Seq("sql", "hive"),
       spIgnoreProvided := true,
@@ -74,8 +70,6 @@ object SparkRedshiftBuild extends Build {
         // A Redshift-compatible JDBC driver must be present on the classpath for spark-redshift to work.
         // For testing, we use an Amazon driver, which is available from
         // http://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-connection.html
-
-        // (luca) need to update this https://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-connection.html
         "com.amazon.redshift" % "jdbc41" % "1.2.27.1051" % "test" from "https://s3.amazonaws.com/redshift-downloads/drivers/jdbc/1.2.27.1051/RedshiftJDBC41-no-awssdk-1.2.27.1051.jar",
 
         "com.google.guava" % "guava" % "14.0.1" % "test",
@@ -84,9 +78,6 @@ object SparkRedshiftBuild extends Build {
 
         "com.amazonaws" % "aws-java-sdk" % testAWSJavaSDKVersion.value % "provided" excludeAll  
           (ExclusionRule(organization = "com.fasterxml.jackson.core")),
-//          exclude("com.fasterxml.jackson.core", "jackson-databind")
-//          exclude("com.fasterxml.jackson.core", "jackson-annotations")
-//          exclude("com.fasterxml.jackson.core", "jackson-core"),
 
         "org.apache.hadoop" % "hadoop-client" % testHadoopVersion.value % "test" exclude("javax.servlet", "servlet-api") force(),
         "org.apache.hadoop" % "hadoop-common" % testHadoopVersion.value % "test" exclude("javax.servlet", "servlet-api") force(),
