@@ -73,7 +73,7 @@ class SaveModeIntegrationSuite extends IntegrationSuiteBase {
 
   // TODO:test overwrite that fails.
 
-  // TODO (luca|) make SaveMode work
+  // TODO (luca|issue #7) make SaveMode work
   ignore("Append SaveMode doesn't destroy existing data") {
     withTempRedshiftTable("append_doesnt_destroy_existing_data") { tableName =>
       createTestDataInRedshift(tableName)

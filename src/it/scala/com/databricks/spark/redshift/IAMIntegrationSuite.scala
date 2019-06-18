@@ -28,7 +28,7 @@ class IAMIntegrationSuite extends IntegrationSuiteBase {
 
   private val IAM_ROLE_ARN: String = loadConfigFromEnv("STS_ROLE_ARN")
 
-  // TODO (luca|COREML-823) Fix IAM Authentication tests
+  // TODO (luca|issue #8) Fix IAM Authentication tests
   ignore("roundtrip save and load") {
     val tableName = s"iam_roundtrip_save_and_load$randomSuffix"
     val df = sqlContext.createDataFrame(sc.parallelize(Seq(Row(1))),

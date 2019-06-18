@@ -28,7 +28,7 @@ class PostgresDriverIntegrationSuite extends IntegrationSuiteBase {
     super.jdbcUrl.replace("jdbc:redshift", "jdbc:postgresql")
   }
 
-  // TODO (luca|COREML-825 Fix tests when using postgresql driver
+  // TODO (luca|issue #9) Fix tests when using postgresql driver
   ignore("postgresql driver takes precedence for jdbc:postgresql:// URIs") {
     val conn = DefaultJDBCWrapper.getConnector(None, jdbcUrl, None)
     try {

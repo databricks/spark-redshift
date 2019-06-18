@@ -56,7 +56,7 @@ object SparkRedshiftBuild extends Build {
       // https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-aws/2.7.7
       testAWSJavaSDKVersion := sys.props.get("aws.testVersion").getOrElse("1.7.4"),
       
-      spName := "databricks/spark-redshift",
+      spName := "spark-redshift-community/spark-redshift",
       sparkComponents ++= Seq("sql", "hive"),
       spIgnoreProvided := true,
       licenses += "Apache-2.0" -> url("http://opensource.org/licenses/Apache-2.0"),
