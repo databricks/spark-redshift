@@ -78,7 +78,7 @@ private[redshift] object Conversions {
    *
    * Note that instances of this function are NOT thread-safe.
    */
-  def createRowConverter(schema: StructType): Array[String] => InternalRow = {
+  def createRowConverter(schema: StructType, nullString: String): Array[String] => InternalRow = {
     val dateFormat = createRedshiftDateFormat()
     val decimalFormat = createRedshiftDecimalFormat()
     val conversionFunctions: Array[String => Any] = schema.fields.map { field =>
@@ -116,7 +116,16 @@ private[redshift] object Conversions {
       var i = 0
       while (i < schema.length) {
         val data = inputRow(i)
-        converted(i) = if (data == null || data.isEmpty) null else conversionFunctions(i)(data)
+        converted(i) = if ((data == null || data == nullString) ||
+          (data.isEmpty && schema.fields(i).dataType != StringType)) {
+          null
+        }
+        else if (data.isEmpty) {
+          ""
+        }
+        else {
+          conversionFunctions(i)(data)
+        }
         i += 1
       }
       encoder.toRow(externalRow)

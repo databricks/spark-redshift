@@ -25,24 +25,6 @@ matrix:
     - jdk: openjdk7
       scala: 2.11.7
       env: HADOOP_VERSION="2.2.0" SPARK_VERSION="2.0.0" SPARK_AVRO_VERSION="3.0.0" AWS_JAVA_SDK_VERSION="1.7.4"
-env:
-  global:
-    # AWS_REDSHIFT_JDBC_URL
-    - secure: "RNkxdKcaKEYuJqxli8naazp42qO5/pgueIzs+J5rHwl39jcBvJMgW3DX8kT7duzdoBb/qrolj/ttbQ3l/30P45+djn0BEwcJMX7G/FGpZYD23yd03qeq7sOKPQl2Ni/OBttYHJMah5rI6aPmAysBZMQO7Wijdenb/RUiU2YcZp0="
-    # AWS_REDSHIFT_PASSWORD
-    - secure: "g5li3gLejD+/2BIqIm+qHiqBUvCc5l0qnftVaVlLtL7SffErp/twDiFP4gW8eqnFqi2GEC1c9Shf7Z9cOIUunNSBQZdYIVG0f38UfBeDP14nOoIuwZ974O5yggbgZhX0cKvJzINcENGoRNk0FzRwgOdCCiF05IMnRqQxI3C24fE="
-    # AWS_REDSHIFT_USER
-    - secure: "LIkY/ZpBXK3vSFsdpBSRXEsgfD2wDF52X8OZOlyBJOiZpS4y1/obj8b3VQABDPyPH95bGX/LOpM0vVM137rYgF0pskgVEzLMyZOPpwYqNGPf/d4BtQhBRc8f7+jmr6D4Hrox4jCl0cCKaeiTazun2+Y9E+zgCUDvQ8y9qGctR2k="
-    # TEST_AWS_ACCESS_KEY_ID
-    - secure: "bsB6YwkscUxtzcZOKja4Y69IR3JqvCP3W/4vFftW/v33/hOC3EBz7TVNKS+ZIomBUQYJnzsMfM59bj7YEc3KZe8WxIcUdLI40hg0X5O1RhJDNPW+0oGbWshmzyua+hY1y7nRja+8/17tYTbAi1+MhscRu+O/2aWaXolA9BicuX0="
-    # TEST_AWS_SECRET_ACCESS_KEY
-    - secure: "cGxnZh4be9XiPBOMxe9wHYwEfrWNw4zSjmvGFEC9UUV11ydHLo5wrXtcTVFmY7qxUxYeb0NB2N+CQXE0GcyUKoTviKG9sOS3cxR1q30FsdOVcWDKAzpBUmzDTMwDLAUMysziyOtMorDlNVydqYdYLMpiUN0O+eDKA+iOHlJp7fo="
-    # STS_ROLE_ARN
-    - secure: "cuyemI1bqPkWBD5B1FqIKDJb5g/SX5x8lrzkO0J/jkyGY0VLbHxrl5j/9PrKFuvraBK3HC56HEP1Zg+IMvh+uv0D+p5y14C97fAzE33uNgR2aVkamOo92zHvxvXe7zBtqc8rztWsJb1pgkrY7SdgSXgQc88ohey+XecDh4TahTY="
-    # AWS_S3_SCRATCH_SPACE
-    - secure: "LvndQIW6dHs6nyaMHtblGI/oL+s460lOezFs2BoD0Isenb/O/IM+nY5K9HepTXjJIcq8qvUYnojZX1FCrxxOXX2/+/Iihiq7GzJYdmdMC6hLg9bJYeAFk0dWYT88/AwadrJCBOa3ockRLhiO3dkai7Ki5+M1erfaFiAHHMpJxYQ="
-    # AWS_S3_CROSS_REGION_SCRATCH_SPACE
-    - secure: "esYmBqt256Dc77HT68zoaE/vtsFGk2N+Kt+52RlR0cjHPY1q5801vxLbeOlpYb2On3x8YckE++HadjL40gwSBsca0ffoogq6zTlfbJYDSQkQG1evxXWJZLcafB0igfBs/UbEUo7EaxoAJQcLgiWWwUdO0a0iU1ciSVyogZPagL0="
 
 script:
   - ./dev/run-tests-travis.sh

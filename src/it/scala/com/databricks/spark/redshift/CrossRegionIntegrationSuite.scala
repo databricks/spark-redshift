@@ -54,7 +54,6 @@ class CrossRegionIntegrationSuite extends IntegrationSuiteBase {
       }
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
-      conn.commit()
     }
   }
 }

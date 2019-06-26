@@ -47,7 +47,6 @@ class ColumnMetadataSuite extends IntegrationSuiteBase {
       }
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
-      conn.commit()
     }
   }
 
@@ -72,7 +71,6 @@ class ColumnMetadataSuite extends IntegrationSuiteBase {
       checkAnswer(encodingDF, Seq(Row("x", "lzo")))
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
-      conn.commit()
     }
   }
 
@@ -113,7 +111,6 @@ class ColumnMetadataSuite extends IntegrationSuiteBase {
       checkAnswer(columnDF, Seq(Row("x", "Hello Column")))
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
-      conn.commit()
     }
   }
 }

@@ -54,16 +54,19 @@ trait IntegrationSuiteBase
   protected val AWS_REDSHIFT_JDBC_URL: String = loadConfigFromEnv("AWS_REDSHIFT_JDBC_URL")
   protected val AWS_REDSHIFT_USER: String = loadConfigFromEnv("AWS_REDSHIFT_USER")
   protected val AWS_REDSHIFT_PASSWORD: String = loadConfigFromEnv("AWS_REDSHIFT_PASSWORD")
-  protected val AWS_ACCESS_KEY_ID: String = loadConfigFromEnv("TEST_AWS_ACCESS_KEY_ID")
-  protected val AWS_SECRET_ACCESS_KEY: String = loadConfigFromEnv("TEST_AWS_SECRET_ACCESS_KEY")
+  protected val AWS_ACCESS_KEY_ID: String = loadConfigFromEnv("AWS_ACCESS_KEY_ID")
+  protected val AWS_SECRET_ACCESS_KEY: String = loadConfigFromEnv("AWS_SECRET_ACCESS_KEY")
   // Path to a directory in S3 (e.g. 's3n://bucket-name/path/to/scratch/space').
   protected val AWS_S3_SCRATCH_SPACE: String = loadConfigFromEnv("AWS_S3_SCRATCH_SPACE")
-  require(AWS_S3_SCRATCH_SPACE.contains("s3n"), "must use s3n:// URL")
+  require(AWS_S3_SCRATCH_SPACE.contains("s3a"), "must use s3a:// URL")
 
   protected def jdbcUrl: String = {
-    s"$AWS_REDSHIFT_JDBC_URL?user=$AWS_REDSHIFT_USER&password=$AWS_REDSHIFT_PASSWORD"
+    s"$AWS_REDSHIFT_JDBC_URL?user=$AWS_REDSHIFT_USER&password=$AWS_REDSHIFT_PASSWORD&ssl=true"
   }
 
+  protected def jdbcUrlNoUserPassword: String = {
+    s"$AWS_REDSHIFT_JDBC_URL?ssl=true"
+  }
   /**
    * Random suffix appended appended to table and directory names in order to avoid collisions
    * between separate Travis builds.
@@ -88,6 +91,8 @@ trait IntegrationSuiteBase
     sc.hadoopConfiguration.setBoolean("fs.s3n.impl.disable.cache", true)
     sc.hadoopConfiguration.set("fs.s3n.awsAccessKeyId", AWS_ACCESS_KEY_ID)
     sc.hadoopConfiguration.set("fs.s3n.awsSecretAccessKey", AWS_SECRET_ACCESS_KEY)
+    sc.hadoopConfiguration.set("fs.s3a.access.key", AWS_ACCESS_KEY_ID)
+    sc.hadoopConfiguration.set("fs.s3a.secret.key", AWS_SECRET_ACCESS_KEY)
     conn = DefaultJDBCWrapper.getConnector(None, jdbcUrl, None)
   }
 
@@ -172,7 +177,6 @@ trait IntegrationSuiteBase
          """.stripMargin
     )
     // scalastyle:on
-    conn.commit()
   }
 
   protected def withTempRedshiftTable[T](namePrefix: String)(body: String => T): T = {
@@ -181,7 +185,6 @@ trait IntegrationSuiteBase
       body(tableName)
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
-      conn.commit()
     }
   }
 
@@ -219,7 +222,6 @@ trait IntegrationSuiteBase
       checkAnswer(loadedDf, df.collect())
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
-      conn.commit()
     }
   }
 }

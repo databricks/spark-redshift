@@ -91,5 +91,7 @@ class FilterPushdownSuite extends FunSuite {
     StructField("test_timestamp", TimestampType)))
 
   /** A new filter subclasss which our pushdown logic does not know how to handle */
-  private case object NewFilter extends Filter
+  private case object NewFilter extends Filter {
+    override def references: Array[String] = Array.empty
+  }
 }

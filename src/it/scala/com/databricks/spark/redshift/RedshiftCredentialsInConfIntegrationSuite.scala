@@ -31,14 +31,14 @@ class RedshiftCredentialsInConfIntegrationSuite extends IntegrationSuiteBase {
     val tableName = s"roundtrip_save_and_load_$randomSuffix"
     try {
       write(df)
-        .option("url", AWS_REDSHIFT_JDBC_URL)
+        .option("url", jdbcUrlNoUserPassword)
         .option("user", AWS_REDSHIFT_USER)
         .option("password", AWS_REDSHIFT_PASSWORD)
         .option("dbtable", tableName)
         .save()
       assert(DefaultJDBCWrapper.tableExists(conn, tableName))
       val loadedDf = read
-        .option("url", AWS_REDSHIFT_JDBC_URL)
+        .option("url", jdbcUrlNoUserPassword)
         .option("user", AWS_REDSHIFT_USER)
         .option("password", AWS_REDSHIFT_PASSWORD)
         .option("dbtable", tableName)
@@ -47,7 +47,6 @@ class RedshiftCredentialsInConfIntegrationSuite extends IntegrationSuiteBase {
       checkAnswer(loadedDf, df.collect())
     } finally {
       conn.prepareStatement(s"drop table if exists $tableName").executeUpdate()
-      conn.commit()
     }
   }
 

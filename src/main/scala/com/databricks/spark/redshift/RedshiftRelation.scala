@@ -131,7 +131,6 @@ private[redshift] case class RedshiftRelation(
       // Unload data from Redshift into a temporary directory in S3:
       val tempDir = params.createPerQueryTempDir()
       val unloadSql = buildUnloadStmt(requiredColumns, filters, tempDir, creds)
-      log.info(unloadSql)
       val conn = jdbcWrapper.getConnector(params.jdbcDriver, params.jdbcUrl, params.credentials)
       try {
         jdbcWrapper.executeInterruptibly(conn.prepareStatement(unloadSql))
@@ -165,6 +164,7 @@ private[redshift] case class RedshiftRelation(
       sqlContext.read
         .format(classOf[RedshiftFileFormat].getName)
         .schema(prunedSchema)
+        .option("nullString", params.nullString)
         .load(filesToRead: _*)
         .queryExecution.executedPlan.execute().asInstanceOf[RDD[Row]]
     }
@@ -189,11 +189,13 @@ private[redshift] case class RedshiftRelation(
       val escapedTableNameOrSubqury = tableNameOrSubquery.replace("\\", "\\\\").replace("'", "\\'")
       s"SELECT $columnList FROM $escapedTableNameOrSubqury $whereClause"
     }
+    log.info(query)
     // We need to remove S3 credentials from the unload path URI because they will conflict with
     // the credentials passed via `credsString`.
     val fixedUrl = Utils.fixS3Url(Utils.removeCredentialsFromURI(new URI(tempDir)).toString)
 
-    s"UNLOAD ('$query') TO '$fixedUrl' WITH CREDENTIALS '$credsString' ESCAPE MANIFEST"
+    s"UNLOAD ('$query') TO '$fixedUrl' WITH CREDENTIALS '$credsString'" +
+      s" ESCAPE MANIFEST NULL AS '${params.nullString}'"
   }
 
   private def pruneSchema(schema: StructType, columns: Array[String]): StructType = {
