@@ -106,7 +106,7 @@ eventsDF.show()
 
 The `.format("com.spark.redshift.community")` line tells the Data Sources API that we are using the `spark-redshift` package. It uses this information to load the proper `DefaultSource` class from the specified package. This class contains the entry points for the data source implementation.
 
-Next we provide the parameters necessary to read the `event` table from Redshift. We provide the JDBC URL, the temporary S3 folder where the table data will be copied to, and the name of the table we want to read. A comprehensive list of parameters is listed on the `spark-redshift` [README](https://github.com.spark.redshift.community).
+Next we provide the parameters necessary to read the `event` table from Redshift. We provide the JDBC URL, the temporary S3 folder where the table data will be copied to, and the name of the table we want to read. A comprehensive list of parameters is listed on the `spark-redshift` [README](https://github.com/spark-redshift-community/spark-redshift).
 
 Executing the above lines will produce the following output:
 
@@ -301,7 +301,7 @@ OPTIONS (
 AS SELECT * FROM myevent;
 ```
 
-By default, the save operation uses the `EVEN` [key distribution style](http://docs.aws.amazon.com/redshift/latest/dg/c_choosing_dist_sort.html) in Redshift. This can be changed by using the optional parameters `diststyle` and `distkey`. See the full [spark-redshift documentation](https://github.com.spark.redshift.community) for details.
+By default, the save operation uses the `EVEN` [key distribution style](http://docs.aws.amazon.com/redshift/latest/dg/c_choosing_dist_sort.html) in Redshift. This can be changed by using the optional parameters `diststyle` and `distkey`. See the full [spark-redshift documentation](https://github.com/spark-redshift-community/spark-redshift) for details.
 
 ### Under the hood - Save Function ###
 

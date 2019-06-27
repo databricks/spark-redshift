@@ -1,7 +1,5 @@
 # Performant Redshift Data Source for Apache Spark - Community edition
 
-[![Build Status](https://travis-ci.org/spark-redshift-community/spark-redshift.svg?branch=master)](https://travis-ci.org/spark-redshift-community/spark-redshift)
-[![codecov.io](http://codecov.io/github/spark-redshift-community/spark-redshift/coverage.svg?branch=master)](http://codecov.io/github/spark-redshift-community/spark-redshift?branch=master)
 
 Welcome to the community edition of spark-redshift! Pull requests are very welcome.
 The main upgrade is compatibility with spark 2.4.
@@ -16,6 +14,7 @@ This is currently not tested on EMR. Some tests have been temporarily disabled a
 ## Note
 
 To ensure the best experience for our customers, we have decided to inline this connector directly in Databricks Runtime. The latest version of Databricks Runtime (3.0+)  includes an advanced version of the RedShift connector for Spark that features both performance improvements (full query pushdown) as well as security improvements (automatic encryption). For more information, refer to the <a href="https://docs.databricks.com/spark/latest/data-sources/aws/amazon-redshift.html">Databricks documentation</a>. As a result, we will no longer be making releases separately from Databricks Runtime.
+
 
 ## Original Readme
 
@@ -48,7 +47,7 @@ This library is more suited to ETL than interactive queries, since large amounts
 
 This library requires Apache Spark 2.0+ and Amazon Redshift 1.0.963+.
 
-For version that works with Spark 1.x, please check for the [1.x branch](https://github.com.spark.redshift.community/tree/branch-1.x).
+For version that works with Spark 1.x, please check for the [1.x branch](https://github.com/databricks/spark-redshift/tree/branch-1.x).
 
 You may use this library in your applications with the following dependency information:
 
@@ -136,7 +135,7 @@ val sqlContext = new SQLContext(sc)
 
 // Get some data from a Redshift table
 val df: DataFrame = sqlContext.read
-    .format("com.spark.redshift.community")
+    .format("com.databricks.spark.redshift")
     .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass")
     .option("dbtable", "my_table")
     .option("tempdir", "s3n://path/for/temp/data")
@@ -144,7 +143,7 @@ val df: DataFrame = sqlContext.read
 
 // Can also load data from a Redshift query
 val df: DataFrame = sqlContext.read
-    .format("com.spark.redshift.community")
+    .format("com.databricks.spark.redshift")
     .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass")
     .option("query", "select x, count(*) my_table group by x")
     .option("tempdir", "s3n://path/for/temp/data")
@@ -154,7 +153,7 @@ val df: DataFrame = sqlContext.read
 // Data Source API to write the data back to another table
 
 df.write
-  .format("com.spark.redshift.community")
+  .format("com.databricks.spark.redshift")
   .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass")
   .option("dbtable", "my_table_copy")
   .option("tempdir", "s3n://path/for/temp/data")
@@ -163,7 +162,7 @@ df.write
 
 // Using IAM Role based authentication
 df.write
-  .format("com.spark.redshift.community")
+  .format("com.databricks.spark.redshift")
   .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass")
   .option("dbtable", "my_table_copy")
   .option("aws_iam_role", "arn:aws:iam::123456789000:role/redshift_iam_role")
@@ -182,7 +181,7 @@ sql_context = SQLContext(sc)
 
 # Read data from a table
 df = sql_context.read \
-    .format("com.spark.redshift.community") \
+    .format("com.databricks.spark.redshift") \
     .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass") \
     .option("dbtable", "my_table") \
     .option("tempdir", "s3n://path/for/temp/data") \
@@ -190,7 +189,7 @@ df = sql_context.read \
 
 # Read data from a query
 df = sql_context.read \
-    .format("com.spark.redshift.community") \
+    .format("com.databricks.spark.redshift") \
     .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass") \
     .option("query", "select x, count(*) my_table group by x") \
     .option("tempdir", "s3n://path/for/temp/data") \
@@ -198,7 +197,7 @@ df = sql_context.read \
 
 # Write back to a table
 df.write \
-  .format("com.spark.redshift.community") \
+  .format("com.databricks.spark.redshift") \
   .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass") \
   .option("dbtable", "my_table_copy") \
   .option("tempdir", "s3n://path/for/temp/data") \
@@ -207,7 +206,7 @@ df.write \
 
 # Using IAM Role based authentication
 df.write \
-  .format("com.spark.redshift.community") \
+  .format("com.databricks.spark.redshift") \
   .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass") \
   .option("dbtable", "my_table_copy") \
   .option("tempdir", "s3n://path/for/temp/data") \
@@ -222,7 +221,7 @@ Reading data using SQL:
 
 ```sql
 CREATE TABLE my_table
-USING com.spark.redshift.community
+USING com.databricks.spark.redshift
 OPTIONS (
   dbtable 'my_table',
   tempdir 's3n://path/for/temp/data',
@@ -235,7 +234,7 @@ Writing data using SQL:
 ```sql
 -- Create a new table, throwing an error if a table with the same name already exists:
 CREATE TABLE my_table
-USING com.spark.redshift.community
+USING com.databricks.spark.redshift
 OPTIONS (
   dbtable 'my_table',
   tempdir 's3n://path/for/temp/data'
@@ -253,7 +252,7 @@ Reading data using R:
 ```R
 df <- read.df(
    NULL,
-   "com.spark.redshift.community",
+   "com.databricks.spark.redshift",
    tempdir = "s3n://path/for/temp/data",
    dbtable = "my_table",
    url = "jdbc:redshift://redshifthost:5439/database?user=username&password=pass")
@@ -265,7 +264,7 @@ The library contains a Hadoop input format for Redshift tables unloaded with the
 which you may make direct use of as follows:
 
 ```scala
-import com.spark.redshift.community.RedshiftInputFormat
+import com.databricks.spark.redshift.RedshiftInputFormat
 
 val records = sc.newAPIHadoopFile(
   path,
@@ -695,7 +694,7 @@ columnLengthMap.foreach { case (colName, length) =>
 }
 
 df.write
-  .format("com.spark.redshift.community")
+  .format("com.databricks.spark.redshift")
   .option("url", jdbcURL)
   .option("tempdir", s3TempDirectory)
   .option("dbtable", sessionTable)

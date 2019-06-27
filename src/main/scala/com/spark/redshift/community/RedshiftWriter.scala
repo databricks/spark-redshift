@@ -346,7 +346,7 @@ private[redshift] class RedshiftWriter(
     if (!params.useStagingTable) {
       log.warn("Setting useStagingTable=false is deprecated; instead, we recommend that you " +
         "drop the target table yourself. For more details on this deprecation, see" +
-        "https://github.com.spark.redshift.community/pull/157")
+        "https://github.com/databricks/spark-redshift/pull/157")
     }
 
     val creds: AWSCredentialsProvider =
@@ -379,7 +379,7 @@ private[redshift] class RedshiftWriter(
           throw new IllegalArgumentException(
             s"The field name '$fieldName' is not supported when using the Avro tempformat. " +
               "Try using the CSV tempformat  instead. For more details, see " +
-              "https://github.com.spark.redshift.community/issues/84")
+              "https://github.com/databricks/spark-redshift/issues/84")
         }
       }
     }
