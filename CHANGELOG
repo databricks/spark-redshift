@@ -1,12 +1,19 @@
 # spark-redshift Changelog
 
-## 4.0.0-SNAPSHOT (2019-06-26)
+## 4.0.0-SNAPSHOT-20190627 (2019-06-27)
 
 Baseline SNAPSHOT version working with 2.4
 
 #### Deprecation
-In order to get this baseline snapshot out, we dropped some features and package versions, and disabled some tests.
+In order to get this baseline snapshot out, we dropped some features and package versions, 
+and disabled some tests.
 Some of these changes are temporary, others - such as dropping hadoop 1.x - are meant to stay.
+
+Our intent is to do the best job possible supporting the minimal set of features
+ that the community needs. Other non-essential features may be dropped before the
+  first non-snapshot release. 
+  The community's feedback and contributions are vitally important.
+
 
 * Support for hadoop 1.x has been dropped.
 * STS and IAM authentication support has been dropped (so are tests).
