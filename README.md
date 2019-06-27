@@ -1,11 +1,19 @@
 # Performant Redshift Data Source for Apache Spark - Community edition
 
 
-Welcome to the community edition of spark-redshift! Pull requests are very welcome.
-The main upgrade is compatibility with spark 2.4.
+Welcome to the community edition of spark-redshift! 
+ The community's feedback and contributions are vitally important. 
+ Pull requests are very welcome.  
+
+This is a fork from Databricks's spark-redshift repository. 
+The main upgrade is spark 2.4 compatibility.
+
 
 ## Disclaimer
-This is a fork from Databricks's spark-redshift repository. 
+
+Our intent is to do the best job possible supporting the minimal set of features
+ that the community needs. Other non-essential features may be dropped before the
+ first non-snapshot release. 
 
 This is currently not tested on EMR. Some tests have been temporarily disabled and some features removed.
 
