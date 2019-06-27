@@ -110,10 +110,10 @@ object SparkRedshiftBuild extends Build {
       releasePublishArtifactsAction := PgpKeys.publishSigned.value,
 
       pomExtra :=
-        <url>https://github.com/databricks/spark-redshift</url>
+        <url>https://github.com.spark.redshift.community</url>
         <scm>
-          <url>git@github.com:databricks/spark-redshift.git</url>
-          <connection>scm:git:git@github.com:databricks/spark-redshift.git</connection>
+          <url>git@github.com.spark.redshift.community.git</url>
+          <connection>scm:git:git@github.com.spark.redshift.community.git</connection>
         </scm>
         <developers>
           <developer>
