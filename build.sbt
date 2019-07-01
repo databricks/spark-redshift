@@ -39,7 +39,7 @@ lazy val root = Project("spark-redshift", file("."))
   .settings(Defaults.itSettings: _*)
   .settings(
     name := "spark-redshift",
-    organization := "com.spark.redshift.community",
+    organization := "com.spark_redshift_community",
     scalaVersion := "2.11.12",
     sparkVersion := "2.4.3",
     testSparkVersion := sys.props.get("spark.testVersion").getOrElse(sparkVersion.value),
@@ -107,10 +107,10 @@ lazy val root = Project("spark-redshift", file("."))
     releasePublishArtifactsAction := PgpKeys.publishSigned.value,
 
     pomExtra :=
-      <url>https://github.com.spark.redshift.community</url>
+      <url>https://github.com:spark_redshift_community/spark.redshift</url>
       <scm>
-        <url>git@github.com.spark.redshift.community.git</url>
-        <connection>scm:git:git@github.com.spark.redshift.community.git</connection>
+        <url>git@github.com:spark_redshift_community/spark.redshift.git</url>
+        <connection>scm:git:git@github.com:spark_redshift_community/spark.redshift.git</connection>
       </scm>
       <developers>
         <developer>

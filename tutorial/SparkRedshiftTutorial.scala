@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.spark.redshift.community.tutorial
+package com.spark_redshift_community.spark.redshift.tutorial
 import org.apache.spark.{SparkConf,SparkContext}
 import org.apache.spark.sql.SaveMode
 import org.apache.spark.sql.SQLContext
@@ -68,7 +68,7 @@ object SparkRedshiftTutorial {
     
     //Load from a table 
     val eventsDF = sqlContext.read
-      .format("com.spark.redshift.community")
+      .format("com.spark_redshift_community.spark.redshift")
       .option("url", jdbcURL)
       .option("tempdir", tempS3Dir)
       .option("dbtable", "event")
@@ -82,7 +82,7 @@ object SparkRedshiftTutorial {
                         FROM sales 
                         ORDER BY saletime DESC LIMIT 10000"""
     val salesDF = sqlContext.read
-      .format("com.spark.redshift.community")
+      .format("com.spark_redshift_community.spark.redshift")
       .option("url", jdbcURL)
       .option("tempdir", tempS3Dir)
       .option("query", salesQuery)
@@ -91,7 +91,7 @@ object SparkRedshiftTutorial {
 
     val eventQuery = "SELECT * FROM event"
     val eventDF = sqlContext.read
-      .format("com.spark.redshift.community")
+      .format("com.spark_redshift_community.spark.redshift")
       .option("url", jdbcURL)
       .option("tempdir", tempS3Dir)
       .option("query", eventQuery)
@@ -110,7 +110,7 @@ object SparkRedshiftTutorial {
      * and write event records with event id less than 1000
      */
     sqlContext.sql("SELECT * FROM myevent WHERE eventid<=1000").withColumnRenamed("eventid", "id")
-      .write.format("com.spark.redshift.community")
+      .write.format("com.spark_redshift_community.spark.redshift")
       .option("url", jdbcURL)
       .option("tempdir", tempS3Dir)
       .option("dbtable", "redshiftevent")
@@ -122,7 +122,7 @@ object SparkRedshiftTutorial {
      * exist and write event records with event id greater than 1000
      */
     sqlContext.sql("SELECT * FROM myevent WHERE eventid>1000").withColumnRenamed("eventid", "id")
-      .write.format("com.spark.redshift.community")
+      .write.format("com.spark_redshift_community.spark.redshift")
       .option("url", jdbcURL)
       .option("tempdir", tempS3Dir)
       .option("dbtable", "redshiftevent")
@@ -135,7 +135,7 @@ object SparkRedshiftTutorial {
                            GROUP BY (sales.eventid)
                            """
     val salesAGGDF = sqlContext.read
-      .format("com.spark.redshift.community")
+      .format("com.spark_redshift_community.spark.redshift")
       .option("url", jdbcURL)
       .option("tempdir", tempS3Dir)
       .option("query", salesAGGQuery)
@@ -152,7 +152,7 @@ object SparkRedshiftTutorial {
     salesAGGDF2.registerTempTable("redshift_sales_agg")
 
     sqlContext.sql("SELECT * FROM redshift_sales_agg")
-      .write.format("com.spark.redshift.community")
+      .write.format("com.spark_redshift_community.spark.redshift")
       .option("url", jdbcURL)
       .option("tempdir", tempS3Dir)
       .option("dbtable", "redshift_sales_agg")
