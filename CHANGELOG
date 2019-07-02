@@ -1,0 +1,76 @@
+# spark-redshift Changelog
+
+## 4.0.0-SNAPSHOT-20190627 (2019-06-27)
+
+Baseline SNAPSHOT version working with 2.4
+
+#### Deprecation
+In order to get this baseline snapshot out, we dropped some features and package versions, 
+and disabled some tests.
+Some of these changes are temporary, others - such as dropping hadoop 1.x - are meant to stay.
+
+Our intent is to do the best job possible supporting the minimal set of features
+ that the community needs. Other non-essential features may be dropped before the
+  first non-snapshot release. 
+  The community's feedback and contributions are vitally important.
+
+
+* Support for hadoop 1.x has been dropped.
+* STS and IAM authentication support has been dropped (so are tests).
+* postgresql driver tests are inactive.
+* SaveMode tests (or functionality?) are broken. This is a bit scarier but I'm not sure we use the functionality and fixing them didn't make it in this version (spark-snowflake removed them too).
+* S3Native has been deprecated. It's our intention to phase it out from this repo. The test util ‘inMemoryFilesystem’ is not present anymore so an entire test suite RedshiftSourceSuite lost its major mock object and I had to remove it. We plan to re-write it using s3a.
+
+#### Commits changelog
+- 5b0f949 (HEAD -> master, origin_community/master) Merge pull request #6 from spark-redshift-community/luca-spark-2.4
+- 25acded (origin_community/luca-spark-2.4, origin/luca-spark-2.4, luca-spark-2.4) Revert sbt scripts to an older version
+- 866d4fd Moving to external github issues - rename spName to spark-redshift-community
+- 094cc15 remove in Memory FileSystem class and clean up comments in the sbt build file
+- 0666bc6 aws_variables.env gitignored
+- f3bbdb7 sbt assembly the package into a fat jar - found the perfect coordination between different libraries versions! Tests pass and can compile spark-on-paasta and spark successfullygit add src/ project/
+- b1fa3f6 Ignoring a bunch of tests as did snowflake - close to have a green build to try out
+- 95cdf94 Removing conn.commit() everywhere - got 88% of integration tests to run - fix for STS token aws access in progress
+- da10897 Compiling - managed to run tests but they mostly fail
+- 0fe37d2 Compiles with spark 2.4.0 - amazon unmarshal error
+- ea5da29 force spark.avro - hadoop 2.7.7 and awsjavasdk downgraded
+- 834f0d6 Upgraded jackson by excluding it in aws
+- 90581a8 Fixed NewFilter - including hadoop-aws - s3n test is failing
+- 50dfd98 (tag: v3.0.0, tag: gtig, origin/master, origin/HEAD) Merge pull request #5 from Yelp/fdc_first-version
+- fbb58b3 (origin/fdc_first-version) First Yelp release
+- 0d2a130 Merge pull request #4 from Yelp/fdc_DATALAKE-4899_empty-string-to-null
+- 689635c (origin/fdc_DATALAKE-4899_empty-string-to-null) Fix File line length exceeds 100 characters
+- d06fe3b Fix scalastyle
+- e15ccb5 Fix parenthesis
+- d16317e Fix indentation
+- 475e7a1 Fix convertion bit and test
+- 3ae6a9b Fix Empty string is converted to null
+- 967dddb Merge pull request #3 from Yelp/fdc_DATALAKE-486_avoid-log-creds
+- 040b4a9 Merge pull request #2 from Yelp/fdc_DATALAKE-488_cleanup-fix-double-to-float
+- 58fb829 (origin/fdc_DATALAKE-488_cleanup-fix-double-to-float) Fix test
+- 3384333 Add bit and default types
+- 3230aaa (origin/fdc_DATALAKE-486_avoid-log-creds) Avoid logging creds. log sql query statement only
+- ab8124a Fix double type to float and cleanup
+- cafa05f Merge pull request #1 from Yelp/fdc_DATALAKE-563_remove-itests-from-public
+- a3a39a2 (origin/fdc_DATALAKE-563_remove-itests-from-public) Remove itests. Fix jdbc url. Update Redshift jdbc driver
+- 184b442 Make the note more obvious.
+- 717a4ad Notes about inlining this in Databricks Runtime.
+- 8adfe95 (origin/fdc_first-test-branch-2) Fix decimal precision loss when reading the results of a Redshift query
+- 8da2d92 Test infra housekeeping: reduce SBT memory, update plugin versions, update SBT
+- 79bac6d Add instructions on using JitPack master SNAPSHOT builds
+- 7a4a08e Use PreparedStatement.getMetaData() to retrieve Redshift query schemas
+- b4c6053 Wrap and re-throw Await.result exceptions in order to capture full stacktrace
+- 1092c7c Update version in README to 3.0.0-preview1
+- 320748a Setting version to 3.0.0-SNAPSHOT
+- a28832b (tag: v3.0.0-preview1, origin/fdc_30-review) Setting version to 3.0.0-preview1
+- 8afde06 Make Redshift to S3 authentication mechanisms mutually exclusive
+- 9ed18a0 Use FileFormat-based data source instead of HadoopRDD for reads
+- 6cc49da Add option to use CSV as an intermediate data format during writes
+- d508d3e Add documentation and warnings related to using different regions for Redshift and S3
+- cdf192a Break RedshiftIntegrationSuite into smaller suites; refactor to remove some redundancy
+- bdf4462 Pass around AWSCredentialProviders instead of AWSCredentials
+- 51c29e6 Add codecov.yml file.
+- a9963da Update AWSCredentialUtils to be uniform between URI schemes.
+
+## 3.0.0-SNAPSHOT (2017-11-08)
+
+Databricks spark-redshift pre-fork, changes not tracked.

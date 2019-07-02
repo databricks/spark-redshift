@@ -1,10 +1,23 @@
-# Redshift Data Source for Apache Spark
+# Performant Redshift Data Source for Apache Spark - Community edition
 
-[![Build Status](https://travis-ci.org/databricks/spark-redshift.svg?branch=master)](https://travis-ci.org/databricks/spark-redshift)
-[![codecov.io](http://codecov.io/github/databricks/spark-redshift/coverage.svg?branch=master)](http://codecov.io/github/databricks/spark-redshift?branch=master)
+
+Welcome to the community edition of spark-redshift! 
+ The community's feedback and contributions are vitally important. 
+ Pull requests are very welcome.  
+
+This is a fork from Databricks's spark-redshift repository. 
+The main upgrade is spark 2.4 compatibility.
+
 
 ## Disclaimer
-This is fork version from Databricks's spark-redshift repository. Our custom changes only tested with Spark **2.4.0** version. These custom changes may not be worked with older version of Spark
+
+Our intent is to do the best job possible supporting the minimal set of features
+ that the community needs. Other non-essential features may be dropped before the
+ first non-snapshot release. 
+
+This is currently not tested on EMR. Some tests have been temporarily disabled and some features removed.
+
+# Original DataBricks Readme
 
 ## Note
 
