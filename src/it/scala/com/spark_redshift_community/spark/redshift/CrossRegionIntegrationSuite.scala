@@ -28,7 +28,7 @@ class CrossRegionIntegrationSuite extends IntegrationSuiteBase {
 
   protected val AWS_S3_CROSS_REGION_SCRATCH_SPACE: String =
     loadConfigFromEnv("AWS_S3_CROSS_REGION_SCRATCH_SPACE")
-  require(AWS_S3_CROSS_REGION_SCRATCH_SPACE.contains("s3n"), "must use s3n:// URL")
+  require(AWS_S3_CROSS_REGION_SCRATCH_SPACE.contains("s3a"), "must use s3a:// URL")
 
   override protected val tempDir: String = AWS_S3_CROSS_REGION_SCRATCH_SPACE + randomSuffix + "/"
 

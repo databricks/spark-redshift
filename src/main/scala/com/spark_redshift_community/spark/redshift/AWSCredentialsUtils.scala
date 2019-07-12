@@ -76,6 +76,9 @@ private[redshift] object AWSCredentialsUtils {
 
     uriScheme match {
       case "s3" | "s3n" | "s3a" =>
+        // WARNING: credentials in the URI is a potentially unsafe practice. I'm removing the test
+        // AWSCredentialsInUriIntegrationSuite, so the following might or might not work.
+
         // This matches what S3A does, with one exception: we don't support anonymous credentials.
         // First, try to parse from URI:
         Option(uri.getUserInfo).flatMap { userInfo =>
