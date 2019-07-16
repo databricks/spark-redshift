@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
+import com.typesafe.sbt.pgp.PgpKeys
 import org.scalastyle.sbt.ScalastylePlugin.rawScalastyleSettings
-import sbt._
 import sbt.Keys._
+import sbt._
+import sbtrelease.ReleasePlugin.autoImport.ReleaseTransformations._
+import sbtrelease.ReleasePlugin.autoImport._
 import sbtsparkpackage.SparkPackagePlugin.autoImport._
 import scoverage.ScoverageKeys
-import sbtrelease.ReleasePlugin.autoImport._
-import sbtrelease.ReleasePlugin.autoImport.ReleaseTransformations._
-import com.typesafe.sbt.pgp.PgpKeys
 
 val testSparkVersion = settingKey[String]("Spark version to test against")
 val testHadoopVersion = settingKey[String]("Hadoop version to test against")
@@ -39,7 +39,7 @@ lazy val root = Project("spark-redshift", file("."))
   .settings(Defaults.itSettings: _*)
   .settings(
     name := "spark-redshift",
-    organization := "com.spark_redshift_community",
+    organization := "io.github.spark_redshift_community",
     scalaVersion := "2.11.12",
     sparkVersion := "2.4.3",
     testSparkVersion := sys.props.get("spark.testVersion").getOrElse(sparkVersion.value),
