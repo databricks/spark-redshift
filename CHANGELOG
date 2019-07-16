@@ -1,5 +1,9 @@
 # spark-redshift Changelog
 
+## 4.0.0-preview20190715 (2019-07-15)
+
+Move to pre-4.0.0 'preview' releases rather than SNAPSHOT
+
 ## 4.0.0-SNAPSHOT-20190710 (2019-07-10)
 
 Remove AWSCredentialsInUriIntegrationSuite test and require s3a path in CrossRegionIntegrationSuite.scala
