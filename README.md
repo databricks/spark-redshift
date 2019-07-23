@@ -1,5 +1,7 @@
 # Performant Redshift Data Source for Apache Spark - Community edition
 
+[![Build Status](https://travis-ci.org/spark-redshift-community/spark-redshift.svg?branch=master)](https://travis-ci.com/spark-redshift-community/spark-redshift)
+[![codecov.io](http://codecov.io/github/spark-redshift-community/spark-redshift/coverage.svg?branch=master)](http://codecov.io/github/spark-redshift-community/spark-redshift?branch=master)
 
 Welcome to the community edition of spark-redshift! 
  The community's feedback and contributions are vitally important. 
