@@ -10,7 +10,6 @@ sbt \
   -Daws.testVersion=$AWS_JAVA_SDK_VERSION \
   -Dhadoop.testVersion=$HADOOP_VERSION \
   -Dspark.testVersion=$SPARK_VERSION \
-  -DsparkAvro.testVersion=$SPARK_AVRO_VERSION \
   ++$TRAVIS_SCALA_VERSION \
   coverage test coverageReport
 
@@ -19,7 +18,6 @@ if [ "$TRAVIS_SECURE_ENV_VARS" == "true" ]; then
     -Daws.testVersion=$AWS_JAVA_SDK_VERSION \
     -Dhadoop.testVersion=$HADOOP_VERSION \
     -Dspark.testVersion=$SPARK_VERSION \
-    -DsparkAvro.testVersion=$SPARK_AVRO_VERSION \
     ++$TRAVIS_SCALA_VERSION \
     coverage it:test coverageReport 2> /dev/null;
 fi
