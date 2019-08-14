@@ -58,6 +58,20 @@ class ConversionsSuite extends FunSuite {
     assert(convertedRow == expectedRow)
   }
 
+  test("Regression test for parsing timestamptz (bug #25 in spark_redshift_community)") {
+    val rowConverter = createRowConverter(
+      StructType(Seq(StructField("timestampWithTimezone", TimestampType))))
+
+    val timestampWithTimezone = "2014-03-01 00:00:01.123 -0300"
+    val expectedTimestampWithTimezoneMillis = TestUtils.toMillis(
+      2014, 2, 1, 0, 0, 1, 123)
+
+    val convertedRow = rowConverter(Array(timestampWithTimezone))
+    val expectedRow = Row(new Timestamp(expectedTimestampWithTimezoneMillis))
+
+    assert(convertedRow == expectedRow)
+  }
+
   test("Row conversion handles null values") {
     val convertRow = createRowConverter(TestUtils.testSchema)
     val emptyRow = List.fill(TestUtils.testSchema.length)(null).toArray[String]
