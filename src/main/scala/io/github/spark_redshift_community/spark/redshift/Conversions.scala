@@ -77,7 +77,8 @@ private[redshift] object Conversions {
 
   /**
     * From the DateTimeFormatter docs (Java 8):
-    * "A formatter created from a pattern can be used as many times as necessary, it is immutable and is thread-safe."
+    * "A formatter created from a pattern can be used as many times as necessary,
+    * it is immutable and is thread-safe."
     */
   private val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss[.SSS][.SS][.S][ X]")
 
