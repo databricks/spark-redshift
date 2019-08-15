@@ -62,7 +62,7 @@ class ConversionsSuite extends FunSuite {
     val rowConverter = createRowConverter(
       StructType(Seq(StructField("timestampWithTimezone", TimestampType))))
 
-    val timestampWithTimezone = "2014-03-01 00:00:01.123 -0300"
+    val timestampWithTimezone = "2014-03-01 00:00:01.123+00"
     val expectedTimestampWithTimezoneMillis = TestUtils.toMillis(
       2014, 2, 1, 0, 0, 1, 123)
 
