@@ -33,6 +33,13 @@ import org.apache.spark.sql.types._
 private[redshift] object Conversions {
 
   /**
+    * From the DateTimeFormatter docs (Java 8):
+    * "A formatter created from a pattern can be used as many times as necessary,
+    * it is immutable and is thread-safe."
+    */
+  private val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss[.SSS][.SS][.S][X]")
+
+  /**
    * Parse a boolean using Redshift's UNLOAD bool syntax
    */
   private def parseBoolean(s: String): Boolean = {
@@ -75,18 +82,12 @@ private[redshift] object Conversions {
     new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
   }
 
-  /**
-    * From the DateTimeFormatter docs (Java 8):
-    * "A formatter created from a pattern can be used as many times as necessary,
-    * it is immutable and is thread-safe."
-    */
-  private val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss[.SSS][.SS][.S][X]")
-
   def parseRedshiftTimestamp(s: String): Timestamp = {
     val temporalAccessor = formatter.parse(s)
 
     try {
-      Timestamp.valueOf(ZonedDateTime.from(temporalAccessor).toLocalDateTime)
+      // timestamptz
+      Timestamp.from(ZonedDateTime.from(temporalAccessor).toInstant)
     }
     catch {
       // Case timestamp without timezone
