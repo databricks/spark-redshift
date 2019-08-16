@@ -18,6 +18,8 @@ package io.github.spark_redshift_community.spark.redshift
 
 import java.sql.Timestamp
 import java.text.{DecimalFormat, DecimalFormatSymbols, SimpleDateFormat}
+import java.time.{DateTimeException, LocalDateTime, ZonedDateTime}
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 import org.apache.spark.sql.catalyst.InternalRow
@@ -29,6 +31,13 @@ import org.apache.spark.sql.types._
  * Data type conversions for Redshift unloaded data
  */
 private[redshift] object Conversions {
+
+  /**
+    * From the DateTimeFormatter docs (Java 8):
+    * "A formatter created from a pattern can be used as many times as necessary,
+    * it is immutable and is thread-safe."
+    */
+  private val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss[.SSS][.SS][.S][X]")
 
   /**
    * Parse a boolean using Redshift's UNLOAD bool syntax
@@ -73,6 +82,20 @@ private[redshift] object Conversions {
     new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
   }
 
+  def parseRedshiftTimestamp(s: String): Timestamp = {
+    val temporalAccessor = formatter.parse(s)
+
+    try {
+      // timestamptz
+      Timestamp.from(ZonedDateTime.from(temporalAccessor).toInstant)
+    }
+    catch {
+      // Case timestamp without timezone
+      case e: DateTimeException =>
+        Timestamp.valueOf(LocalDateTime.from(temporalAccessor))
+    }
+  }
+
   /**
    * Return a function that will convert arrays of strings conforming to the given schema to Rows.
    *
@@ -104,7 +127,7 @@ private[redshift] object Conversions {
         case LongType => (data: String) => java.lang.Long.parseLong(data)
         case ShortType => (data: String) => java.lang.Short.parseShort(data)
         case StringType => (data: String) => data
-        case TimestampType => (data: String) => Timestamp.valueOf(data)
+        case TimestampType => (data: String) => parseRedshiftTimestamp(data)
         case _ => (data: String) => data
       }
     }

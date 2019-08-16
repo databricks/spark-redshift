@@ -17,6 +17,7 @@
 package io.github.spark_redshift_community.spark.redshift
 
 import java.sql.Timestamp
+import java.time.{LocalDateTime, ZoneId, ZoneOffset, ZonedDateTime}
 import java.util.Locale
 
 import org.apache.spark.sql.Row
@@ -43,9 +44,9 @@ class ConversionsSuite extends FunSuite {
     // scalastyle:on
 
     val timestampWithMillis = "2014-03-01 00:00:01.123"
+    val expectedTimestampMillis = TestUtils.toMillis(2014, 2, 1, 0, 0, 1, 123)
 
     val expectedDateMillis = TestUtils.toMillis(2015, 6, 1, 0, 0, 0)
-    val expectedTimestampMillis = TestUtils.toMillis(2014, 2, 1, 0, 0, 1, 123)
 
     val convertedRow = convertRow(
       Array("1", "t", "2015-07-01", doubleMin, "1.0", "42",
@@ -54,6 +55,22 @@ class ConversionsSuite extends FunSuite {
     val expectedRow = Row(1.asInstanceOf[Byte], true, new Timestamp(expectedDateMillis),
       Double.MinValue, 1.0f, 42, Long.MaxValue, 23.toShort, unicodeString,
       new Timestamp(expectedTimestampMillis))
+
+    assert(convertedRow == expectedRow)
+  }
+
+  test("Regression test for parsing timestamptz (bug #25 in spark_redshift_community)") {
+    val rowConverter = createRowConverter(
+      StructType(Seq(StructField("timestampWithTimezone", TimestampType))))
+
+    // when converting to timestamp, we discard the TZ info.
+    val timestampWithTimezone = "2014-03-01 00:00:01.123-03"
+
+    val expectedTimestampWithTimezoneMillis = TestUtils.toMillis(
+      2014, 2, 1, 0, 0, 1, 123, "-03")
+
+    val convertedRow = rowConverter(Array(timestampWithTimezone))
+    val expectedRow = Row(new Timestamp(expectedTimestampWithTimezoneMillis))
 
     assert(convertedRow == expectedRow)
   }

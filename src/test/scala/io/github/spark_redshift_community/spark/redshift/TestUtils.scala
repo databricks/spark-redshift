@@ -17,7 +17,8 @@
 package io.github.spark_redshift_community.spark.redshift
 
 import java.sql.{Date, Timestamp}
-import java.util.{Calendar, Locale}
+import java.time.ZoneId
+import java.util.{Calendar, Locale, TimeZone}
 
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.types._
@@ -84,10 +85,12 @@ object TestUtils {
       hour: Int,
       minutes: Int,
       seconds: Int,
-      millis: Int = 0): Long = {
+      millis: Int = 0,
+      timeZone: String = null): Long = {
     val calendar = Calendar.getInstance()
     calendar.set(year, zeroBasedMonth, date, hour, minutes, seconds)
     calendar.set(Calendar.MILLISECOND, millis)
+    if (timeZone != null) calendar.setTimeZone(TimeZone.getTimeZone(ZoneId.of(timeZone)))
     calendar.getTime.getTime
   }
 

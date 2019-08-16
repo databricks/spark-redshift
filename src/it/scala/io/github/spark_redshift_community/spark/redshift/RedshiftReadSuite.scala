@@ -215,6 +215,21 @@ class RedshiftReadSuite extends IntegrationSuiteBase {
     }
   }
 
+  test("test timestamptz parsing") {
+    withTempRedshiftTable("luca_test_timestamptz_spark_redshift") { tableName =>
+      conn.createStatement().executeUpdate(
+        s"CREATE TABLE $tableName (x timestamptz)"
+      )
+      conn.createStatement().executeUpdate(
+        s"INSERT INTO $tableName VALUES ('2015-07-03 00:00:00.000 -0300')"
+      )
+
+      checkAnswer(
+        read.option("dbtable", tableName).load(),
+        Seq(Row.apply("2015-07-03 03:00:00.0"))
+      )
+    }
+  }
 
   test("read special double values (regression test for #261)") {
     val tableName = s"roundtrip_special_double_values_$randomSuffix"
