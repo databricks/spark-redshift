@@ -16,6 +16,8 @@
 
 package io.github.spark_redshift_community.spark.redshift
 
+import java.sql.Timestamp
+
 import org.apache.spark.sql.types.LongType
 import org.apache.spark.sql.{Row, execution}
 
@@ -226,7 +228,9 @@ class RedshiftReadSuite extends IntegrationSuiteBase {
 
       checkAnswer(
         read.option("dbtable", tableName).load(),
-        Seq(Row.apply("2015-07-03 03:00:00.0"))
+        Seq(Row.apply(
+          new Timestamp(TestUtils.toMillis(
+      2015, 6, 3, 0, 0, 0, 0, "-03"))))
       )
     }
   }
