@@ -17,7 +17,6 @@
 package io.github.spark_redshift_community.spark.redshift
 
 import java.sql.Timestamp
-import java.time.{LocalDateTime, ZoneId, ZoneOffset, ZonedDateTime}
 import java.util.Locale
 
 import org.apache.spark.sql.Row
