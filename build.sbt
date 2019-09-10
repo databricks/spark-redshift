@@ -57,7 +57,7 @@ lazy val root = Project("spark-redshift", file("."))
     sparkComponents ++= Seq("sql", "hive"),
     spIgnoreProvided := true,
     licenses += "Apache-2.0" -> url("http://opensource.org/licenses/Apache-2.0"),
-    credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"),
+    credentials += Credentials(Path.userHome / ".sbt" / ".credentials"),
     scalacOptions ++= Seq("-target:jvm-1.8"),
     javacOptions ++= Seq("-source", "1.8", "-target", "1.8"),
     libraryDependencies ++= Seq(
@@ -101,12 +101,20 @@ lazy val root = Project("spark-redshift", file("."))
      * Release settings *
      ********************/
 
+    publishTo := {
+      val nexus = "https://oss.sonatype.org/"
+      if (isSnapshot.value)
+        Some("snapshots" at nexus + "content/repositories/snapshots")
+      else
+        Some("releases"  at nexus + "service/local/staging/deploy/maven2")
+    },
+
     publishMavenStyle := true,
     releaseCrossBuild := true,
     licenses += ("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0")),
     releasePublishArtifactsAction := PgpKeys.publishSigned.value,
 
-    pomExtra :=
+      pomExtra :=
       <url>https://github.com:spark_redshift_community/spark.redshift</url>
       <scm>
         <url>git@github.com:spark_redshift_community/spark.redshift.git</url>
@@ -127,6 +135,11 @@ lazy val root = Project("spark-redshift", file("."))
           <id>marmbrus</id>
           <name>Michael Armbrust</name>
           <url>https://github.com/marmbrus</url>
+        </developer>
+        <developer>
+          <id>lucagiovagnoli</id>
+          <name>Luca Giovagnoli</name>
+          <url>https://github.com/lucagiovagnoli</url>
         </developer>
       </developers>,
 
