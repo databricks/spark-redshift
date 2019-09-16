@@ -1,5 +1,8 @@
 # spark-redshift Changelog
 
+## 4.0.0-SNAPSHOT
+- SNAPSHOT version to test publishing to Maven Central.
+
 ## 4.0.0-preview20190730 (2019-07-30)
 
 - The library is tested in production using spark2.4

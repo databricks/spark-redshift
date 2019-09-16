@@ -39,7 +39,7 @@ lazy val root = Project("spark-redshift", file("."))
   .settings(Defaults.itSettings: _*)
   .settings(
     name := "spark-redshift",
-    organization := "io.github.spark_redshift_community",
+    organization := "io.github.spark-redshift-community",
     scalaVersion := "2.11.12",
     sparkVersion := "2.4.3",
     testSparkVersion := sys.props.get("spark.testVersion").getOrElse(sparkVersion.value),
@@ -57,7 +57,7 @@ lazy val root = Project("spark-redshift", file("."))
     sparkComponents ++= Seq("sql", "hive"),
     spIgnoreProvided := true,
     licenses += "Apache-2.0" -> url("http://opensource.org/licenses/Apache-2.0"),
-    credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"),
+    credentials += Credentials(Path.userHome / ".sbt" / ".credentials"),
     scalacOptions ++= Seq("-target:jvm-1.8"),
     javacOptions ++= Seq("-source", "1.8", "-target", "1.8"),
     libraryDependencies ++= Seq(
@@ -101,34 +101,47 @@ lazy val root = Project("spark-redshift", file("."))
      * Release settings *
      ********************/
 
+    publishTo := {
+      val nexus = "https://oss.sonatype.org/"
+      if (isSnapshot.value)
+        Some("snapshots" at nexus + "content/repositories/snapshots")
+      else
+        Some("releases"  at nexus + "service/local/staging/deploy/maven2")
+    },
+
     publishMavenStyle := true,
     releaseCrossBuild := true,
     licenses += ("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0")),
     releasePublishArtifactsAction := PgpKeys.publishSigned.value,
 
     pomExtra :=
-      <url>https://github.com:spark_redshift_community/spark.redshift</url>
-      <scm>
-        <url>git@github.com:spark_redshift_community/spark.redshift.git</url>
-        <connection>scm:git:git@github.com:spark_redshift_community/spark.redshift.git</connection>
-      </scm>
-      <developers>
-        <developer>
-          <id>meng</id>
-          <name>Xiangrui Meng</name>
-          <url>https://github.com/mengxr</url>
-        </developer>
-        <developer>
-          <id>JoshRosen</id>
-          <name>Josh Rosen</name>
-          <url>https://github.com/JoshRosen</url>
-        </developer>
-        <developer>
-          <id>marmbrus</id>
-          <name>Michael Armbrust</name>
-          <url>https://github.com/marmbrus</url>
-        </developer>
-      </developers>,
+    <url>https://github.com:spark_redshift_community/spark.redshift</url>
+    <scm>
+      <url>git@github.com:spark_redshift_community/spark.redshift.git</url>
+      <connection>scm:git:git@github.com:spark_redshift_community/spark.redshift.git</connection>
+    </scm>
+    <developers>
+      <developer>
+        <id>meng</id>
+        <name>Xiangrui Meng</name>
+        <url>https://github.com/mengxr</url>
+      </developer>
+      <developer>
+        <id>JoshRosen</id>
+        <name>Josh Rosen</name>
+        <url>https://github.com/JoshRosen</url>
+      </developer>
+      <developer>
+        <id>marmbrus</id>
+        <name>Michael Armbrust</name>
+        <url>https://github.com/marmbrus</url>
+      </developer>
+      <developer>
+        <id>lucagiovagnoli</id>
+        <name>Luca Giovagnoli</name>
+        <url>https://github.com/lucagiovagnoli</url>
+      </developer>
+    </developers>,
 
     bintrayReleaseOnPublish in ThisBuild := false,
 
