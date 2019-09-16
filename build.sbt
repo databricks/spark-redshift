@@ -114,34 +114,34 @@ lazy val root = Project("spark-redshift", file("."))
     licenses += ("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0")),
     releasePublishArtifactsAction := PgpKeys.publishSigned.value,
 
-      pomExtra :=
-      <url>https://github.com:spark_redshift_community/spark.redshift</url>
-      <scm>
-        <url>git@github.com:spark_redshift_community/spark.redshift.git</url>
-        <connection>scm:git:git@github.com:spark_redshift_community/spark.redshift.git</connection>
-      </scm>
-      <developers>
-        <developer>
-          <id>meng</id>
-          <name>Xiangrui Meng</name>
-          <url>https://github.com/mengxr</url>
-        </developer>
-        <developer>
-          <id>JoshRosen</id>
-          <name>Josh Rosen</name>
-          <url>https://github.com/JoshRosen</url>
-        </developer>
-        <developer>
-          <id>marmbrus</id>
-          <name>Michael Armbrust</name>
-          <url>https://github.com/marmbrus</url>
-        </developer>
-        <developer>
-          <id>lucagiovagnoli</id>
-          <name>Luca Giovagnoli</name>
-          <url>https://github.com/lucagiovagnoli</url>
-        </developer>
-      </developers>,
+    pomExtra :=
+    <url>https://github.com:spark_redshift_community/spark.redshift</url>
+    <scm>
+      <url>git@github.com:spark_redshift_community/spark.redshift.git</url>
+      <connection>scm:git:git@github.com:spark_redshift_community/spark.redshift.git</connection>
+    </scm>
+    <developers>
+      <developer>
+        <id>meng</id>
+        <name>Xiangrui Meng</name>
+        <url>https://github.com/mengxr</url>
+      </developer>
+      <developer>
+        <id>JoshRosen</id>
+        <name>Josh Rosen</name>
+        <url>https://github.com/JoshRosen</url>
+      </developer>
+      <developer>
+        <id>marmbrus</id>
+        <name>Michael Armbrust</name>
+        <url>https://github.com/marmbrus</url>
+      </developer>
+      <developer>
+        <id>lucagiovagnoli</id>
+        <name>Luca Giovagnoli</name>
+        <url>https://github.com/lucagiovagnoli</url>
+      </developer>
+    </developers>,
 
     bintrayReleaseOnPublish in ThisBuild := false,
 
