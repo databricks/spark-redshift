@@ -19,6 +19,14 @@ Our intent is to do the best job possible supporting the minimal set of features
 
 This is currently not tested on EMR. Some tests have been temporarily disabled and some features removed.
 
+## How to help
+
+Community's contributions are very welcome! Feel free to:
+
+- Open an issue on github
+- Open a PR on github. Make sure tests pass.
+- Contact the developers in the 'developers' section in the build.sbt file.
+
 # Original DataBricks Readme
 
 ## Note
