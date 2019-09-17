@@ -1,5 +1,18 @@
 # spark-redshift Changelog
 
+## 4.0.0
+
+This major release makes spark-redshift compatible with spark 2.4. This was tested in production.
+
+While upgrading the package we droped some features due to time constraints.
+
+- Support for hadoop 1.x has been dropped.
+- STS and IAM authentication support has been dropped.
+- postgresql driver tests are inactive.
+- SaveMode tests (or functionality?) are broken. This is a bit scary but I'm not sure we use the functionality
+ and fixing them didn't make it in this version (spark-snowflake removed them too).
+- S3Native has been deprecated. We created an InMemoryS3AFileSystem to test S3A.
+
 ## 4.0.0-SNAPSHOT
 - SNAPSHOT version to test publishing to Maven Central.
 
