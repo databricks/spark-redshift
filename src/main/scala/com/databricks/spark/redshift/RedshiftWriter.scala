@@ -282,7 +282,7 @@ private[redshift] class RedshiftWriter(
     val writer = sqlContext.createDataFrame(convertedRows, convertedSchema).write
     (tempFormat match {
       case "AVRO" =>
-        writer.format("com.databricks.spark.avro")
+        writer.format("avro")
       case "CSV" =>
         writer.format("csv")
           .option("escape", "\"")
