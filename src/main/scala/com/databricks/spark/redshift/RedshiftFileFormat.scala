@@ -36,7 +36,7 @@ import org.apache.spark.sql.types.StructType
  * This is not intended for public consumption / use outside of this package and therefore
  * no API stability is guaranteed.
  */
-private[redshift] class RedshiftFileFormat extends FileFormat {
+class RedshiftFileFormat extends FileFormat {
   override def inferSchema(
       sparkSession: SparkSession,
       options: Map[String, String],
