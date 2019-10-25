@@ -182,7 +182,9 @@ private[redshift] class JDBCWrapper {
         fields(i) = StructField(columnName, columnType, nullable)
         i = i + 1
       }
-      new StructType(fields)
+      val schema = new StructType(fields)
+      log.info("Redshift gave us the following schema: ", schema)
+      schema
     } finally {
       ps.close()
     }
