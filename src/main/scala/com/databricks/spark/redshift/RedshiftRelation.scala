@@ -22,16 +22,15 @@ import java.net.URI
 import org.apache.spark.sql.catalyst.encoders.RowEncoder
 
 import scala.collection.JavaConverters._
-
 import com.amazonaws.auth.AWSCredentialsProvider
 import com.amazonaws.services.s3.AmazonS3Client
+import com.amazonaws.services.s3.model.AmazonS3Exception
 import com.eclipsesource.json.Json
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{DataFrame, Row, SaveMode, SQLContext}
+import org.apache.spark.sql.{DataFrame, Row, SQLContext, SaveMode}
 import org.slf4j.LoggerFactory
-
 import com.databricks.spark.redshift.Parameters.MergedParameters
 
 /**
@@ -145,13 +144,18 @@ private[redshift] case class RedshiftRelation(
           Utils.fixS3Url(Utils.removeCredentialsFromURI(URI.create(tempDir)).toString)
         val s3URI = Utils.createS3URI(cleanedTempDirUri)
         val s3Client = s3ClientFactory(creds)
-        val is = s3Client.getObject(s3URI.getBucket, s3URI.getKey + "manifest").getObjectContent
         val s3Files = try {
-          val entries = Json.parse(new InputStreamReader(is)).asObject().get("entries").asArray()
-          entries.iterator().asScala.map(_.asObject().get("url").asString()).toSeq
-        } finally {
-          is.close()
+          val is = s3Client.getObject(s3URI.getBucket, s3URI.getKey + "manifest").getObjectContent
+          try {
+            val entries = Json.parse(new InputStreamReader(is)).asObject().get("entries").asArray()
+            entries.iterator().asScala.map(_.asObject().get("url").asString()).toSeq
+          } finally {
+            is.close()
+          }
+        } catch {
+          case _: AmazonS3Exception => Seq()
         }
+
         // The filenames in the manifest are of the form s3://bucket/key, without credentials.
         // If the S3 credentials were originally specified in the tempdir's URI, then we need to
         // reintroduce them here
