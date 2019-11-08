@@ -1,11 +1,11 @@
-# Performant Redshift Data Source for Apache Spark - Community edition
+# Performant Redshift Data Source for Apache Spark - Community Edition
 
 [![Build Status](https://travis-ci.org/spark-redshift-community/spark-redshift.svg?branch=master)](https://travis-ci.com/spark-redshift-community/spark-redshift)
 [![codecov.io](http://codecov.io/github/spark-redshift-community/spark-redshift/coverage.svg?branch=master)](http://codecov.io/github/spark-redshift-community/spark-redshift?branch=master)
 
 Welcome to the community edition of spark-redshift! 
  The community's feedback and contributions are vitally important. 
- Pull requests are very welcome.  
+ Pull requests are very welcome.
 
 This is a fork from Databricks's spark-redshift repository. 
 The main upgrade is spark 2.4 compatibility.
@@ -36,9 +36,14 @@ JDBC is used to automatically trigger the appropriate `COPY` and `UNLOAD` comman
 This library is more suited to ETL than interactive queries, since large amounts of data could be extracted to S3 for each query execution. If you plan to perform many queries against the same Redshift tables then we recommend saving the extracted data in a format such as Parquet.
 
 - [Installation](#installation)
+  - [Release builds](#release-builds)
   - [Snapshot builds](#snapshot-builds)
-- Usage:
-  - Data sources API: [Scala](#scala), [Python](#python), [SQL](#sql), [R](#r)
+- [Usage](#usage)
+  - [Data Sources API](#data-sources-api)
+    - [Scala](#scala)
+    - [Python](#python)
+    - [SQL](#sql)
+    - [R](#r)
   - [Hadoop InputFormat](#hadoop-inputformat)
 - [Configuration](#configuration)
   - [Authenticating to S3 and Redshift](#authenticating-to-s3-and-redshift)
@@ -62,14 +67,25 @@ For version that works with Spark 1.x, please check for the [1.x branch](https:/
 
 Currently, only master-SNAPSHOT is supported.
 
+NOTE: In the examples below, `2.11` is the Scala version. If you are using a different version, be sure to update these values accordingly.
+
 ### Release builds
 You may use this library in your applications with the following dependency information:
 
+- **Without build tool**:
+    ```bash
+    spark-submit \
+      --deploy-mode cluster \
+      --master yarn \
+      --jars https://s3.amazonaws.com/redshift-downloads/drivers/jdbc/1.2.36.1060/RedshiftJDBC42-no-awssdk-1.2.36.1060.jar\
+      --packages org.apache.spark:spark-avro_2.11:2.4.2,io.github.spark-redshift-community:spark-redshift_2.11:4.0.0 \
+      my_script.py
+    ```
+
+
 - **In Maven**:
 
-    **Scala 2.11**
     ```XML
-    <!-- https://mvnrepository.com/artifact/io.github.spark-redshift-community/spark-redshift -->
     <dependency>
         <groupId>io.github.spark-redshift-community</groupId>
         <artifactId>spark-redshift_2.11</artifactId>
@@ -79,11 +95,8 @@ You may use this library in your applications with the following dependency info
 
 - **In SBT**:
 
-    **Scala 2.11**
-
-    ``` SBT
-    // https://mvnrepository.com/artifact/io.github.spark-redshift-community/spark-redshift
-    libraryDependencies += "io.github.spark-redshift-community" %% "spark-redshift" % "4.0.0"
+    ```SBT
+    libraryDependencies += "io.github.spark-redshift-community" %% "spark-redshift_2.11" % "4.0.0"
     ```
 
 ### Snapshot builds
@@ -91,8 +104,19 @@ You may use this library in your applications with the following dependency info
 Master snapshot builds of this library are built using [jitpack.io](https://jitpack.io/). In order
 to use these snapshots in your build, you'll need to add the JitPack repository to your build file.
 
+- **Without build tool**:
+    ```bash
+    spark-submit \
+      --deploy-mode cluster \
+      --master yarn \
+      --jars https://s3.amazonaws.com/redshift-downloads/drivers/jdbc/1.2.36.1060/RedshiftJDBC42-no-awssdk-1.2.36.1060.jar \
+      --repositories https://jitpack.io \
+      --packages org.apache.spark:spark-avro_2.11:2.4.2,io.github.spark-redshift-community:spark-redshift:master-SNAPSHOT \
+      my_script.py
+    ```
+
 - **In Maven**:
-   ```
+   ```XML
    <repositories>
       <repository>
         <id>jitpack.io</id>
@@ -103,33 +127,24 @@ to use these snapshots in your build, you'll need to add the JitPack repository 
 
    then
 
-   ```
+   ```XML
    <dependency>
      <groupId>io.github.spark-redshift-community</groupId>
-     <artifactId>spark-redshift_2.10</artifactId>  <!-- For Scala 2.11, use spark-redshift_2.11 instead -->
-     <version>4.0.0-SNAPSHOT</version>
+     <artifactId>spark-redshift</artifactId>
+     <version>master-SNAPSHOT</version>
    </dependency>
    ```
 
 - **In SBT**:
-   ```
+   ```SBT
    resolvers += "jitpack" at "https://jitpack.io"
    ```
 
    then
 
+   ```SBT
+   libraryDependencies += "io.github.spark-redshift-community" %% "spark-redshift" % "master-SNAPSHOT"
    ```
-   libraryDependencies += "io.github.spark-redshift-community" %% "spark-redshift" % "4.0.0-SNAPSHOT"
-   ```
-
-- In Databricks: use the "Advanced Options" toggle in the "Create Library" screen to specify
-  a custom Maven repository:
-
-  ![](https://cloud.githubusercontent.com/assets/50748/20371277/6c34a8d2-ac18-11e6-879f-d07320d56fa4.png)
-
-  Use `https://jitpack.io` as the repository.
-
-  - For Scala 2.11: use the coordinate `io.github.spark-redshift-community:spark-redshift_2.11:master-SNAPSHOT`
 
 You will also need to provide a JDBC driver that is compatible with Redshift. Amazon recommend that you use [their driver](http://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-connection.html), which is distributed as a JAR that is hosted on Amazon's website. This library has also been successfully tested using the Postgres JDBC driver.
 
