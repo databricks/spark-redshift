@@ -38,7 +38,7 @@ private[redshift] object Conversions {
     * it is immutable and is thread-safe."
     */
   private val formatter = DateTimeFormatter.ofPattern(
-    "yyyy-MM-dd HH:mm:ss[.SSSSSS][.SSS][.SS][.S][X]")
+    "yyyy-MM-dd HH:mm:ss[.SSSSSS][.SSSSS][.SSSS][.SSS][.SS][.S][X]")
 
   /**
    * Parse a boolean using Redshift's UNLOAD bool syntax

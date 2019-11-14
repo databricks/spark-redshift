@@ -96,6 +96,10 @@ class ConversionsSuite extends FunSuite {
     Seq(
       "2014-03-01 00:00:01.123456" ->
         TestUtils.toNanosTimestamp(2014, 2, 1, 0, 0, 1, nanos = 123456000),
+      "2014-03-01 00:00:01.12345" ->
+        TestUtils.toNanosTimestamp(2014, 2, 1, 0, 0, 1, nanos = 123450000),
+      "2014-03-01 00:00:01.1234" ->
+        TestUtils.toNanosTimestamp(2014, 2, 1, 0, 0, 1, nanos = 123400000),
       "2014-03-01 00:00:01" ->
         TestUtils.toTimestamp(2014, 2, 1, 0, 0, 0, millis = 1000),
       "2014-03-01 00:00:01.000" ->
