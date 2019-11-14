@@ -94,6 +94,29 @@ object TestUtils {
     calendar.getTime.getTime
   }
 
+  def toNanosTimestamp(
+    year: Int,
+    zeroBasedMonth: Int,
+    date: Int,
+    hour: Int,
+    minutes: Int,
+    seconds: Int,
+    nanos: Int
+                               ): Timestamp = {
+    val ts = new Timestamp(
+      toMillis(
+        year,
+        zeroBasedMonth,
+        date,
+        hour,
+        minutes,
+        seconds
+      )
+    )
+    ts.setNanos(nanos)
+    ts
+  }
+
   /**
    * Convert date components to a SQL Timestamp
    */
