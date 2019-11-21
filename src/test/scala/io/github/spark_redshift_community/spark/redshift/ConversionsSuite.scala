@@ -94,19 +94,33 @@ class ConversionsSuite extends FunSuite {
     val schema = StructType(Seq(StructField("a", TimestampType)))
     val convertRow = createRowConverter(schema)
     Seq(
-      "2014-03-01 00:00:01" -> TestUtils.toMillis(2014, 2, 1, 0, 0, 0, millis = 1000),
-      "2014-03-01 00:00:01.000" -> TestUtils.toMillis(2014, 2, 1, 0, 0, 0, millis = 1000),
-      "2014-03-01 00:00:00.1" -> TestUtils.toMillis(2014, 2, 1, 0, 0, 0, millis = 100),
-      "2014-03-01 00:00:00.10" -> TestUtils.toMillis(2014, 2, 1, 0, 0, 0, millis = 100),
-      "2014-03-01 00:00:00.100" -> TestUtils.toMillis(2014, 2, 1, 0, 0, 0, millis = 100),
-      "2014-03-01 00:00:00.01" -> TestUtils.toMillis(2014, 2, 1, 0, 0, 0, millis = 10),
-      "2014-03-01 00:00:00.010" -> TestUtils.toMillis(2014, 2, 1, 0, 0, 0, millis = 10),
-      "2014-03-01 00:00:00.001" -> TestUtils.toMillis(2014, 2, 1, 0, 0, 0, millis = 1)
+      "2014-03-01 00:00:01.123456" ->
+        TestUtils.toNanosTimestamp(2014, 2, 1, 0, 0, 1, nanos = 123456000),
+      "2014-03-01 00:00:01.12345" ->
+        TestUtils.toNanosTimestamp(2014, 2, 1, 0, 0, 1, nanos = 123450000),
+      "2014-03-01 00:00:01.1234" ->
+        TestUtils.toNanosTimestamp(2014, 2, 1, 0, 0, 1, nanos = 123400000),
+      "2014-03-01 00:00:01" ->
+        TestUtils.toTimestamp(2014, 2, 1, 0, 0, 0, millis = 1000),
+      "2014-03-01 00:00:01.000" ->
+        TestUtils.toTimestamp(2014, 2, 1, 0, 0, 0, millis = 1000),
+      "2014-03-01 00:00:00.1" ->
+        TestUtils.toTimestamp(2014, 2, 1, 0, 0, 0, millis = 100),
+      "2014-03-01 00:00:00.10" ->
+        TestUtils.toTimestamp(2014, 2, 1, 0, 0, 0, millis = 100),
+      "2014-03-01 00:00:00.100" ->
+        TestUtils.toTimestamp(2014, 2, 1, 0, 0, 0, millis = 100),
+      "2014-03-01 00:00:00.01" ->
+        TestUtils.toTimestamp(2014, 2, 1, 0, 0, 0, millis = 10),
+      "2014-03-01 00:00:00.010" ->
+        TestUtils.toTimestamp(2014, 2, 1, 0, 0, 0, millis = 10),
+      "2014-03-01 00:00:00.001" ->
+        TestUtils.toTimestamp(2014, 2, 1, 0, 0, 0, millis = 1)
     ).foreach { case (timestampString, expectedTime) =>
       withClue(s"timestamp string is '$timestampString'") {
         val convertedRow = convertRow(Array(timestampString))
         val convertedTimestamp = convertedRow.get(0).asInstanceOf[Timestamp]
-        assert(convertedTimestamp === new Timestamp(expectedTime))
+        assert(convertedTimestamp === expectedTime)
       }
     }
   }

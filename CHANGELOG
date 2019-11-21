@@ -1,5 +1,9 @@
 # spark-redshift Changelog
 
+## 4.0.1
+
+- Fix bug when parsing microseconds from Redshift
+
 ## 4.0.0
 
 This major release makes spark-redshift compatible with spark 2.4. This was tested in production.
