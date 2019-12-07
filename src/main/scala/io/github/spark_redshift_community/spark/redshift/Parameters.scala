@@ -248,14 +248,14 @@ private[redshift] object Parameters {
     def preActions: Array[String] = parameters("preactions").trim.split(";")
 
     /**
-     * List of semi-colon separated SQL statements to run after successful write operations.
-     * This can be useful for running GRANT operations to make your new tables readable to other
-     * users and groups.
-     *
-     * If the action string contains %s, the table name will be substituted in, in case a staging
-     * table is being used.
-     *
-     * Defaults to empty.
+      * List of semi-colon separated SQL statements to run after successful write operations.
+      * This can be useful for running GRANT operations to make your new tables readable to other
+      * users and groups.
+      *
+      * If the action string contains %s, the table name will be substituted in, in case a staging
+      * table is being used.
+      *
+      * Defaults to empty.
      */
     def postActions: Array[String] = parameters("postactions").trim.split(";")
 
