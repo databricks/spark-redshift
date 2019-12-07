@@ -155,16 +155,16 @@ class ParametersSuite extends FunSuite with Matchers {
       "tempdir" -> "s3://foo/bar",
       "dbtable" -> "test_schema.test_table",
       "url" -> "jdbc:redshift://foo/bar?user=user&password=password",
-      "preactions" -> "update table1 set col1 = val1; update table1 set col2 = val2;  ",
-      "postactions" -> "update table2 set col1 = val1;  update table2 set col2 = val2;  "
+      "preactions" -> "update table1 set col1 = val1;update table1 set col2 = val2;  ",
+      "postactions" -> "update table2 set col1 = val1;update table2 set col2 = val2;  "
     ))
 
     assert(params.preActions.length == 2)
     assert(params.preActions.head == "update table1 set col1 = val1")
-    assert(params.preActions.head == "update table1 set col2 = val2")
+    assert(params.preActions.last == "update table1 set col2 = val2")
     assert(params.postActions.length == 2)
     assert(params.postActions.head == "update table2 set col1 = val1")
-    assert(params.postActions.head == "update table2 set col2 = val2")
+    assert(params.postActions.last == "update table2 set col2 = val2")
   }
 
 }
