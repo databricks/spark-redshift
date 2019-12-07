@@ -229,7 +229,7 @@ private[redshift] object Parameters {
     /**
      * Extra options to append to the Redshift COPY command (e.g. "MAXERROR 100").
      */
-    def extraCopyOptions: String = parameters.get("extracopyoptions").getOrElse("")
+    def extraCopyOptions: String = parameters.getOrElse("extracopyoptions", "")
 
     /**
       * Description of the table, set using the SQL COMMENT command.

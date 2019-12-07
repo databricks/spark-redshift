@@ -19,8 +19,8 @@ package io.github.spark_redshift_community.spark.redshift
 import org.scalatest.{FunSuite, Matchers}
 
 /**
- * Check validation of parameter config
- */
+  * Check validation of parameter config
+  */
 class ParametersSuite extends FunSuite with Matchers {
 
   test("Minimal valid parameter map is accepted") {
@@ -32,8 +32,8 @@ class ParametersSuite extends FunSuite with Matchers {
 
     val mergedParams = Parameters.mergeParameters(params)
 
-    mergedParams.rootTempDir should startWith (params("tempdir"))
-    mergedParams.createPerQueryTempDir() should startWith (params("tempdir"))
+    mergedParams.rootTempDir should startWith(params("tempdir"))
+    mergedParams.createPerQueryTempDir() should startWith(params("tempdir"))
     mergedParams.jdbcUrl shouldBe params("url")
     mergedParams.table shouldBe Some(TableName("test_schema", "test_table"))
     assert(mergedParams.forwardSparkS3Credentials)
@@ -63,6 +63,7 @@ class ParametersSuite extends FunSuite with Matchers {
       }
       assert(e.getMessage.contains(err))
     }
+
     val testURL = "jdbc:redshift://foo/bar?user=user&password=password"
     checkMerge(Map("dbtable" -> "test_table", "url" -> testURL), "tempdir")
     checkMerge(Map("tempdir" -> "s3://foo/bar", "url" -> testURL), "Redshift table name")
@@ -77,7 +78,7 @@ class ParametersSuite extends FunSuite with Matchers {
         "forward_spark_s3_credentials" -> "true",
         "tempdir" -> "s3://foo/bar",
         "url" -> "jdbc:redshift://foo/bar?user=user&password=password"))
-    }.getMessage should (include ("dbtable") and include ("query"))
+    }.getMessage should (include("dbtable") and include("query"))
 
     intercept[IllegalArgumentException] {
       Parameters.mergeParameters(Map(
@@ -86,7 +87,7 @@ class ParametersSuite extends FunSuite with Matchers {
         "dbtable" -> "test_table",
         "query" -> "select * from test_table",
         "url" -> "jdbc:redshift://foo/bar?user=user&password=password"))
-    }.getMessage should (include ("dbtable") and include ("query") and include("both"))
+    }.getMessage should (include("dbtable") and include("query") and include("both"))
 
     Parameters.mergeParameters(Map(
       "forward_spark_s3_credentials" -> "true",
@@ -102,7 +103,7 @@ class ParametersSuite extends FunSuite with Matchers {
         "tempdir" -> "s3://foo/bar",
         "query" -> "select * from test_table",
         "url" -> "jdbc:redshift://foo/bar"))
-    }.getMessage should (include ("credentials"))
+    }.getMessage should (include("credentials"))
 
     intercept[IllegalArgumentException] {
       Parameters.mergeParameters(Map(
@@ -112,7 +113,7 @@ class ParametersSuite extends FunSuite with Matchers {
         "user" -> "user",
         "password" -> "password",
         "url" -> "jdbc:redshift://foo/bar?user=user&password=password"))
-    }.getMessage should (include ("credentials") and include("both"))
+    }.getMessage should (include("credentials") and include("both"))
 
     Parameters.mergeParameters(Map(
       "forward_spark_s3_credentials" -> "true",
@@ -147,4 +148,23 @@ class ParametersSuite extends FunSuite with Matchers {
     }
     assert(e.getMessage.contains("mutually-exclusive"))
   }
+
+  test("preaction and postactions should be trimmed before splitting by semicolon") {
+    val params = Parameters.mergeParameters(Map(
+      "forward_spark_s3_credentials" -> "true",
+      "tempdir" -> "s3://foo/bar",
+      "dbtable" -> "test_schema.test_table",
+      "url" -> "jdbc:redshift://foo/bar?user=user&password=password",
+      "preactions" -> "update table1 set col1 = val1; update table1 set col2 = val2;  ",
+      "postactions" -> "update table2 set col1 = val1;  update table2 set col2 = val2;  "
+    ))
+
+    assert(params.preActions.length == 2)
+    assert(params.preActions.head == "update table1 set col1 = val1")
+    assert(params.preActions.head == "update table1 set col2 = val2")
+    assert(params.postActions.length == 2)
+    assert(params.postActions.head == "update table2 set col1 = val1")
+    assert(params.postActions.head == "update table2 set col2 = val2")
+  }
+
 }
