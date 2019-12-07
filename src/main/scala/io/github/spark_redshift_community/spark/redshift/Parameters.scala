@@ -245,7 +245,7 @@ private[redshift] object Parameters {
       *
       * Defaults to empty.
       */
-    def preActions: Array[String] = parameters("preactions").split(";")
+    def preActions: Array[String] = parameters("preactions").trim.split(";")
 
     /**
      * List of semi-colon separated SQL statements to run after successful write operations.
@@ -257,7 +257,7 @@ private[redshift] object Parameters {
      *
      * Defaults to empty.
      */
-    def postActions: Array[String] = parameters("postactions").split(";")
+    def postActions: Array[String] = parameters("postactions").trim.split(";")
 
     /**
       * The IAM role that Redshift should assume for COPY/UNLOAD operations.
