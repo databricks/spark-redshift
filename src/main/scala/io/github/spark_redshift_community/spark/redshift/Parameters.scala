@@ -229,7 +229,7 @@ private[redshift] object Parameters {
     /**
      * Extra options to append to the Redshift COPY command (e.g. "MAXERROR 100").
      */
-    def extraCopyOptions: String = parameters.get("extracopyoptions").getOrElse("")
+    def extraCopyOptions: String = parameters.getOrElse("extracopyoptions", "")
 
     /**
       * Description of the table, set using the SQL COMMENT command.
@@ -245,19 +245,19 @@ private[redshift] object Parameters {
       *
       * Defaults to empty.
       */
-    def preActions: Array[String] = parameters("preactions").split(";")
+    def preActions: Array[String] = parameters("preactions").trim.split(";")
 
     /**
-     * List of semi-colon separated SQL statements to run after successful write operations.
-     * This can be useful for running GRANT operations to make your new tables readable to other
-     * users and groups.
-     *
-     * If the action string contains %s, the table name will be substituted in, in case a staging
-     * table is being used.
-     *
-     * Defaults to empty.
+      * List of semi-colon separated SQL statements to run after successful write operations.
+      * This can be useful for running GRANT operations to make your new tables readable to other
+      * users and groups.
+      *
+      * If the action string contains %s, the table name will be substituted in, in case a staging
+      * table is being used.
+      *
+      * Defaults to empty.
      */
-    def postActions: Array[String] = parameters("postactions").split(";")
+    def postActions: Array[String] = parameters("postactions").trim.split(";")
 
     /**
       * The IAM role that Redshift should assume for COPY/UNLOAD operations.
