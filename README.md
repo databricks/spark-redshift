@@ -565,7 +565,7 @@ need to be configured to allow access from your driver application.
     <td><tt>tempdir</tt></td>
     <td>Yes</td>
     <td>No default</td>
-    <td>A writeable location in Amazon S3, to be used for unloaded data when reading and Avro data to be loaded into
+    <td>A writable location in Amazon S3, to be used for unloaded data when reading and Avro data to be loaded into
 Redshift when writing. If you're using Redshift data source for Spark as part of a regular ETL pipeline, it can be useful to
 set a <a href="http://docs.aws.amazon.com/AmazonS3/latest/dev/object-lifecycle-mgmt.html">Lifecycle Policy</a> on a bucket
 and use that as a temp location for this data.
@@ -636,7 +636,7 @@ See also the <tt>description</tt> metadata to set descriptions on individual col
 It may be useful to have some <tt>DELETE</tt> commands or similar run here before loading new data. If the command contains
 <tt>%s</tt>, the table name will be formatted in before execution (in case you're using a staging table).</p>
 
-<p>Be warned that if this commands fail, it is treated as an error and you'll get an exception. If using a staging
+<p>Be warned that if this command fails, it is treated as an error and you'll get an exception. If using a staging
 table, the changes will be reverted and the backup table restored if pre actions fail.</p>
     </td>
  </tr>
