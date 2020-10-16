@@ -1,5 +1,9 @@
 # spark-redshift Changelog
 
+## 4.0.3
+
+- Fix typos on README.md
+
 ## 4.0.2
 
 - Trim SQL text for preactions and postactions, to fix empty SQL queries bug.
