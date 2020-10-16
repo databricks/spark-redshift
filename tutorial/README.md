@@ -95,7 +95,7 @@ Let's fetch data from the Redshift `event` table. Add the following lines of cod
 ```scala
 import sqlContext.implicits._
 val eventsDF = sqlContext.read
-	.format("com.databricks.spark.redshift")
+	.format("io.github.spark_redshift_community.spark.redshift")
 	.option("url",jdbcURL )
 	.option("tempdir", tempS3Dir)
 	.option("dbtable", "event")
@@ -104,9 +104,9 @@ eventsDF.show()
 ```
 
 
-The `.format("com.databricks.spark.redshift")` line tells the Data Sources API that we are using the `spark-redshift` package. It uses this information to load the proper `DefaultSource` class from the specified package. This class contains the entry points for the data source implementation.
+The `.format("io.github.spark_redshift_community.spark.redshift")` line tells the Data Sources API that we are using the `spark-redshift` package. It uses this information to load the proper `DefaultSource` class from the specified package. This class contains the entry points for the data source implementation.
 
-Next we provide the parameters necessary to read the `event` table from Redshift. We provide the JDBC URL, the temporary S3 folder where the table data will be copied to, and the name of the table we want to read. A comprehensive list of parameters is listed on the `spark-redshift` [README](https://github.com/databricks/spark-redshift).
+Next we provide the parameters necessary to read the `event` table from Redshift. We provide the JDBC URL, the temporary S3 folder where the table data will be copied to, and the name of the table we want to read. A comprehensive list of parameters is listed on the `spark-redshift` [README](https://github.com/spark-redshift-community/spark-redshift).
 
 Executing the above lines will produce the following output:
 
@@ -161,7 +161,7 @@ While the above examples used Scala, we could have also used SQL as follows:
 
 ```sql
 CREATE TEMPORARY TABLE myevent
-USING com.databricks.spark.redshift
+USING io.github.spark_redshift_community.spark.redshift
 OPTIONS (
   dbtable 'event',
   tempdir 's3n://redshift-spark/temp/',
@@ -184,7 +184,7 @@ val salesQuery = """
     FROM sales 
     ORDER BY saletime DESC LIMIT 10000"""
 val salesDF = sqlContext.read
-    .format("com.databricks.spark.redshift")
+    .format("io.github.spark_redshift_community.spark.redshift")
     .option("url", jdbcURL) 
     .option("tempdir", tempS3Dir) 
     .option("query", salesQuery)
@@ -244,7 +244,7 @@ The diagram below shows how the files unloaded in S3 are consumed to form a `Dat
 
 ![](images/loadreadstep.png)
 
-Once the files are written to S3, a custom InputFormat (`com.databricks.spark.redshift.RedshiftInputFormat`) is used to consume the files in parallel. This class is similar to Hadoop's standard `TextInputFormat` class, where the key is the byte offset of the start of each line in the file. The value class, however, is of type `Array[String]` (unlike, `TextInputFormat`, whose type is `Text`). The values are created by splitting the lines using the default delimiter (`|`). The `RedshiftInputFormat` processes the S3 files line-by-line to produce an `RDD`. The schema obtained earlier is then applied on this `RDD` to convert the strings to the proper data types and to generate a `DataFrame`.
+Once the files are written to S3, a custom InputFormat (`io.github.spark_redshift_community.spark.redshift.RedshiftInputFormat`) is used to consume the files in parallel. This class is similar to Hadoop's standard `TextInputFormat` class, where the key is the byte offset of the start of each line in the file. The value class, however, is of type `Array[String]` (unlike, `TextInputFormat`, whose type is `Text`). The values are created by splitting the lines using the default delimiter (`|`). The `RedshiftInputFormat` processes the S3 files line-by-line to produce an `RDD`. The schema obtained earlier is then applied on this `RDD` to convert the strings to the proper data types and to generate a `DataFrame`.
 
 ### Save Function - Writing to a Redshift table ###
 
@@ -263,7 +263,7 @@ s write the contents of this `myevent` temporary table to a Redshift table named
 // Create a new table, `redshiftevent`, after dropping any existing redshiftevent table,
 // then write event records with event id less than 1000
 sqlContext.sql("SELECT * FROM myevent WHERE eventid <= 1000").withColumnRenamed("eventid", "id")
-    .write.format("com.databricks.spark.redshift")
+    .write.format("io.github.spark_redshift_community.spark.redshift")
     .option("url", jdbcURL)
     .option("tempdir", tempS3Dir)
     .option("dbtable", "redshiftevent")
@@ -273,7 +273,7 @@ sqlContext.sql("SELECT * FROM myevent WHERE eventid <= 1000").withColumnRenamed(
 // Append to an existing table redshiftevent if it exists or create a new one if it does 
 // not exist, then write event records with event id greater than 1000
 sqlContext.sql("SELECT * FROM myevent WHERE eventid > 1000").withColumnRenamed("eventid", "id")
-    .write.format("com.databricks.spark.redshift")
+    .write.format("io.github.spark_redshift_community.spark.redshift")
     .option("url", jdbcURL)
     .option("tempdir", tempS3Dir)
     .option("dbtable", "redshiftevent")
@@ -292,7 +292,7 @@ We could have achieved similar results using SQL. The only thing to be aware of 
 
 ```sql
 CREATE TABLE redshiftevent
-USING com.databricks.spark.redshift
+USING io.github.spark_redshift_community.spark.redshift
 OPTIONS (
   dbtable 'redshiftevent',
   tempdir 's3n://redshift-spark/temp/',
@@ -301,11 +301,11 @@ OPTIONS (
 AS SELECT * FROM myevent;
 ```
 
-By default, the save operation uses the `EVEN` [key distribution style](http://docs.aws.amazon.com/redshift/latest/dg/c_choosing_dist_sort.html) in Redshift. This can be changed by using the optional parameters `diststyle` and `distkey`. See the full [spark-redshift documentation](https://github.com/databricks/spark-redshift) for details.
+By default, the save operation uses the `EVEN` [key distribution style](http://docs.aws.amazon.com/redshift/latest/dg/c_choosing_dist_sort.html) in Redshift. This can be changed by using the optional parameters `diststyle` and `distkey`. See the full [spark-redshift documentation](https://github.com/spark-redshift-community/spark-redshift) for details.
 
 ### Under the hood - Save Function ###
 
-`spark-redshift`'s save functionality is implemented in the class, `com.databricks.spark.redshift.RedshiftWriter`. The following diagram shows how the `save` function works:
+`spark-redshift`'s save functionality is implemented in the class, `io.github.spark_redshift_community.spark.redshift.RedshiftWriter`. The following diagram shows how the `save` function works:
 
 ![](images/savetoredshift.png)
 
@@ -331,7 +331,7 @@ val salesAGGQuery = """
     FROM sales
     GROUP BY sales.eventid"""
 val salesAGGDF = sqlContext.read
-    .format("com.databricks.spark.redshift")
+    .format("io.github.spark_redshift_community.spark.redshift")
     .option("url",jdbcURL)
     .option("tempdir", tempS3Dir)
     .option("query", salesAGGQuery)
@@ -351,7 +351,7 @@ The `salesAGGDF2` `DataFrame` is created by joining `eventsDF` and `salesAGGDF2`
 salesAGGDF2.registerTempTable("redshift_sales_agg")
 
 sqlContext.sql("SELECT * FROM redshift_sales_agg")
-	.write.format("com.databricks.spark.redshift")
+	.write.format("io.github.spark_redshift_community.spark.redshift")
 	.option("url", jdbcURL)
 	.option("tempdir", tempS3Dir)
 	.option("dbtable", "redshift_sales_agg")
@@ -362,11 +362,11 @@ sqlContext.sql("SELECT * FROM redshift_sales_agg")
 
 ## Under the hood - Putting it all together ##
 
-As we discussed earlier Spark SQL will search for a class named `DefaultSource` in the data source's package, `com.databricks.spark.redshift`. The `DefaultSource` class implements the `RelationProvider` trait, which provides the default load functionality for the library. The `RelationProvider` trait provides methods which consume the user-provided configuration parameters and return instances of `BaseRelation`, which `spark-redshift` implements using class `com.databricks.spark.redshift.RedshiftRelation`.
+As we discussed earlier Spark SQL will search for a class named `DefaultSource` in the data source's package, `io.github.spark_redshift_community.spark.redshift`. The `DefaultSource` class implements the `RelationProvider` trait, which provides the default load functionality for the library. The `RelationProvider` trait provides methods which consume the user-provided configuration parameters and return instances of `BaseRelation`, which `spark-redshift` implements using class `io.github.spark_redshift_community.spark.redshift.RedshiftRelation`.
 
-The `com.databricks.spark.redshift.RedshiftRelation` class is responsible for providing an `RDD` of `org.apache.spark.sql.Row` which backs the `org.apache.spark.sql.DataFrame` instance. This represents the underlying implementation for the load functionality for the `spark-redshift` package where the schema is inferred from the underlying Redshift table. The load function which supports the a user-defined schema is supported by the trait `org.apache.spark.sql.sources.SchemaRelationProvider` and implemented in the class `RedshiftRelation`.
+The `io.github.spark_redshift_community.spark.redshift.RedshiftRelation` class is responsible for providing an `RDD` of `org.apache.spark.sql.Row` which backs the `org.apache.spark.sql.DataFrame` instance. This represents the underlying implementation for the load functionality for the `spark-redshift` package where the schema is inferred from the underlying Redshift table. The load function which supports the a user-defined schema is supported by the trait `org.apache.spark.sql.sources.SchemaRelationProvider` and implemented in the class `RedshiftRelation`.
 
-The store functionality of the `spark-redshift` package is supported by the trait `org.apache.spark.sql.sources.CreatableRelationProvider` and implemented by the class `com.databricks.spark.redshift.RedshiftWriter`.
+The store functionality of the `spark-redshift` package is supported by the trait `org.apache.spark.sql.sources.CreatableRelationProvider` and implemented by the class `io.github.spark_redshift_community.spark.redshift.RedshiftWriter`.
 
 
 ## Conclusion ###

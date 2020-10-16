@@ -1,14 +1,33 @@
-# Redshift Data Source for Apache Spark
+# Performant Redshift Data Source for Apache Spark - Community Edition
 
-[![Build Status](https://travis-ci.org/databricks/spark-redshift.svg?branch=master)](https://travis-ci.org/databricks/spark-redshift)
-[![codecov.io](http://codecov.io/github/databricks/spark-redshift/coverage.svg?branch=master)](http://codecov.io/github/databricks/spark-redshift?branch=master)
+[![Build Status](https://travis-ci.org/spark-redshift-community/spark-redshift.svg?branch=master)](https://travis-ci.com/spark-redshift-community/spark-redshift)
+[![codecov.io](http://codecov.io/github/spark-redshift-community/spark-redshift/coverage.svg?branch=master)](http://codecov.io/github/spark-redshift-community/spark-redshift?branch=master)
 
-## Note
+Welcome to the community edition of spark-redshift! 
+ The community's feedback and contributions are vitally important. 
+ Pull requests are very welcome.
 
-To ensure the best experience for our customers, we have decided to inline this connector directly in Databricks Runtime. The latest version of Databricks Runtime (3.0+)  includes an advanced version of the RedShift connector for Spark that features both performance improvements (full query pushdown) as well as security improvements (automatic encryption). For more information, refer to the <a href="https://docs.databricks.com/spark/latest/data-sources/aws/amazon-redshift.html">Databricks documentation</a>. As a result, we will no longer be making releases separately from Databricks Runtime.
+This is a fork from Databricks's spark-redshift repository. 
+The main upgrade is spark 2.4 compatibility.
 
 
-## Original Readme
+## Disclaimer
+
+Our intent is to do the best job possible supporting the minimal set of features
+ that the community needs. Other non-essential features may be dropped before the
+ first non-snapshot release. 
+
+This is currently not tested on EMR. Some tests have been temporarily disabled and some features removed.
+
+## How to help
+
+Community's contributions are very welcome! Feel free to:
+
+- Open an issue on github
+- Open a PR on github. Make sure tests pass.
+- Contact the developers in the 'developers' section in the build.sbt file.
+
+## About
 
 A library to load data into Spark SQL DataFrames from Amazon Redshift, and write them back to
 Redshift tables. Amazon S3 is used to efficiently transfer data in and out of Redshift, and
@@ -17,9 +36,14 @@ JDBC is used to automatically trigger the appropriate `COPY` and `UNLOAD` comman
 This library is more suited to ETL than interactive queries, since large amounts of data could be extracted to S3 for each query execution. If you plan to perform many queries against the same Redshift tables then we recommend saving the extracted data in a format such as Parquet.
 
 - [Installation](#installation)
+  - [Release builds](#release-builds)
   - [Snapshot builds](#snapshot-builds)
-- Usage:
-  - Data sources API: [Scala](#scala), [Python](#python), [SQL](#sql), [R](#r)
+- [Usage](#usage)
+  - [Data Sources API](#data-sources-api)
+    - [Scala](#scala)
+    - [Python](#python)
+    - [SQL](#sql)
+    - [R](#r)
   - [Hadoop InputFormat](#hadoop-inputformat)
 - [Configuration](#configuration)
   - [Authenticating to S3 and Redshift](#authenticating-to-s3-and-redshift)
@@ -41,36 +65,58 @@ This library requires Apache Spark 2.0+ and Amazon Redshift 1.0.963+.
 
 For version that works with Spark 1.x, please check for the [1.x branch](https://github.com/databricks/spark-redshift/tree/branch-1.x).
 
+Currently, only master-SNAPSHOT is supported.
+
+NOTE: In the examples below, `2.11` is the Scala version. If you are using a different version, be sure to update these values accordingly.
+
+### Release builds
 You may use this library in your applications with the following dependency information:
 
-**Scala 2.10**
+- **Without build tool**:
+    ```bash
+    spark-submit \
+      --deploy-mode cluster \
+      --master yarn \
+      --jars https://s3.amazonaws.com/redshift-downloads/drivers/jdbc/1.2.36.1060/RedshiftJDBC42-no-awssdk-1.2.36.1060.jar\
+      --packages org.apache.spark:spark-avro_2.11:2.4.2,io.github.spark-redshift-community:spark-redshift_2.11:4.0.0 \
+      my_script.py
+    ```
 
-```
-groupId: com.databricks
-artifactId: spark-redshift_2.10
-version: 3.0.0-preview1
-```
 
-**Scala 2.11**
-```
-groupId: com.databricks
-artifactId: spark-redshift_2.11
-version: 3.0.0-preview1
-```
+- **In Maven**:
 
-You will also need to provide a JDBC driver that is compatible with Redshift. Amazon recommend that you use [their driver](http://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-connection.html), which is distributed as a JAR that is hosted on Amazon's website. This library has also been successfully tested using the Postgres JDBC driver.
+    ```XML
+    <dependency>
+        <groupId>io.github.spark-redshift-community</groupId>
+        <artifactId>spark-redshift_2.11</artifactId>
+        <version>4.0.0</version>
+    </dependency>
+    ```
 
-**Note on Hadoop versions**: This library depends on [`spark-avro`](https://github.com/databricks/spark-avro), which should automatically be downloaded because it is declared as a dependency. However, you may need to provide the corresponding `avro-mapred` dependency which matches your Hadoop distribution. In most deployments, however, this dependency will be automatically provided by your cluster's Spark assemblies and no additional action will be required.
+- **In SBT**:
 
-**Note on Amazon SDK dependency**: This library declares a `provided` dependency on components of the AWS Java SDK. In most cases, these libraries will be provided by your deployment environment. However, if you get ClassNotFoundExceptions for Amazon SDK classes then you will need to add explicit dependencies on `com.amazonaws.aws-java-sdk-core` and `com.amazonaws.aws-java-sdk-s3` as part of your build / runtime configuration. See the comments in `project/SparkRedshiftBuild.scala` for more details.
+    ```SBT
+    libraryDependencies += "io.github.spark-redshift-community" %% "spark-redshift_2.11" % "4.0.0"
+    ```
 
 ### Snapshot builds
 
 Master snapshot builds of this library are built using [jitpack.io](https://jitpack.io/). In order
 to use these snapshots in your build, you'll need to add the JitPack repository to your build file.
 
+- **Without build tool**:
+    ```bash
+    spark-submit \
+      --deploy-mode cluster \
+      --master yarn \
+      --jars https://s3.amazonaws.com/redshift-downloads/drivers/jdbc/1.2.36.1060/RedshiftJDBC42-no-awssdk-1.2.36.1060.jar \
+      --repositories https://jitpack.io \
+      --packages org.apache.spark:spark-avro_2.11:2.4.2,io.github.spark-redshift-community:spark-redshift:master-SNAPSHOT \
+      my_script.py
+    ```
+
 - **In Maven**:
-   ```
+   ```XML
    <repositories>
       <repository>
         <id>jitpack.io</id>
@@ -81,35 +127,30 @@ to use these snapshots in your build, you'll need to add the JitPack repository 
 
    then
 
-   ```
+   ```XML
    <dependency>
-     <groupId>com.github.databricks</groupId>
-     <artifactId>spark-redshift_2.10</artifactId>  <!-- For Scala 2.11, use spark-redshift_2.11 instead -->
+     <groupId>io.github.spark-redshift-community</groupId>
+     <artifactId>spark-redshift</artifactId>
      <version>master-SNAPSHOT</version>
    </dependency>
    ```
 
 - **In SBT**:
-   ```
+   ```SBT
    resolvers += "jitpack" at "https://jitpack.io"
    ```
 
    then
 
+   ```SBT
+   libraryDependencies += "io.github.spark-redshift-community" %% "spark-redshift" % "master-SNAPSHOT"
    ```
-   libraryDependencies += "com.github.databricks" %% "spark-redshift" % "master-SNAPSHOT"
-   ```
 
-- In Databricks: use the "Advanced Options" toggle in the "Create Library" screen to specify
-  a custom Maven repository:
+You will also need to provide a JDBC driver that is compatible with Redshift. Amazon recommend that you use [their driver](http://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-connection.html), which is distributed as a JAR that is hosted on Amazon's website. This library has also been successfully tested using the Postgres JDBC driver.
 
-  ![](https://cloud.githubusercontent.com/assets/50748/20371277/6c34a8d2-ac18-11e6-879f-d07320d56fa4.png)
+**Note on Hadoop versions**: This library depends on [`spark-avro`](https://github.com/databricks/spark-avro), which should automatically be downloaded because it is declared as a dependency. However, you may need to provide the corresponding `avro-mapred` dependency which matches your Hadoop distribution. In most deployments, however, this dependency will be automatically provided by your cluster's Spark assemblies and no additional action will be required.
 
-  Use `https://jitpack.io` as the repository.
-
-  - For Scala 2.10: use the coordinate `com.github.databricks:spark-redshift_2.10:master-SNAPSHOT`
-  - For Scala 2.11: use the coordinate `com.github.databricks:spark-redshift_2.11:master-SNAPSHOT`
-
+**Note on Amazon SDK dependency**: This library declares a `provided` dependency on components of the AWS Java SDK. In most cases, these libraries will be provided by your deployment environment. However, if you get ClassNotFoundExceptions for Amazon SDK classes then you will need to add explicit dependencies on `com.amazonaws.aws-java-sdk-core` and `com.amazonaws.aws-java-sdk-s3` as part of your build / runtime configuration. See the comments in `project/SparkRedshiftBuild.scala` for more details.
 
 ## Usage
 
@@ -127,7 +168,7 @@ val sqlContext = new SQLContext(sc)
 
 // Get some data from a Redshift table
 val df: DataFrame = sqlContext.read
-    .format("com.databricks.spark.redshift")
+    .format("io.github.spark_redshift_community.spark.redshift")
     .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass")
     .option("dbtable", "my_table")
     .option("tempdir", "s3n://path/for/temp/data")
@@ -135,7 +176,7 @@ val df: DataFrame = sqlContext.read
 
 // Can also load data from a Redshift query
 val df: DataFrame = sqlContext.read
-    .format("com.databricks.spark.redshift")
+    .format("io.github.spark_redshift_community.spark.redshift")
     .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass")
     .option("query", "select x, count(*) my_table group by x")
     .option("tempdir", "s3n://path/for/temp/data")
@@ -145,7 +186,7 @@ val df: DataFrame = sqlContext.read
 // Data Source API to write the data back to another table
 
 df.write
-  .format("com.databricks.spark.redshift")
+  .format("io.github.spark_redshift_community.spark.redshift")
   .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass")
   .option("dbtable", "my_table_copy")
   .option("tempdir", "s3n://path/for/temp/data")
@@ -154,7 +195,7 @@ df.write
 
 // Using IAM Role based authentication
 df.write
-  .format("com.databricks.spark.redshift")
+  .format("io.github.spark_redshift_community.spark.redshift")
   .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass")
   .option("dbtable", "my_table_copy")
   .option("aws_iam_role", "arn:aws:iam::123456789000:role/redshift_iam_role")
@@ -173,7 +214,7 @@ sql_context = SQLContext(sc)
 
 # Read data from a table
 df = sql_context.read \
-    .format("com.databricks.spark.redshift") \
+    .format("io.github.spark_redshift_community.spark.redshift") \
     .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass") \
     .option("dbtable", "my_table") \
     .option("tempdir", "s3n://path/for/temp/data") \
@@ -181,7 +222,7 @@ df = sql_context.read \
 
 # Read data from a query
 df = sql_context.read \
-    .format("com.databricks.spark.redshift") \
+    .format("io.github.spark_redshift_community.spark.redshift") \
     .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass") \
     .option("query", "select x, count(*) my_table group by x") \
     .option("tempdir", "s3n://path/for/temp/data") \
@@ -189,7 +230,7 @@ df = sql_context.read \
 
 # Write back to a table
 df.write \
-  .format("com.databricks.spark.redshift") \
+  .format("io.github.spark_redshift_community.spark.redshift") \
   .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass") \
   .option("dbtable", "my_table_copy") \
   .option("tempdir", "s3n://path/for/temp/data") \
@@ -198,7 +239,7 @@ df.write \
 
 # Using IAM Role based authentication
 df.write \
-  .format("com.databricks.spark.redshift") \
+  .format("io.github.spark_redshift_community.spark.redshift") \
   .option("url", "jdbc:redshift://redshifthost:5439/database?user=username&password=pass") \
   .option("dbtable", "my_table_copy") \
   .option("tempdir", "s3n://path/for/temp/data") \
@@ -213,7 +254,7 @@ Reading data using SQL:
 
 ```sql
 CREATE TABLE my_table
-USING com.databricks.spark.redshift
+USING io.github.spark_redshift_community.spark.redshift
 OPTIONS (
   dbtable 'my_table',
   tempdir 's3n://path/for/temp/data',
@@ -226,7 +267,7 @@ Writing data using SQL:
 ```sql
 -- Create a new table, throwing an error if a table with the same name already exists:
 CREATE TABLE my_table
-USING com.databricks.spark.redshift
+USING io.github.spark_redshift_community.spark.redshift
 OPTIONS (
   dbtable 'my_table',
   tempdir 's3n://path/for/temp/data'
@@ -244,7 +285,7 @@ Reading data using R:
 ```R
 df <- read.df(
    NULL,
-   "com.databricks.spark.redshift",
+   "io.github.spark_redshift_community.spark.redshift",
    tempdir = "s3n://path/for/temp/data",
    dbtable = "my_table",
    url = "jdbc:redshift://redshifthost:5439/database?user=username&password=pass")
@@ -256,7 +297,7 @@ The library contains a Hadoop input format for Redshift tables unloaded with the
 which you may make direct use of as follows:
 
 ```scala
-import com.databricks.spark.redshift.RedshiftInputFormat
+import io.github.spark_redshift_community.spark.redshift.RedshiftInputFormat
 
 val records = sc.newAPIHadoopFile(
   path,
@@ -524,7 +565,7 @@ need to be configured to allow access from your driver application.
     <td><tt>tempdir</tt></td>
     <td>Yes</td>
     <td>No default</td>
-    <td>A writeable location in Amazon S3, to be used for unloaded data when reading and Avro data to be loaded into
+    <td>A writable location in Amazon S3, to be used for unloaded data when reading and Avro data to be loaded into
 Redshift when writing. If you're using Redshift data source for Spark as part of a regular ETL pipeline, it can be useful to
 set a <a href="http://docs.aws.amazon.com/AmazonS3/latest/dev/object-lifecycle-mgmt.html">Lifecycle Policy</a> on a bucket
 and use that as a temp location for this data.
@@ -595,7 +636,7 @@ See also the <tt>description</tt> metadata to set descriptions on individual col
 It may be useful to have some <tt>DELETE</tt> commands or similar run here before loading new data. If the command contains
 <tt>%s</tt>, the table name will be formatted in before execution (in case you're using a staging table).</p>
 
-<p>Be warned that if this commands fail, it is treated as an error and you'll get an exception. If using a staging
+<p>Be warned that if this command fails, it is treated as an error and you'll get an exception. If using a staging
 table, the changes will be reverted and the backup table restored if pre actions fail.</p>
     </td>
  </tr>
@@ -686,7 +727,7 @@ columnLengthMap.foreach { case (colName, length) =>
 }
 
 df.write
-  .format("com.databricks.spark.redshift")
+  .format("io.github.spark_redshift_community.spark.redshift")
   .option("url", jdbcURL)
   .option("tempdir", s3TempDirectory)
   .option("dbtable", sessionTable)
