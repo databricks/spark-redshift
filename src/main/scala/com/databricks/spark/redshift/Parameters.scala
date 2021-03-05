@@ -30,6 +30,7 @@ private[redshift] object Parameters {
     // * sortkeyspec has no default, but is optional
     // * distkey has no default, but is optional unless using diststyle KEY
     // * jdbcdriver has no default, but is optional
+    // * sse_kms_key has no default, but is optional
 
     "forward_spark_s3_credentials" -> "false",
     "tempformat" -> "AVRO",
@@ -285,5 +286,10 @@ private[redshift] object Parameters {
           new BasicSessionCredentials(accessKey, secretAccessKey, sessionToken))
       }
     }
+
+    /**
+     * The AWS SSE-KMS key to use for encryption during UNLOAD operations instead of AWS's default encryption
+     */
+    def sseKmsKey: Option[String] = parameters.get("sse_kms_key")
   }
 }

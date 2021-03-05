@@ -305,6 +305,50 @@ class RedshiftSourceSuite
     mockRedshift.verifyThatExpectedQueriesWereIssued(Seq(expectedQuery))
   }
 
+  test("DefaultSource adds SSE-KMS clause") {
+    // scalastyle:off
+    unloadedData =
+      """
+        |1|t
+        |1|f
+        |0|
+        |0|f
+        ||
+      """.stripMargin.trim
+    // scalastyle:on
+    val kmsKeyId = "abc123"
+    val expectedQuery = (
+      "UNLOAD \\('SELECT \"testbyte\", \"testbool\" FROM \"PUBLIC\".\"test_table\" '\\) " +
+      "TO '.*' " +
+      "WITH CREDENTIALS 'aws_access_key_id=test1;aws_secret_access_key=test2' " +
+      "ESCAPE MANIFEST " +
+      "KMS_KEY_ID 'abc123' ENCRYPTED").r
+    val mockRedshift =
+      new MockRedshift(defaultParams("url"), Map("test_table" -> TestUtils.testSchema))
+    // Construct the source with a custom schema
+    val source = new DefaultSource(mockRedshift.jdbcWrapper, _ => mockS3Client)
+    val params = defaultParams + ("sse_kms_key" -> kmsKeyId)
+    val relation = source.createRelation(testSqlContext, params, TestUtils.testSchema)
+    val resultSchema =
+      StructType(Seq(StructField("testbyte", ByteType), StructField("testbool", BooleanType)))
+
+    val rdd = relation.asInstanceOf[PrunedFilteredScan]
+      .buildScan(Array("testbyte", "testbool"), Array.empty[Filter])
+      .mapPartitions { iter =>
+        val fromRow = RowEncoder(resultSchema).resolveAndBind().fromRow _
+        iter.asInstanceOf[Iterator[InternalRow]].map(fromRow)
+      }
+    val prunedExpectedValues = Array(
+      Row(1.toByte, true),
+      Row(1.toByte, false),
+      Row(0.toByte, null),
+      Row(0.toByte, false),
+      Row(null, null))
+    assert(rdd.collect() === prunedExpectedValues)
+    mockRedshift.verifyThatConnectionsWereClosed()
+    mockRedshift.verifyThatExpectedQueriesWereIssued(Seq(expectedQuery))
+  }
+
   test("DefaultSource supports preactions options to run queries before running COPY command") {
     val mockRedshift = new MockRedshift(
       defaultParams("url"),
