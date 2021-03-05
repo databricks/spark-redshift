@@ -625,6 +625,19 @@ for other options).</p>
 at the end of the command can be used, but that should cover most possible use cases.</p>
     </td>
  </tr>
+  <tr>
+    <td><tt>sse_kms_key</tt></td>
+    <td>No</td>
+    <td>No default</td>
+    <td>
+<p>The KMS key ID to use for server-side encryption in S3 during the Redshift <tt>UNLOAD</tt> operation rather than AWS's default
+encryption. The Redshift IAM role must have access to the KMS key for writing with it, and the Spark IAM role must have access
+to the key for read operations. Reading the encrypted data requires no changes (AWS handles this under-the-hood) so long as
+Spark's IAM role has the proper access.</p> 
+<p>See the <a href="https://docs.aws.amazon.com/redshift/latest/dg/t_unloading_encrypted_files.html">Redshift docs</a>
+for more information.</p>
+    </td>
+ </tr>
  <tr>
     <td><tt>tempformat</tt>  (Experimental)</td>
     <td>No</td>
